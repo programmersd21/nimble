@@ -1,0 +1,14 @@
+fn factorial(n int) -> int:
+    if n <= 1:
+        return 1
+    else:
+        return n * factorial(n - 1)
+
+fn power(base int, exp int) -> int:
+    if exp == 0:
+        return 1
+    else:
+        return base * power(base, exp - 1)
+
+out("5! = {factorial(5)}")
+out("2^8 = {power(2, 8)}")

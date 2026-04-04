@@ -1,0 +1,5 @@
+load net
+
+url = "https://www.example.com"
+body = net.http_get(url)?
+out("fetched {len(body)} characters from {url}")

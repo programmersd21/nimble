@@ -1,0 +1,9 @@
+load list
+
+nums = [9, 3, 7, 1]
+list.sort(nums)?
+out("sorted = {nums}")
+out("first {list.first(nums)?}, last {list.last(nums)?}")
+slice_window = list.slice(nums, 1, 4)
+out("slice 1..4 = {slice_window}")
+out("contains 7? {list.contains(nums, 7)}")

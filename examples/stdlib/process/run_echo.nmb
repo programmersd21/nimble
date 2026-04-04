@@ -1,0 +1,3 @@
+load process
+
+out(process.run("echo Nimble")?)

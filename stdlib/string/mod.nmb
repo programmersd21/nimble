@@ -1,0 +1,32 @@
+# string.nmb
+
+export fn split(s str, delim str) -> [str] = __builtin_str_split(s, delim)
+export fn join(parts [str], sep str) -> str = __builtin_str_join(parts, sep)
+export fn trim(s str) -> str = __builtin_str_trim(s)
+export fn trim_start(s str) -> str = __builtin_str_trim_start(s)
+export fn trim_end(s str) -> str = __builtin_str_trim_end(s)
+export fn upper(s str) -> str = __builtin_str_upper(s)
+export fn lower(s str) -> str = __builtin_str_lower(s)
+export fn contains(s str, sub str) -> bool:
+    return index_of(s, sub) != -1
+export fn starts_with(s str, prefix str) -> bool = __builtin_str_starts_with(s, prefix)
+export fn ends_with(s str, suffix str) -> bool = __builtin_str_ends_with(s, suffix)
+export fn replace(s str, old str, new str) -> str = __builtin_str_replace(s, old, new)
+export fn replace_all(s str, old str, new str) -> str = __builtin_str_replace_all(s, old, new)
+export fn count(s str, sub str) -> int = __builtin_str_count(s, sub)
+export fn index_of(s str, sub str) -> int = __builtin_str_index_of(s, sub)
+export fn slice(s str, start int, end int) -> str = __builtin_str_slice(s, start, end)
+export fn repeat(s str, n int) -> str = __builtin_str_repeat(s, n)
+export fn pad_left(s str, width int, char str) -> str = __builtin_str_pad_left(s, width, char)
+export fn pad_right(s str, width int, char str) -> str = __builtin_str_pad_right(s, width, char)
+export fn to_int(s str) -> int | error = __builtin_str_to_int(s)
+export fn to_float(s str) -> float | error = __builtin_str_to_float(s)
+export fn from_int(n int) -> str = __builtin_str_from_int(n)
+export fn from_float(f float) -> str = __builtin_str_from_float(f)
+export fn chars(s str) -> [str] = __builtin_str_chars(s)
+export fn len(s str) -> int = __builtin_str_len(s)
+export fn is_empty(s str) -> bool:
+    return __builtin_str_len(s) == 0
+export fn is_numeric(s str) -> bool = __builtin_str_is_numeric(s)
+export fn is_alpha(s str) -> bool = __builtin_str_is_alpha(s)
+export fn format(template str, args [str]) -> str = __builtin_str_format(template, args)

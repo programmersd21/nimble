@@ -1,0 +1,4 @@
+load process
+
+output = process.run("echo Nimble rocks")?
+out("process output: {output}")

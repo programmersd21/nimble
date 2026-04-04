@@ -1,0 +1,12 @@
+load list
+
+numbers = [3, 1, 4, 1, 5, 9, 2]
+list.sort(numbers)?
+out("sorted = {numbers}")
+evens = []
+for n in numbers:
+    if n % 2 == 0:
+        list.push(evens, n)?
+out("evens = {evens}")
+list.reverse(numbers)?
+out("reversed = {numbers}")

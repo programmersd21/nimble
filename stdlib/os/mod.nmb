@@ -1,0 +1,3 @@
+# os.nmb
+export fn args() -> [str] = __builtin_os_args()
+export fn exit(code int) = __builtin_os_exit(code)

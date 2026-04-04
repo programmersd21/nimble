@@ -1,0 +1,9 @@
+load map
+
+profile = {"name": "Nim", "role": "engineer"}
+if map.has(profile, "name"):
+    out("Name: {profile[\"name\"]}")
+keys = map.keys(profile)
+values = map.values(profile)
+out("keys: {keys}")
+out("values: {values}")

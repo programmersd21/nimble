@@ -1,0 +1,8 @@
+load regex
+
+text = "nimble 101: blazing interpreters"
+pattern = "(\\\\w+) (\\\\d+)"
+matches = regex.matches(pattern, text)
+out("found matches: {matches}")
+first = regex.find(pattern, text)?
+out("first match: {first}")

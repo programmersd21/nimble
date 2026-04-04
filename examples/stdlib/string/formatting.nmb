@@ -1,0 +1,7 @@
+load string
+
+name = "Nimble"
+score = 42
+out("{name} scored {score}")
+out("upper: {string.upper(name)}")
+out("padded: {string.pad_left(name, 10, '-')}")

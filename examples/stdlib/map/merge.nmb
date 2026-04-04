@@ -1,0 +1,8 @@
+load map
+
+defaults = {"timeout": 30, "tries": 3, "debug": false}
+overrides = {"debug": true, "timeout": 60}
+for key in map.keys(overrides):
+    defaults[key] = overrides[key]
+out("merged config = {defaults}")
+out("keys = {map.keys(defaults)}")

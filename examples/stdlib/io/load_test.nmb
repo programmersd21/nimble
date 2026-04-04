@@ -1,0 +1,4 @@
+load io
+
+exists = io.exists("Cargo.toml")
+out("Cargo exists? {exists}")

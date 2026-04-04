@@ -1,0 +1,7 @@
+load math
+
+out("PI ≈ {math.PI}")
+out("div 14/3 = {math.div(14.0, 3.0)?}")
+out("sqrt(25) = {math.sqrt(25.0)?}")
+out("clamp -2 -> {math.clamp(-2.0, 0.0, 5.0)}")
+out("rand int 1..10 = {math.rand_int(1, 10)?}")

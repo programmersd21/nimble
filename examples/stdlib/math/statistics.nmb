@@ -1,0 +1,18 @@
+load math
+load list
+
+values = [3, 7, 9, 2]
+sum = 0
+for n in values:
+    sum = sum + n
+mean = sum / len(values)
+diffs = []
+for n in values:
+    diff = n - mean
+    list.push(diffs, diff * diff)?
+variance = 0
+for d in diffs:
+    variance = variance + d
+variance = variance / len(values)
+stddev = math.sqrt(variance)?
+out("mean = {mean}, stddev ≈ {stddev}")

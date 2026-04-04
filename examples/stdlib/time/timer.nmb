@@ -1,0 +1,6 @@
+load time
+
+start = time.now()
+time.sleep(50)
+elapsed = time.now() - start
+out("slept at least 50ms: {elapsed} ms")

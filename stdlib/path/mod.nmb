@@ -1,0 +1,2 @@
+# path.nmb
+export fn join(parts [str]) -> str = __builtin_path_join(parts)

@@ -1,0 +1,4 @@
+# json.nmb
+export fn parse(s str) -> {str: str} | error = __builtin_json_parse(s)
+export fn stringify(data {str: T}) -> str | error = __builtin_json_stringify(data)
+export fn pretty(data {str: T}) -> str | error = __builtin_json_pretty(data)

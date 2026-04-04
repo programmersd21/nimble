@@ -1,0 +1,10 @@
+load string
+
+raw = "  Nimble  "
+repeat_pattern = "yo"
+contains_target = "im"
+
+out("trim: '{string.trim(raw)}'")
+out("upper: {string.upper(raw)}")
+out("repeat: {string.repeat(repeat_pattern, 3)}")
+out("contains {contains_target}? {string.contains(raw, contains_target)}")

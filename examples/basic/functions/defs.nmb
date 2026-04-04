@@ -1,0 +1,11 @@
+fn greet(name str) -> str:
+    return "Hello, {name}!"
+
+fn repeat(msg str, times int) -> str:
+    result = ""
+    for i in 0..times:
+        result = result + msg
+    return result
+
+out(greet("Nimble"))
+out(repeat("🚀 ", 3))

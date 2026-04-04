@@ -1,0 +1,4 @@
+load path
+segments = ["examples", "basic", "control", "conditionals.nmb"]
+joined = path.join(segments)
+out("joined path: {joined}")

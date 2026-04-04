@@ -1,0 +1,10 @@
+load json
+
+config = {"env": "dev", "port": 8080, "version": "1.0", "features": ["fast", "safe"]}
+
+serialized = json.stringify(config)?
+pretty = json.pretty(config)?
+
+out("serialized = {serialized}")
+out("pretty = {pretty}")
+out("env = {config['env']}")

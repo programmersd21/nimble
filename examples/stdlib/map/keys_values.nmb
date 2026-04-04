@@ -1,0 +1,7 @@
+load map
+
+scores = {"alice": 9, "bob": 12, "carl": 7}
+if map.has(scores, "bob"):
+    out("bob scored {scores[\"bob\"]}")
+out("all keys: {map.keys(scores)}")
+out("all values: {map.values(scores)}")

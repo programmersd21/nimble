@@ -1,0 +1,7 @@
+# regex.nmb
+export fn matches(pattern str, s str) -> bool = __builtin_regex_matches(pattern, s)
+export fn find(pattern str, s str) -> str | error = __builtin_regex_find(pattern, s)
+export fn find_all(pattern str, s str) -> [str] | error = __builtin_regex_find_all(pattern, s)
+export fn replace(pattern str, s str, replacement str) -> str | error = __builtin_regex_replace(pattern, s, replacement)
+export fn replace_all(pattern str, s str, replacement str) -> str | error = __builtin_regex_replace_all(pattern, s, replacement)
+export fn split(pattern str, s str) -> [str] | error = __builtin_regex_split(pattern, s)

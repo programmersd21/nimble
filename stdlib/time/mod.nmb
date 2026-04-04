@@ -1,0 +1,3 @@
+# time.nmb
+export fn now() -> int = __builtin_time_now()
+export fn sleep(ms int) = __builtin_time_sleep(ms)

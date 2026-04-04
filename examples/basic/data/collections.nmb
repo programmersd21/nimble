@@ -1,0 +1,19 @@
+load list
+load map
+
+friends = ["alice", "bob", "claire"]
+list.push(friends, "dan")?
+list.sort(friends)?
+out("friends: {friends}")
+
+scores = {"alice": 10, "bob": 12, "claire": 7}
+scores["dan"] = 8
+out("everyone: {map.keys(scores)}")
+
+total = 0
+for name in map.keys(scores):
+    total = total + scores[name]
+out("total score: {total}")
+
+popped = list.pop(friends)?
+out("remove: {popped}")

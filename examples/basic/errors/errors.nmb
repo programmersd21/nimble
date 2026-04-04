@@ -1,0 +1,7 @@
+fn safe_div(a int, b int) -> int | error:
+    if b == 0:
+        return error("division by zero")
+    return a / b
+
+result = safe_div(10, 2)?
+out("safe division: {result}")

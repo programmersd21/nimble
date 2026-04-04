@@ -1,0 +1,5 @@
+load net
+load string
+
+body = net.http_get("https://www.example.com")?
+out("snippet: {string.slice(body, 0, 60)}")

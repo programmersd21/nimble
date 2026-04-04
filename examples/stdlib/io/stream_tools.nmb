@@ -1,0 +1,12 @@
+load io
+
+sample = "examples/stdlib/io/sample.txt"
+if not io.exists(sample):
+    error("missing sample file")?
+
+lines = io.read_lines(sample)?
+out("{len(lines)} lines read from {sample}")
+io.write_lines("examples/stdlib/io/sample_copy.txt", lines)?
+bytes = io.read_bytes(sample)?
+out("read {len(bytes)} bytes as raw data")
+io.write_bytes("examples/stdlib/io/sample_copy.bin", bytes)?

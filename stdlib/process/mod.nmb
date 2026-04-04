@@ -1,0 +1,2 @@
+# process.nmb
+export fn run(cmd str) -> str | error = __builtin_process_run(cmd)

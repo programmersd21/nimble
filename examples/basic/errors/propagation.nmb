@@ -1,0 +1,10 @@
+load io
+
+fn first_line(path str) -> str | error:
+    lines = io.read_lines(path)?
+    if len(lines) == 0:
+        return error("{path} has no lines")
+    return lines[0]
+
+result = first_line("examples/stdlib/io/sample.txt")?
+out("sample first line: {result}")

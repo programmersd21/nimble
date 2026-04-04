@@ -1,0 +1,29 @@
+# math.nmb
+
+export fn add(a float, b float) -> float = a + b
+export fn sub(a float, b float) -> float = a - b
+export fn mul(a float, b float) -> float = a * b
+export fn div(a float, b float) -> float | error:
+    if b == 0.0:
+        return error("division by zero")
+    return a / b
+
+export fn pow(base float, exp float) -> float = __builtin_math_pow(base, exp)
+export fn sqrt(x float) -> float | error = __builtin_math_sqrt(x)
+export fn abs(x float) -> float = __builtin_math_abs(x)
+export fn floor(x float) -> float = __builtin_math_floor(x)
+export fn ceil(x float) -> float = __builtin_math_ceil(x)
+export fn round(x float) -> float = __builtin_math_round(x)
+export fn min(a float, b float) -> float = __builtin_math_min(a, b)
+export fn max(a float, b float) -> float = __builtin_math_max(a, b)
+export fn clamp(x float, lo float, hi float) -> float = __builtin_math_clamp(x, lo, hi)
+export fn log(x float) -> float | error = __builtin_math_log(x)
+export fn log2(x float) -> float | error = __builtin_math_log2(x)
+export fn sin(x float) -> float = __builtin_math_sin(x)
+export fn cos(x float) -> float = __builtin_math_cos(x)
+export fn tan(x float) -> float = __builtin_math_tan(x)
+export fn random() -> float = __builtin_math_random()
+export fn rand_int(lo int, hi int) -> int | error = __builtin_math_rand_int(lo, hi)
+
+export PI float = 3.141592653589793
+export E  float = 2.718281828459045

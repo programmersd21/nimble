@@ -1,0 +1,14 @@
+load time
+
+fn countdown(n int):
+    while n > 0:
+        out("{n}...")
+        time.sleep(250)
+        n = n - 1
+    out("lift off!")
+
+start = time.now()
+countdown(3)
+finish = time.now()
+elapsed = finish - start
+out("elapsed {elapsed} ms")

@@ -1,0 +1,6 @@
+load path
+
+base = "examples/stdlib/io"
+file = "sample.txt"
+full = path.join([base, file])?
+out("resolved path: {full}")

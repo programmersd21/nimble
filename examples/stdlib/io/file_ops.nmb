@@ -1,0 +1,13 @@
+load io
+
+path = "examples/stdlib/io/sample.txt"
+lines = ["first line", "second line", "third line"]
+out("ready to write")
+io.write_lines(path, lines)?
+out("done writing")
+out("checking exists")
+if io.exists(path):
+    out("reading file")
+    read = io.read_lines(path)?
+    for line in read:
+        out("line: {line}")

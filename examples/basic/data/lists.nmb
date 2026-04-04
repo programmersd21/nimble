@@ -1,0 +1,10 @@
+load list
+
+nums = [5, 2, 4, 1]
+list.push(nums, 3)
+list.sort(nums)?
+window = list.slice(nums, 1, 4)
+out("sorted + pushed = {nums}")
+out("window = {window}")
+out("contains 4? {list.contains(nums, 4)}")
+out("popped = {list.pop(nums)?}")

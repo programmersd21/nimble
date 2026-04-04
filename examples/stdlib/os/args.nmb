@@ -1,0 +1,8 @@
+load os
+
+args = os.args()
+if len(args) == 0:
+    out("no arguments")
+else:
+    for arg in args:
+        out("arg: {arg}")

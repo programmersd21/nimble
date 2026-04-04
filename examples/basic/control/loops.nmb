@@ -1,0 +1,12 @@
+fn sum_range(start int, end int):
+    total = 0
+    for i in start..end:
+        total = total + i
+    out("sum {start}..{end} = {total}")
+
+sum_range(1, 5)
+
+count = 0
+while count < 3:
+    out("loop {count}")
+    count = count + 1

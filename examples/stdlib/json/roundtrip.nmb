@@ -1,0 +1,11 @@
+load json
+load io
+
+config = {"name": "nimble", "version": "0.1.0", "features": ["fast", "fun"]}
+text = json.stringify(config)?
+out("json = {text}")
+parsed = json.parse(text)?
+parsed["version"] = "0.2.0"
+out("updated = {json.stringify(parsed)}")
+pretty = json.pretty(parsed)?
+out("pretty:\n{pretty}")

@@ -1,0 +1,23 @@
+# io.nmb
+
+export fn read_file(path str) -> str | error = __builtin_io_read_file(path)
+export fn write_file(path str, content str) -> error | null = __builtin_io_write_file(path, content)
+export fn append_file(path str, content str) -> error | null = __builtin_io_append_file(path, content)
+export fn delete_file(path str) -> error | null = __builtin_io_delete_file(path)
+export fn read_lines(path str) -> [str] | error = __builtin_io_read_lines(path)
+export fn write_lines(path str, lines [str]) -> error | null = __builtin_io_write_lines(path, lines)
+export fn read_bytes(path str) -> [int] | error = __builtin_io_read_bytes(path)
+export fn write_bytes(path str, data [int]) -> error | null = __builtin_io_write_bytes(path, data)
+export fn copy_file(src str, dst str) -> error | null = __builtin_io_copy_file(src, dst)
+
+export fn stdin() -> str:
+    return input()
+
+export fn stdout(data str):
+    out(data)
+
+export fn stderr(data str):
+    __builtin_io_stderr(data)
+
+export fn exists(path str) -> bool:
+    return __builtin_file_exists(path)
