@@ -2,7 +2,9 @@ use clap::{Parser as ClapParser, Subcommand};
 use colored::Colorize;
 use miette::Report;
 use nimble_core::compiler::Compiler;
-use nimble_core::error::{install_diagnostic_hook, print_diagnostic, report_for_span, DiagnosticKind};
+use nimble_core::error::{
+    install_diagnostic_hook, print_diagnostic, report_for_span, DiagnosticKind,
+};
 use nimble_core::lexer::Lexer;
 use nimble_core::parser::{ast::Stmt, Parser};
 use nimble_core::repl;

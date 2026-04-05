@@ -1,4 +1,5 @@
 pub mod compiler;
+pub mod compiler_legacy;
 pub mod error;
 pub mod jit;
 pub mod lexer;

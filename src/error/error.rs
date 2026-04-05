@@ -1,5 +1,5 @@
-use colored::{Color, Colorize};
 use crate::lexer::Span;
+use colored::{Color, Colorize};
 use miette::highlighters::SyntectHighlighter;
 use miette::{Diagnostic, GraphicalReportHandler, NamedSource, Report, SourceSpan};
 use once_cell::sync::Lazy;

@@ -1,33 +1,27 @@
-use crate::compiler::bytecode::{FunctionChunk, Reg};
+use crate::compiler::bytecode::Chunk;
 use crate::vm::Value;
-use std::path::PathBuf;
 use std::sync::Arc;
 
 pub struct CallFrame {
-    pub chunk: Arc<FunctionChunk>,
+    pub chunk: Arc<Chunk>,
     pub ip: usize,
-    pub registers: Vec<Value>,
-    pub return_reg: Option<Reg>,
-    pub module_dir: PathBuf,
+    pub registers: [Value; 256],
 }
 
 impl CallFrame {
-    pub fn new(chunk: Arc<FunctionChunk>, module_dir: PathBuf, return_reg: Option<Reg>) -> Self {
-        let num_regs = chunk.num_registers as usize;
+    pub fn new(chunk: Arc<Chunk>) -> Self {
         Self {
             chunk,
             ip: 0,
-            registers: vec![Value::Null; num_regs],
-            return_reg,
-            module_dir,
+            registers: std::array::from_fn(|_| Value::Null),
         }
     }
 
-    pub fn get_reg(&self, reg: Reg) -> Value {
-        self.registers[reg.0 as usize].clone()
+    pub fn get(&self, reg: u8) -> Value {
+        self.registers[reg as usize].clone()
     }
 
-    pub fn set_reg(&mut self, reg: Reg, val: Value) {
-        self.registers[reg.0 as usize] = val;
+    pub fn set(&mut self, reg: u8, value: Value) {
+        self.registers[reg as usize] = value;
     }
 }

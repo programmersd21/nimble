@@ -1,10 +1,10 @@
-use colored::Colorize;
 use crate::compiler::Compiler;
 use crate::error::report_for_span;
 use crate::lexer::Lexer;
 use crate::parser::Parser;
 use crate::vm::Value;
 use crate::vm::VM;
+use colored::Colorize;
 use miette::Report;
 use rustyline::error::ReadlineError;
 use rustyline::DefaultEditor;

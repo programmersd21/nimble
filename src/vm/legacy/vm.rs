@@ -1,7 +1,7 @@
 use crate::compiler::bytecode::Instr;
 use crate::modules::resolver::ModuleResolver;
 use crate::vm::builtins;
-use crate::vm::frame::CallFrame;
+use crate::vm::legacy::frame::CallFrame;
 use crate::vm::Value;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
