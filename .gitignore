@@ -8,6 +8,7 @@ Cargo.lock
 result.txt
 examples/stdlib/io/sample_copy.txt
 examples/stdlib/io/sample_copy.bin
+local/
 
 # OS/IDE
 .DS_Store
