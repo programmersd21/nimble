@@ -14,6 +14,7 @@ pub fn start() -> NimbleResult<()> {
     let mut rl = DefaultEditor::new()
         .map_err(|error| miette::Report::msg(format!("failed to start the REPL: {error}")))?;
     let mut vm = VM::new();
+    let mut inferencer = Inferencer::new();
 
     println!("Nimble v0.1.0");
     println!("Type :help for commands");
@@ -43,7 +44,7 @@ pub fn start() -> NimbleResult<()> {
                     continue;
                 }
 
-                if let Err(report) = execute_line(&line, &mut vm) {
+                if let Err(report) = execute_line(&line, &mut vm, &mut inferencer) {
                     emit_report(&report);
                 }
             }
@@ -82,17 +83,16 @@ fn parse_source(source_file: &SourceFile) -> NimbleResult<Vec<Stmt>> {
     })
 }
 
-fn type_check(source_file: &SourceFile, stmts: &[Stmt]) -> NimbleResult<()> {
-    let mut inferencer = Inferencer::new();
+fn type_check(source_file: &SourceFile, stmts: &[Stmt], inferencer: &mut Inferencer) -> NimbleResult<()> {
     inferencer
         .infer_stmts(stmts)
         .map_err(|error| miette::Report::new(NimbleError::from_semantic(source_file, error)))
 }
 
-fn execute_line(line: &str, vm: &mut VM) -> NimbleResult<()> {
+fn execute_line(line: &str, vm: &mut VM, inferencer: &mut Inferencer) -> NimbleResult<()> {
     let source_file = SourceFile::new("<repl>", format!("{line}\n"));
     let stmts = parse_source(&source_file)?;
-    type_check(&source_file, &stmts)?;
+    type_check(&source_file, &stmts, inferencer)?;
 
     let mut compiler = Compiler::new("repl".into());
     let chunk = compiler.compile_stmts(&stmts);

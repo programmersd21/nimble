@@ -224,7 +224,7 @@ pub enum SemanticError {
 #[derive(Debug, Error, Diagnostic)]
 pub enum NimbleError {
     #[error("failed to read `{path}`")]
-    #[diagnostic(code(nimble::io::read_file))]
+    #[diagnostic(code(io_error))]
     Io {
         path: String,
         #[source]
@@ -232,7 +232,7 @@ pub enum NimbleError {
     },
 
     #[error("invalid token `{found}`")]
-    #[diagnostic(code(nimble::lexer::invalid_token))]
+    #[diagnostic(code(lexer_error))]
     InvalidToken {
         found: String,
         #[source_code]
@@ -244,7 +244,7 @@ pub enum NimbleError {
     },
 
     #[error("unterminated string literal")]
-    #[diagnostic(code(nimble::lexer::unterminated_string))]
+    #[diagnostic(code(syntax_error))]
     UnterminatedString {
         #[source_code]
         src: NamedSource,
@@ -255,7 +255,7 @@ pub enum NimbleError {
     },
 
     #[error("unexpected token")]
-    #[diagnostic(code(nimble::parser::unexpected_token))]
+    #[diagnostic(code(syntax_error))]
     UnexpectedToken {
         expected: String,
         found: String,
@@ -268,7 +268,7 @@ pub enum NimbleError {
     },
 
     #[error("missing delimiter `{delimiter}`")]
-    #[diagnostic(code(nimble::parser::missing_delimiter))]
+    #[diagnostic(code(syntax_error))]
     MissingDelimiter {
         delimiter: String,
         #[source_code]
@@ -280,7 +280,7 @@ pub enum NimbleError {
     },
 
     #[error("type mismatch: expected {expected}, found {found}")]
-    #[diagnostic(code(nimble::semantic::type_mismatch))]
+    #[diagnostic(code(type_error))]
     TypeMismatch {
         expected: String,
         found: String,
@@ -295,7 +295,7 @@ pub enum NimbleError {
     },
 
     #[error("cannot find `{name}` in this scope")]
-    #[diagnostic(code(nimble::semantic::undefined_variable))]
+    #[diagnostic(code(name_error))]
     UndefinedVariable {
         name: String,
         #[source_code]
@@ -307,7 +307,7 @@ pub enum NimbleError {
     },
 
     #[error("{message}")]
-    #[diagnostic(code(nimble::diagnostic::generic))]
+    #[diagnostic(code(error))]
     Generic {
         message: String,
         #[source_code]
@@ -320,7 +320,7 @@ pub enum NimbleError {
     },
 
     #[error("{message}")]
-    #[diagnostic(code(nimble::pipeline::multiple_errors))]
+    #[diagnostic(code(multiple_errors))]
     Multiple {
         message: String,
         #[source_code]
@@ -332,7 +332,7 @@ pub enum NimbleError {
     },
 
     #[error("runtime error: {message}")]
-    #[diagnostic(code(nimble::runtime::error))]
+    #[diagnostic(code(runtime_error))]
     Runtime {
         message: String,
         #[source_code]
