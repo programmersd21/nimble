@@ -465,12 +465,12 @@ pub fn install_diagnostic_hook() {
             Box::new(
                 GraphicalReportHandler::new()
                     .with_theme(GraphicalTheme::unicode())
-                    .with_width(140)
-                    .with_context_lines(5)
-                    .with_tab_width(4)
-                    .with_links(true)
+                    .with_width(80)
+                    .with_context_lines(2)
+                    .with_tab_width(2)
+                    .with_links(false)
                     .with_cause_chain()
-                    .with_code(true),
+                    .with_code(false),
             )
         }));
     });
