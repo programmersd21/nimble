@@ -4,7 +4,7 @@
 //! and type feedback to drive tiered JIT compilation decisions.
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
 
 // ── Function Profile ──────────────────────────────────────────────────────────
@@ -46,6 +46,7 @@ impl FunctionProfile {
     pub fn new() -> Self {
         Self {
             entry_count: AtomicU32::new(0),
+            is_jit_queued: AtomicBool::new(false),
             loop_backedge_count: AtomicU32::new(0),
             sample_count: AtomicU32::new(0),
             total_time_us: AtomicU64::new(0),
@@ -379,4 +380,4 @@ impl TypeIdProvider {
     }
 }
 
-use std::sync::atomic::AtomicBool;
+
