@@ -9,10 +9,16 @@ pub struct CallFrame {
     pub registers: Vec<Value>,
     pub return_reg: Option<Reg>,
     pub module_dir: PathBuf,
+    pub func_id: u32,
 }
 
 impl CallFrame {
-    pub fn new(chunk: Arc<FunctionChunk>, module_dir: PathBuf, return_reg: Option<Reg>) -> Self {
+    pub fn new(
+        chunk: Arc<FunctionChunk>,
+        module_dir: PathBuf,
+        return_reg: Option<Reg>,
+        func_id: u32,
+    ) -> Self {
         let num_regs = (chunk.num_registers as usize).max(64);
         Self {
             chunk,
@@ -20,6 +26,7 @@ impl CallFrame {
             registers: vec![Value::Null; num_regs],
             return_reg,
             module_dir,
+            func_id,
         }
     }
 

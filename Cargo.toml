@@ -1,6 +1,6 @@
 [package]
 name = "nimble"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 
 [dependencies]
@@ -20,6 +20,10 @@ libloading = "0.8"
 
 # JIT Dependencies
 # (removed)
+
+[[bin]]
+name = "simple_bench"
+path = "benches/simple_bench.rs"
 
 [lib]
 name = "nimble"

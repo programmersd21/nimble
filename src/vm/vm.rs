@@ -1,42 +1,79 @@
 use crate::compiler::bytecode::{CallArgDesc, FunctionChunk, Instr, Reg};
+use crate::compiler::jit::JitCoordinator;
 use crate::modules::resolver::ModuleResolver;
 use crate::vm::frame::CallFrame;
-use crate::vm::Value;
+use crate::vm::profiling::ProfileRegistry;
+use crate::vm::safepoint::{SafepointCheck, SafepointCoordinator};
+use crate::vm::tier::{TierManager, TierState};
+use crate::vm::value::{StructData, Value};
+use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
 type RuntimeCallArg = (Option<String>, Value);
 
+#[allow(dead_code)]
 pub struct VM {
     frames: Vec<CallFrame>,
     pub globals: HashMap<String, Value>,
     module_cache: Arc<Mutex<HashMap<String, Value>>>,
     resolver: ModuleResolver,
     script_args: Vec<String>,
+    profile_registry: Arc<ProfileRegistry>,
+    tier_manager: Arc<TierManager>,
+    jit: JitCoordinator,
+    tier_states: Arc<Mutex<HashMap<u32, Arc<TierState>>>>,
+    safepoint: SafepointCoordinator,
+    safepoint_check: SafepointCheck,
 }
 
 impl VM {
     pub fn new() -> Self {
+        let profile_registry = Arc::new(ProfileRegistry::new());
+        let tier_manager = Arc::new(TierManager::new());
+        let jit = JitCoordinator::new();
+        let safepoint = SafepointCoordinator::new(1);
+        let safepoint_check = SafepointCheck::new(safepoint.request_clone());
+
         let mut vm = Self {
             frames: Vec::new(),
             globals: HashMap::new(),
             module_cache: Arc::new(Mutex::new(HashMap::new())),
             resolver: ModuleResolver::new(),
             script_args: Vec::new(),
+            profile_registry,
+            tier_manager,
+            jit,
+            tier_states: Arc::new(Mutex::new(HashMap::new())),
+            safepoint,
+            safepoint_check,
         };
         vm.install_builtins();
         vm
     }
 
-    fn with_shared_cache(cache: Arc<Mutex<HashMap<String, Value>>>) -> Self {
+    fn with_shared_cache(
+        cache: Arc<Mutex<HashMap<String, Value>>>,
+        profile_registry: Arc<ProfileRegistry>,
+        tier_manager: Arc<TierManager>,
+        safepoint: SafepointCoordinator,
+    ) -> Self {
+        let safepoint_check = SafepointCheck::new(safepoint.request_clone());
         let mut vm = Self {
             frames: Vec::new(),
             globals: HashMap::new(),
             module_cache: cache,
             resolver: ModuleResolver::new(),
             script_args: Vec::new(),
+            profile_registry,
+            tier_manager,
+            jit: JitCoordinator::new(),
+            tier_states: Arc::new(Mutex::new(HashMap::new())),
+            safepoint,
+            safepoint_check,
         };
         vm.install_builtins();
         vm
@@ -58,7 +95,7 @@ impl VM {
         chunk: Arc<FunctionChunk>,
         module_dir: PathBuf,
     ) -> Result<Value, String> {
-        self.frames.push(CallFrame::new(chunk, module_dir, None));
+        self.frames.push(self.create_frame(chunk, module_dir, None));
         self.execute()
     }
 
@@ -83,7 +120,12 @@ impl VM {
         let module_dir = path.parent().unwrap_or(Path::new(".")).to_path_buf();
         let exports = chunk.exports.clone();
 
-        let mut module_vm = VM::with_shared_cache(self.module_cache.clone());
+        let mut module_vm = VM::with_shared_cache(
+            self.module_cache.clone(),
+            self.profile_registry.clone(),
+            self.tier_manager.clone(),
+            self.safepoint.clone(),
+        );
         module_vm.script_args = self.script_args.clone();
         module_vm.run_with_dir(chunk, module_dir)?;
 
@@ -116,6 +158,41 @@ impl VM {
             .last()
             .map(|f| f.module_dir.clone())
             .unwrap_or_else(|| PathBuf::from("."))
+    }
+
+    fn compute_func_id(chunk: &Arc<FunctionChunk>) -> u32 {
+        let mut hasher = DefaultHasher::new();
+        chunk.name.hash(&mut hasher);
+        chunk.num_registers.hash(&mut hasher);
+        chunk.instrs.len().hash(&mut hasher);
+        chunk.names.hash(&mut hasher);
+        (hasher.finish() as u32).wrapping_add(0x9E37_179B)
+    }
+
+    fn create_frame(
+        &self,
+        chunk: Arc<FunctionChunk>,
+        module_dir: PathBuf,
+        return_reg: Option<Reg>,
+    ) -> CallFrame {
+        let func_id = Self::compute_func_id(&chunk);
+        let profile = self.profile_registry.get_or_create(func_id);
+        if profile.record_entry() {
+            if !profile.is_jit_queued.swap(true, std::sync::atomic::Ordering::SeqCst) {
+                self.jit.enqueue_tier1(func_id);
+                // Temporary: Log to confirm trigger
+                println!("JIT Tier 1 triggered for func_id: {}", func_id);
+            }
+        }
+        CallFrame::new(chunk, module_dir, return_reg, func_id)
+    }
+
+    #[allow(dead_code)]
+    fn ensure_tier_state(&self, func_id: u32) -> Arc<TierState> {
+        self.tier_states.lock().unwrap()
+            .entry(func_id)
+            .or_insert_with(|| Arc::new(TierState::new()))
+            .clone()
     }
 
     fn collect_call_args(frame: &CallFrame, args: &[CallArgDesc]) -> Vec<RuntimeCallArg> {
@@ -221,12 +298,13 @@ impl VM {
 
     fn execute(&mut self) -> Result<Value, String> {
         loop {
-            let mut frame = match self.frames.pop() {
+            let frame = match self.frames.last_mut() {
                 Some(f) => f,
                 None => return Ok(Value::Null),
             };
 
             if frame.ip >= frame.chunk.instrs.len() {
+                let frame = self.frames.pop().unwrap();
                 if let Some(ret) = self.return_from_frame(Value::Null, frame.return_reg) {
                     return Ok(ret);
                 }
@@ -235,7 +313,6 @@ impl VM {
 
             let instr = frame.chunk.instrs[frame.ip].clone();
             frame.ip += 1;
-            self.frames.push(frame);
 
             match instr {
                 Instr::LoadConst { dst, idx } => {
@@ -271,6 +348,8 @@ impl VM {
                     };
                     frame.set_reg(dst, res);
                 }
+                // ... (other instructions continue)
+
                 Instr::SubInt { dst, a, b } => {
                     let frame = self.frames.last_mut().unwrap();
                     let res = match (frame.get_reg(a), frame.get_reg(b)) {
@@ -480,7 +559,7 @@ impl VM {
                             }
                         }
                         Value::Function(c) => {
-                            let mut new_frame = CallFrame::new(c, module_dir, dst);
+                            let mut new_frame = self.create_frame(c, module_dir, dst);
                             let bound =
                                 Self::bind_named_args(&new_frame.chunk.param_names, arg_vals)?;
                             for (i, v) in bound.into_iter().enumerate() {
@@ -497,10 +576,10 @@ impl VM {
                                     bound.get(i).cloned().unwrap_or(Value::Null),
                                 );
                             }
-                            let val = Value::Struct {
+                            let val = Value::Struct(Box::new(StructData {
                                 class: name,
                                 fields: Arc::new(Mutex::new(map)),
-                            };
+                            }));
                             if let Some(d) = dst {
                                 self.frames.last_mut().unwrap().set_reg(d, val);
                             }
@@ -509,7 +588,7 @@ impl VM {
                     }
                 }
                 Instr::Spawn { callee, args } => {
-                    let (func, arg_vals, globals, cache, script_args, mdir) = {
+                    let (func, arg_vals, globals, cache, script_args, mdir, profile, tier, safe) = {
                         let frame = self.frames.last().unwrap();
                         (
                             frame.get_reg(callee),
@@ -518,10 +597,13 @@ impl VM {
                             self.module_cache.clone(),
                             self.script_args.clone(),
                             frame.module_dir.clone(),
+                            self.profile_registry.clone(),
+                            self.tier_manager.clone(),
+                            self.safepoint.clone(),
                         )
                     };
                     thread::spawn(move || {
-                        let mut vm = VM::with_shared_cache(cache);
+                        let mut vm = VM::with_shared_cache(cache, profile, tier, safe);
                         vm.globals = globals;
                         vm.script_args = script_args;
                         let _ = vm.invoke(func, arg_vals, mdir);
@@ -572,10 +654,10 @@ impl VM {
                     }
                     frame.set_reg(
                         dst,
-                        Value::Struct {
+                        Value::Struct(Box::new(StructData {
                             class: Arc::new(class_name),
                             fields: Arc::new(Mutex::new(map)),
-                        },
+                        })),
                     );
                 }
                 Instr::Len { dst, src } => {
@@ -631,7 +713,7 @@ impl VM {
                     let field_name = frame.chunk.names[field.0 as usize].clone();
                     let obj_val = frame.get_reg(obj);
                     let val = match obj_val {
-                        Value::Struct { fields, .. } => fields
+                        Value::Struct(data) => data.fields
                             .lock()
                             .unwrap()
                             .get(&field_name)
@@ -654,8 +736,8 @@ impl VM {
                     let obj_val = frame.get_reg(obj);
                     let val = frame.get_reg(src);
                     match obj_val {
-                        Value::Struct { fields, .. } => {
-                            fields.lock().unwrap().insert(field_name, val);
+                        Value::Struct(data) => {
+                            data.fields.lock().unwrap().insert(field_name, val);
                         }
                         Value::Map(m) => {
                             m.lock().unwrap().insert(field_name, val);
@@ -817,7 +899,7 @@ impl VM {
                 Ok(f(self, args.into_iter().map(|(_, value)| value).collect()))
             }
             Value::Function(c) => {
-                let mut frame = CallFrame::new(c, module_dir, None);
+                let mut frame = self.create_frame(c, module_dir, None);
                 let bound = Self::bind_named_args(&frame.chunk.param_names, args)?;
                 for (i, v) in bound.into_iter().enumerate() {
                     frame.set_reg(Reg(i as u8), v);
@@ -831,10 +913,10 @@ impl VM {
                 for (i, field) in fields.iter().enumerate() {
                     map.insert(field.clone(), bound.get(i).cloned().unwrap_or(Value::Null));
                 }
-                Ok(Value::Struct {
+                Ok(Value::Struct(Box::new(StructData {
                     class: name,
                     fields: Arc::new(Mutex::new(map)),
-                })
+                })))
             }
             _ => Err("Not a function".into()),
         }

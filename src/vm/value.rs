@@ -29,14 +29,17 @@ pub enum Value {
         name: Arc<String>,
         fields: Vec<String>,
     },
-    Struct {
-        class: Arc<String>,
-        fields: Arc<Mutex<HashMap<String, Value>>>,
-    },
+    Struct(Box<StructData>),
     Iterator {
         items: Arc<Mutex<Vec<Value>>>,
         pos: Arc<Mutex<usize>>,
     },
+}
+
+#[derive(Clone, Debug)]
+pub struct StructData {
+    pub class: Arc<String>,
+    pub fields: Arc<Mutex<HashMap<String, Value>>>,
 }
 
 pub type NativeFunction = fn(&mut VM, Vec<Value>) -> Value;
@@ -91,14 +94,14 @@ impl Value {
             Value::Module(_) => "<module>".into(),
             Value::FfiLibrary(path) => format!("<ffi {}>", path),
             Value::Class { name, .. } => format!("<class {name}>"),
-            Value::Struct { class, fields } => {
-                let parts: Vec<String> = fields
+            Value::Struct(data) => {
+                let parts: Vec<String> = data.fields
                     .lock()
                     .unwrap()
                     .iter()
                     .map(|(k, v)| format!("{k}: {}", v.stringify()))
                     .collect();
-                format!("{class}{{{}}}", parts.join(", "))
+                format!("{class}{{{fields}}}", class=data.class, fields=parts.join(", "))
             }
             Value::Iterator { .. } => "<iterator>".into(),
         }
@@ -120,8 +123,37 @@ impl Value {
             Value::Module(_) => "module",
             Value::FfiLibrary(_) => "ffi_library",
             Value::Class { .. } => "class",
-            Value::Struct { .. } => "struct",
+            Value::Struct(_) => "struct",
             Value::Iterator { .. } => "iterator",
+        }
+    }
+
+    pub fn downgrade(&self) -> Option<WeakValue> {
+        match self {
+            Value::Str(s) => Some(WeakValue::Str(Arc::downgrade(s))),
+            Value::List(l) => Some(WeakValue::List(Arc::downgrade(l))),
+            Value::Map(m) => Some(WeakValue::Map(Arc::downgrade(m))),
+            Value::Struct(data) => Some(WeakValue::Struct(Arc::downgrade(&data.fields))),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum WeakValue {
+    Str(std::sync::Weak<String>),
+    List(std::sync::Weak<Mutex<Vec<Value>>>),
+    Map(std::sync::Weak<Mutex<HashMap<String, Value>>>),
+    Struct(std::sync::Weak<Mutex<HashMap<String, Value>>>),
+}
+
+impl WeakValue {
+    pub fn is_alive(&self) -> bool {
+        match self {
+            WeakValue::Str(w) => w.strong_count() > 0,
+            WeakValue::List(w) => w.strong_count() > 0,
+            WeakValue::Map(w) => w.strong_count() > 0,
+            WeakValue::Struct(w) => w.strong_count() > 0,
         }
     }
 }
