@@ -1,0 +1,10 @@
+# Nimble Standard Library - Threading
+
+extern fn nimble_thread_create(entry: String) -> Int
+extern fn nimble_thread_join(thread: Int) -> Void
+
+fn create(entry: String) -> Int:
+    return nimble_thread_create(entry)
+
+fn join(thread: Int) -> Void:
+    nimble_thread_join(thread)

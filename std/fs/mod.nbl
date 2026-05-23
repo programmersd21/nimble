@@ -1,0 +1,10 @@
+# Nimble Standard Library - File system helpers
+
+extern fn fopen(path: String, mode: String) -> String
+extern fn fclose(file: String) -> Int
+
+fn open(path: String, mode: String) -> String:
+    return fopen(path, mode)
+
+fn close(file: String) -> Int:
+    return fclose(file)

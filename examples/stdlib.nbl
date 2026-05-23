@@ -1,0 +1,19 @@
+load std.io
+load std.log
+load std.testing
+load std.core
+load std.fmt
+load std.alloc
+load std.mem
+load std.builtin
+
+fn main() -> Int:
+    std.io.println("Nimble standard library demo")
+    std.log.info("Starting stdlib feature demo")
+    std.testing.assert_eq(7, std.core.max_i(3, 7))
+    std.testing.assert_eq(3, std.core.min_i(3, 7))
+    std.fmt.print_label("clamp(10,0,5) = ", std.core.clamp(10, 0, 5))
+    let scratch = std.alloc.alloc(16)
+    std.mem.free_bytes(scratch, 16)
+    std.builtin.debug("stdlib demo complete")
+    return 0

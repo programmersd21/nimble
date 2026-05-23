@@ -1,0 +1,14 @@
+# Nimble Standard Library - Synchronization primitives
+
+extern fn nimble_mutex_new() -> Int
+extern fn nimble_mutex_lock(mutex: Int) -> Void
+extern fn nimble_mutex_unlock(mutex: Int) -> Void
+
+fn mutex_new() -> Int:
+    return nimble_mutex_new()
+
+fn mutex_lock(mutex: Int) -> Void:
+    nimble_mutex_lock(mutex)
+
+fn mutex_unlock(mutex: Int) -> Void:
+    nimble_mutex_unlock(mutex)

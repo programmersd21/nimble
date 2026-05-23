@@ -1,0 +1,25 @@
+extern fn print_int(x: Int) -> Void
+
+fn double(x: Int) -> Int:
+    return x * 2
+
+fn apply(f: Int, g: Int) -> Int:
+    return double(f) + double(g)
+
+fn recursive(n: Int) -> Int:
+    if n == 0:
+        return 1
+    else:
+        return n * recursive(n - 1)
+
+fn main() -> Int:
+    let r1 = double(21)
+    print_int(r1)
+
+    let r2 = apply(3, 4)
+    print_int(r2)
+
+    let r3 = recursive(5)
+    print_int(r3)
+
+    return 0

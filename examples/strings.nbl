@@ -1,0 +1,12 @@
+extern fn printf(fmt: String) -> Int
+
+fn main() -> Int:
+    printf("hello\n")
+    printf("tab:\tend\n")
+    printf("quote: \"\n")
+    printf("backslash: \\\n")
+
+    let s: String = "Nimble"
+    printf(s)
+
+    return 0

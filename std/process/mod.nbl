@@ -1,0 +1,12 @@
+# Nimble Standard Library - Process control
+
+extern fn exit(code: Int) -> Void
+
+fn terminate(code: Int) -> Void:
+    exit(code)
+
+fn exit_success() -> Void:
+    exit(0)
+
+fn exit_failure() -> Void:
+    exit(1)

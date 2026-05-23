@@ -1,0 +1,10 @@
+# Nimble Standard Library - Crypto helpers
+
+extern fn rand() -> Int
+extern fn srand(seed: Int) -> Void
+
+fn random_int() -> Int:
+    return rand()
+
+fn seed(seed: Int) -> Void:
+    srand(seed)

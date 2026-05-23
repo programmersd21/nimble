@@ -1,0 +1,28 @@
+extern fn print_int(x: Int) -> Void
+
+fn classify(n: Int) -> Int:
+    if n > 0:
+        return 1
+    elif n < 0:
+        return -1
+    else:
+        return 0
+
+fn countdown(n: Int) -> Void:
+    var i = n
+    while i >= 0:
+        print_int(i)
+        i = i - 1
+
+fn main() -> Int:
+    let sig = classify(42)
+    print_int(sig)
+
+    countdown(5)
+
+    var x = 0
+    while x < 3:
+        print_int(x)
+        x = x + 1
+
+    return 0

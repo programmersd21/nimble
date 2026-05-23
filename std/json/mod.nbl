@@ -1,0 +1,10 @@
+# Nimble Standard Library - JSON support
+
+extern fn nimble_json_parse(json: String) -> String
+extern fn nimble_json_stringify(value: String) -> String
+
+fn parse(json: String) -> String:
+    return nimble_json_parse(json)
+
+fn stringify(value: String) -> String:
+    return nimble_json_stringify(value)

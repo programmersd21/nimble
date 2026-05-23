@@ -1,0 +1,7 @@
+# Nimble Standard Library - Formatting helpers
+
+load std.io::{print_int, print_str}
+
+fn print_label(label: String, value: Int) -> Void:
+    print_str(label)
+    print_int(value)

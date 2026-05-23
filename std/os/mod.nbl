@@ -1,0 +1,10 @@
+# Nimble Standard Library - OS helpers
+
+extern fn getenv(name: String) -> String
+extern fn system(command: String) -> Int
+
+fn get_env(name: String) -> String:
+    return getenv(name)
+
+fn execute(command: String) -> Int:
+    return system(command)

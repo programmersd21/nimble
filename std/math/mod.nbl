@@ -1,0 +1,7 @@
+# Nimble Standard Library - Math
+
+extern fn sin(x: Float) -> Float
+extern fn cos(x: Float) -> Float
+extern fn tan(x: Float) -> Float
+extern fn sqrt(x: Float) -> Float
+extern fn pow(base: Float, exp: Float) -> Float

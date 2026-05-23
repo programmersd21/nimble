@@ -1,0 +1,19 @@
+extern fn print_int(x: Int) -> Void
+extern fn print_str(x: String) -> Void
+
+fn fizzbuzz(n: Int) -> Void:
+    if n % 3 == 0 && n % 5 == 0:
+        print_str("FizzBuzz")
+    elif n % 3 == 0:
+        print_str("Fizz")
+    elif n % 5 == 0:
+        print_str("Buzz")
+    else:
+        print_int(n)
+
+fn main() -> Int:
+    var i = 1
+    while i <= 100:
+        fizzbuzz(i)
+        i = i + 1
+    return 0

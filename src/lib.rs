@@ -1,0 +1,21 @@
+pub mod lexer;
+pub mod ast;
+pub mod errors;
+pub mod parser;
+pub mod types;
+pub mod env;
+pub mod typechecker;
+pub mod codegen;
+pub mod module_loader;
+pub mod pipeline;
+pub mod driver;
+
+pub use ast::*;
+pub use codegen::Codegen;
+pub use driver::{compile, compile_to_ir, CompileOptions};
+pub use env::{Environment, Symbol, SymbolKind};
+pub use errors::ParseError;
+pub use lexer::{Lexer, Span, Token, TokenKind};
+pub use parser::Parser;
+pub use typechecker::{TypeChecker, TypeError};
+pub use types::{Substitution, Type};

@@ -1,0 +1,10 @@
+# Nimble Standard Library - Reflection
+
+extern fn nimble_type_name(value: String) -> String
+extern fn nimble_size_of(type_name: String) -> Int
+
+fn type_name(value: String) -> String:
+    return nimble_type_name(value)
+
+fn size_of(type_name: String) -> Int:
+    return nimble_size_of(type_name)

@@ -1,0 +1,14 @@
+fn fib(n: Int) -> Int:
+    if n <= 1:
+        return n
+    else:
+        return fib(n - 1) + fib(n - 2)
+
+fn main() -> Int:
+    var n = 40
+    print_str("fibonacci(")
+    print_int(n)
+    print_str(") = ")
+    print_int(fib(n))
+    print_str("\n")
+    return 0

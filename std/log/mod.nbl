@@ -1,0 +1,15 @@
+# Nimble Standard Library - Logging
+
+load std.io::{print, print_str}
+
+fn info(message: String) -> Void:
+    print_str("[INFO] ")
+    print(message)
+
+fn warn(message: String) -> Void:
+    print_str("[WARN] ")
+    print(message)
+
+fn error(message: String) -> Void:
+    print_str("[ERROR] ")
+    print(message)

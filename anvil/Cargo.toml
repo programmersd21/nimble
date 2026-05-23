@@ -1,0 +1,17 @@
+[package]
+name = "anvil"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "anvil"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+nimble = { path = ".." }
+
+[dev-dependencies]
+tempfile = "3"

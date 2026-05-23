@@ -1,0 +1,14 @@
+# Nimble Standard Library - Async
+
+extern fn nimble_sleep(ms: Int) -> Void
+extern fn nimble_thread_spawn(entry: String) -> Int
+extern fn nimble_thread_join(thread: Int) -> Void
+
+fn sleep(ms: Int) -> Void:
+    nimble_sleep(ms)
+
+fn spawn(entry: String) -> Int:
+    return nimble_thread_spawn(entry)
+
+fn join(thread: Int) -> Void:
+    nimble_thread_join(thread)

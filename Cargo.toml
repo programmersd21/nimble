@@ -1,0 +1,46 @@
+[workspace]
+resolver = "2"
+members = [
+    ".",
+    "ember",
+    "smelt",
+    "anvil",
+    "lantern",
+    "chisel",
+    "forge",
+]
+
+[package]
+name = "nimble"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+miette = { version = "7", features = ["derive"] }
+thiserror = "2"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values())'] }
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = "symbols"
+debug = false
+incremental = false
+
+[profile.bench]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+debug = false
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "compiler_perf"
+path = "benches/compiler_perf.rs"
+harness = false

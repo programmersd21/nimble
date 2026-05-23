@@ -1,0 +1,14 @@
+# Nimble Standard Library - Allocation
+
+extern fn nimble_alloc(size: Int) -> String
+extern fn nimble_free(ptr: String, size: Int) -> Void
+extern fn nimble_realloc(ptr: String, old_size: Int, new_size: Int) -> String
+
+fn alloc(size: Int) -> String:
+    return nimble_alloc(size)
+
+fn free(ptr: String, size: Int) -> Void:
+    nimble_free(ptr, size)
+
+fn realloc(ptr: String, old_size: Int, new_size: Int) -> String:
+    return nimble_realloc(ptr, old_size, new_size)

@@ -1,0 +1,16 @@
+# Nimble Standard Library - I/O
+
+# Low-level I/O primitives provided by the ember runtime.
+extern fn print(s: String) -> Void
+extern fn print_str(s: String) -> Void
+extern fn print_int(i: Int) -> Void
+extern fn print_float(f: Float) -> Void
+
+fn println(s: String) -> Void:
+    print(s)
+
+fn print_no_newline(s: String) -> Void:
+    print_str(s)
+
+fn print_int_val(i: Int) -> Void:
+    print_int(i)

@@ -1,0 +1,12 @@
+# Nimble Standard Library - Memory helpers
+
+load std.alloc::{alloc, free, realloc}
+
+fn alloc_bytes(size: Int) -> String:
+    return alloc(size)
+
+fn free_bytes(ptr: String, size: Int) -> Void:
+    free(ptr, size)
+
+fn resize_bytes(ptr: String, old_size: Int, new_size: Int) -> String:
+    return realloc(ptr, old_size, new_size)

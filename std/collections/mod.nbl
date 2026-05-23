@@ -1,0 +1,14 @@
+# Nimble Standard Library - Collections
+
+extern fn nimble_list_new() -> String
+extern fn nimble_list_push(list: String, item: String) -> Void
+extern fn nimble_list_get(list: String, index: Int) -> String
+
+fn list_new() -> String:
+    return nimble_list_new()
+
+fn list_push(list: String, item: String) -> Void:
+    nimble_list_push(list, item)
+
+fn list_get(list: String, index: Int) -> String:
+    return nimble_list_get(list, index)

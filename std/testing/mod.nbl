@@ -1,0 +1,10 @@
+# Nimble Standard Library - Testing helpers
+
+load std.io::{print_int, print_str}
+
+fn assert_eq(expected: Int, actual: Int) -> Void:
+    if expected != actual:
+        print_str("[TEST] expected ")
+        print_int(expected)
+        print_str(" but got ")
+        print_int(actual)

@@ -1,0 +1,26 @@
+extern fn print_int(x: Int) -> Void
+
+fn test_and(a: Bool, b: Bool) -> Bool:
+    return a && b
+
+fn test_or(a: Bool, b: Bool) -> Bool:
+    return a || b
+
+fn test_not(flag: Bool) -> Bool:
+    return !flag
+
+fn main() -> Int:
+    let t = true
+    let f = false
+
+    let r1 = test_and(t, t)
+    let r2 = test_or(f, f)
+    let r3 = test_not(f)
+
+    if t && !f:
+        print_int(1)
+
+    if f || t:
+        print_int(2)
+
+    return 0

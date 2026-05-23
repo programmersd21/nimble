@@ -1,0 +1,12 @@
+# Nimble Standard Library - Builtins
+
+load std.io::{print, print_str}
+
+fn assert(condition: Bool, message: String) -> Void:
+    if !condition:
+        print_str("[ASSERT] ")
+        print(message)
+
+fn debug(message: String) -> Void:
+    print_str("[DEBUG] ")
+    print(message)

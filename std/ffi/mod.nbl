@@ -1,0 +1,10 @@
+# Nimble Standard Library - Foreign function interface
+
+extern fn printf(fmt: String) -> Int
+extern fn puts(s: String) -> Int
+
+fn print_format(fmt: String) -> Int:
+    return printf(fmt)
+
+fn write_line(s: String) -> Int:
+    return puts(s)

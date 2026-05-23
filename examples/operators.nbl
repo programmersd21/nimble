@@ -1,0 +1,27 @@
+extern fn print_int(x: Int) -> Void
+extern fn print_str(x: String) -> Void
+
+fn main() -> Int:
+    let a = 10
+    let b = 3
+
+    print_int(a + b)
+    print_int(a - b)
+    print_int(a * b)
+    print_int(a / b)
+    print_int(a % b)
+
+    let eq = a == b
+    let ne = a != b
+    let lt = a < b
+    let gt = a > b
+    let le = a <= b
+    let ge = a >= b
+
+    let and_val = true && false
+    let or_val = true || false
+    let not_val = !true
+
+    let neg = -a
+
+    return 0

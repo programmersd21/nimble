@@ -1,0 +1,6 @@
+# Nimble Standard Library - Time helpers
+
+extern fn clock() -> Int
+
+fn now() -> Int:
+    return clock()

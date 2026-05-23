@@ -1,0 +1,17 @@
+extern fn print_int(x: Int) -> Void
+extern fn print_str(x: String) -> Void
+
+fn main() -> Int:
+    let a: Int = 42
+    let b: Float = 3.14
+    let c: Bool = true
+    let d: String = "hello"
+
+    print_int(a)
+    print_str(d)
+
+    var inferred = 99
+    inferred = 100
+    print_int(inferred)
+
+    return 0

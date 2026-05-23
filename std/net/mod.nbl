@@ -1,0 +1,14 @@
+# Nimble Standard Library - Networking helpers
+
+extern fn nimble_net_connect(address: String) -> Int
+extern fn nimble_net_send(socket: Int, data: String) -> Int
+extern fn nimble_net_recv(socket: Int, buffer: String, size: Int) -> Int
+
+fn connect(address: String) -> Int:
+    return nimble_net_connect(address)
+
+fn send(socket: Int, data: String) -> Int:
+    return nimble_net_send(socket, data)
+
+fn recv(socket: Int, buffer: String, size: Int) -> Int:
+    return nimble_net_recv(socket, buffer, size)

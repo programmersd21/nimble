@@ -1,0 +1,15 @@
+load std.math as m
+
+fn main() -> Int:
+    print("Testing math functions...\n")
+    
+    let zero = m.sin(0.0)
+    let root = m.sqrt(16.0)
+    let power = m.pow(2.0, 10.0)
+
+    if zero == 0.0 && root == 4.0 && power == 1024.0:
+        print("All tests passed!\n")
+        return 0
+    print("Tests failed!\n")
+    return 1
+    

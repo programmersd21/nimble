@@ -1,0 +1,17 @@
+[package]
+name = "forge"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "forge"
+path = "src/main.rs"
+
+[dependencies]
+nimble = { path = ".." }
+rustyline = "15"
+inkwell = { version = "0.5", optional = true }
+
+[features]
+default = []
+jit = ["dep:inkwell"]

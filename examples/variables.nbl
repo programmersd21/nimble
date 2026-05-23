@@ -1,0 +1,26 @@
+extern fn print_int(x: Int) -> Void
+
+fn main() -> Int:
+    let x = 42
+    print_int(x)
+
+    var y = 10
+    y = 20
+    print_int(y)
+
+    y += 5
+    print_int(y)
+
+    y -= 3
+    print_int(y)
+
+    y *= 2
+    print_int(y)
+
+    y /= 4
+    print_int(y)
+
+    y %= 3
+    print_int(y)
+
+    return 0
