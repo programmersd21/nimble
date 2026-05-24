@@ -91,6 +91,7 @@ See `docs/stdlib.md` for the full stdlib overview and API reference.
 | -     | `nimble` | Core compiler library (lexer, parser, typechecker, codegen) |
 | `smelt`| Compiler | Compile `.nbl` → executable. Flags: `-o <file>`, `--emit-llvm`, `-r` / `--run` |
 | `anvil`| Project  | `init`, `build`, `run`. Build accepts `-r` to auto-run after compile |
+| `nim`| Package Manager | `fetch`, `pkg install`, `install`. Decentralized URI-driven dependency and binary management |
 | `ember`| Runtime  | Static library linked into every executable (print, alloc, string ops) |
 | `lantern`| LSP    | Language server protocol implementation |
 | `chisel`| Formatter| Canonical source code formatting |
