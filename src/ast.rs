@@ -27,6 +27,16 @@ pub enum Stmt {
         body: Vec<Stmt>,
         span: Span,
     },
+    StructDef {
+        name: String,
+        fields: Vec<Param>,
+        span: Span,
+    },
+    InterfaceDef {
+        name: String,
+        methods: Vec<Param>,
+        span: Span,
+    },
     If {
         condition: Expr,
         body: Vec<Stmt>,
@@ -37,6 +47,12 @@ pub enum Stmt {
     While {
         condition: Expr,
         body: Vec<Stmt>,
+        span: Span,
+    },
+    Break {
+        span: Span,
+    },
+    Continue {
         span: Span,
     },
     For {
@@ -102,6 +118,11 @@ pub enum Expr {
         member: String,
         span: Span,
     },
+    StructLiteral {
+        name: String,
+        fields: Vec<(String, Expr)>,
+        span: Span,
+    },
     Cast {
         expr: Box<Expr>,
         target_type: Type,
@@ -142,5 +163,6 @@ pub struct Param {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Type {
     pub name: String,
+    pub args: Vec<Type>,
     pub span: Span,
 }

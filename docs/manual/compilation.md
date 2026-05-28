@@ -20,7 +20,7 @@ Token stream -> Parser -> AST (Program)
 
 ### 3. Type Checking
 
-`TypeChecker::check_program(program)` performs Hindley-Milner inference in two passes:
+`TypeChecker::check_program(program)` performs semantic analysis in two passes:
 - **Pass 1**: Register all top-level function signatures.
 - **Pass 2**: Type-check all function bodies against registered signatures.
 
@@ -56,7 +56,7 @@ LLVM IR -> clang -c -> .o / .obj
 
 ### 6. Linking
 
-The `smelt` driver auto-discovers a system linker (`cc`, `clang`, `gcc`, `link.exe`) and links the object file with the `ember` runtime library.
+The `smelt` driver auto-discovers a system linker (`cc`, `clang`, `gcc`, `cl.exe`, or `link.exe`) and links the object file with the `ember` runtime library.
 
 ```
 .o/.obj + ember.a -> linker -> executable
@@ -71,11 +71,11 @@ The `smelt` driver auto-discovers a system linker (`cc`, `clang`, `gcc`, `link.e
 | `opt_level` | `Aggressive` | `-O0` through `-O3` |
 | `vectorize_slp` | `true` | `-vectorize-slp` |
 | `vectorize_loop` | `true` | `-vectorize-loops` |
-| `gvn` | `true` | Global Value Numbering |
-| `sroa` | `true` | Scalar Replacement of Aggregates |
-| `licm` | `true` | Loop Invariant Code Motion |
-| `slsr` | `true` | Straight-Line Strength Reduction |
-| `merge_functions` | `true` | Function merging |
+| `gvn` | `true` | Reserved for future fine-grained control |
+| `sroa` | `true` | Reserved for future fine-grained control |
+| `licm` | `true` | Reserved for future fine-grained control |
+| `slsr` | `true` | Reserved for future fine-grained control |
+| `merge_functions` | `true` | Reserved for future fine-grained control |
 | `target_cpu` | `None` | `-mcpu=<cpu>` |
 | `target_features` | `None` | `-mattr=<features>` |
 | `reloc_model` | `"pic"` | `-relocation-model=<model>` |
@@ -85,15 +85,12 @@ The `smelt` driver auto-discovers a system linker (`cc`, `clang`, `gcc`, `link.e
 ## Compiler Driver API
 
 ```
-use nimble::{compile, compile_to_ir, CompileOptions};
+use nimble::{compile, CompileOptions};
 
-// Get LLVM IR as a string
-let ir = compile_to_ir(source).unwrap();
-
-// Compile to object file via clang -c
 let opts = CompileOptions {
     output_path: "output.obj".into(),
-    emit_ir: false,
+    source_path: Some("src/main.nbl".into()),
+    emit_llvm: false,
     ..Default::default()
 };
 compile(source, &opts).unwrap();

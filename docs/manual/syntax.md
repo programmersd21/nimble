@@ -34,7 +34,7 @@ String escape sequences: `\n` (newline), `\t` (tab), `\r` (carriage return), `\0
 
 ```
 fn  let  var  if  elif  else  struct  interface  pub
-return  while  for  in  extern  true  false
+return  while  break  continue  for  in  extern  load  as  true  false
 ```
 
 ## Indentation
@@ -59,10 +59,10 @@ fn main() -> Int:
 | `:` | Block start, type annotation separator |
 | `->` | Return type arrow |
 | `,` | Separator in parameter/argument lists |
-| `.` | Dot (reserved for member access) |
+| `.` | Member access |
 | `(` `)` | Grouping, function call, parameter list |
-| `[` `]` | Array indexing (reserved) |
-| `{` `}` | Struct literal (reserved) |
+| `[` `]` | Generic type argument list |
+| `{` `}` | Struct literal fields |
 
 ## Operators
 
@@ -119,3 +119,24 @@ fn main() -> Int:
 | 7 | `*` `/` `%` | left |
 | 8 | unary `-` `!` | right (prefix) |
 | 9 | `()` call | left |
+
+## Expressions
+
+Supported expression forms today include:
+
+- Literals: integers, floats, strings, booleans
+- Identifiers
+- Binary and unary operators
+- Function calls
+- Assignment expressions
+- Parenthesized grouping
+- Member access chains
+- Struct literals
+- Explicit casts using `as`
+
+Not yet implemented as first-class syntax:
+
+- Lists, maps, tuples, and comprehensions
+- Pattern matching
+- Lambdas / anonymous functions
+- Lists, maps, tuples, and comprehensions

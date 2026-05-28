@@ -25,44 +25,33 @@ pub enum Type {
     Function(Vec<Type>, Box<Type>),
 }
 
-/// A mapping from type‑variable IDs to their resolved types.
-///
-/// Used to communicate results of unification back to the caller.
 pub type Substitution = HashMap<usize, Type>;
 
-
 impl Type {
-    /// Create a fresh type variable with the given id.
     pub fn new_var(id: usize) -> Self {
         Type::Variable(id)
     }
 
-    /// Apply a substitution to `self`, recursively replacing variables.
     pub fn apply(&self, subst: &Substitution) -> Type {
         match self {
-            Type::Variable(id) => {
-                match subst.get(id) {
-                    Some(resolved) => resolved.apply(subst),
-                    None => Type::Variable(*id),
-                }
-            }
+            Type::Variable(id) => match subst.get(id) {
+                Some(resolved) => resolved.apply(subst),
+                None => Type::Variable(*id),
+            },
             Type::Function(params, ret) => {
-                let new_params: Vec<Type> =
-                    params.iter().map(|p| p.apply(subst)).collect();
+                let new_params: Vec<Type> = params.iter().map(|p| p.apply(subst)).collect();
                 let new_ret = ret.apply(subst);
                 Type::Function(new_params, Box::new(new_ret))
             }
             Type::GenericInstance(name, args) => {
-                let new_args: Vec<Type> =
-                    args.iter().map(|a| a.apply(subst)).collect();
+                let new_args: Vec<Type> = args.iter().map(|a| a.apply(subst)).collect();
                 Type::GenericInstance(name.clone(), new_args)
             }
             other => other.clone(),
         }
     }
 
-    /// Collect all free (i.e. unresolved) type‑variable ids contained in this
-    /// type.  Used by the occurs check in unification.
+    /// Used by the occurs check in unification.
     pub fn free_vars(&self) -> Vec<usize> {
         match self {
             Type::Variable(id) => vec![*id],
@@ -85,7 +74,6 @@ impl Type {
     }
 }
 
-/// Pretty‑print a type for error messages.
 impl std::fmt::Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -121,22 +109,24 @@ impl std::fmt::Display for Type {
     }
 }
 
-
 impl From<&crate::ast::Type> for Type {
     fn from(t: &crate::ast::Type) -> Self {
+        if !t.args.is_empty() {
+            return Type::GenericInstance(
+                t.name.clone(),
+                t.args.iter().map(Type::from).collect(),
+            );
+        }
         match t.name.to_lowercase().as_str() {
             "int" => Type::Int,
             "float" => Type::Float,
             "string" => Type::String,
             "bool" => Type::Bool,
             "void" => Type::Void,
-            _ => {
-                Type::Struct(t.name.clone())
-            }
+            _ => Type::Struct(t.name.clone()),
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -196,6 +186,7 @@ mod tests {
     fn from_ast_type_primitive() {
         let ast_t = crate::ast::Type {
             name: "Int".into(),
+            args: Vec::new(),
             span: crate::lexer::Span::new(1, 1, 0),
         };
         assert_eq!(Type::from(&ast_t), Type::Int);
@@ -205,6 +196,7 @@ mod tests {
     fn from_ast_type_user_defined() {
         let ast_t = crate::ast::Type {
             name: "MyStruct".into(),
+            args: Vec::new(),
             span: crate::lexer::Span::new(1, 1, 0),
         };
         assert_eq!(Type::from(&ast_t), Type::Struct("MyStruct".into()));

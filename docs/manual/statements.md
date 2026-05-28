@@ -107,6 +107,17 @@ while i < 10:
     i = i + 1
 ```
 
+## `break` / `continue`
+
+```
+while condition:
+    if done:
+        break
+    continue
+```
+
+`break` exits the nearest enclosing loop. `continue` jumps to the next loop iteration.
+
 ## `for`
 
 ```
@@ -121,6 +132,24 @@ for i in range:
     print(i)
 ```
 
+## `load`
+
+```
+load module.path
+load module.path as alias
+load module.path::{symbol1, symbol2}
+```
+
+Imports a module into the current scope. This is the primary module-loading mechanism for the standard library and project code.
+
+## `pub`
+
+```
+pub load module.path
+```
+
+Marks a `load` as public. The parser and type checker recognize it, but visibility semantics are still lightweight.
+
 ## Expression Statements
 
 Any expression can be used as a statement. The result is discarded.
@@ -130,3 +159,9 @@ print("hello")
 x + y
 fizzbuzz(42)
 ```
+
+## Current Gaps
+
+- No `match` statement
+- No `try` / `except`-style error handling
+- No `defer` or `using` statement

@@ -1,24 +1,26 @@
-[workspace]
-resolver = "2"
-members = [
-    ".",
-    "ember",
-    "smelt",
-    "anvil",
-    "lantern",
-    "chisel",
-    "forge",
-    "nim",
-]
-
 [package]
 name = "nimble"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-miette = { version = "7", features = ["derive"] }
+miette = { version = "7", features = ["derive", "fancy"] }
 thiserror = "2"
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+tempfile = "3"
+rustyline = "15"
+inkwell = { version = "0.5", optional = true }
+tokio = { version = "1", features = ["full"] }
+tower-lsp = "0.20"
+serde_json = "1"
+dashmap = "6"
+dirs = "5"
+
+[features]
+default = []
+jit = ["dep:inkwell"]
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values())'] }

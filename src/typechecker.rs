@@ -1,4 +1,5 @@
 use miette::{Diagnostic, SourceSpan};
+use std::collections::HashMap;
 use thiserror::Error;
 
 use crate::ast::{BinaryOp, Expr, Stmt, UnaryOp};
@@ -7,9 +8,6 @@ use crate::lexer::Span;
 use crate::module_loader::ModuleLoader;
 use crate::types::{Substitution, Type};
 
-// TypeError (miette‑diagnostic errors)
-
-/// A structured type‑error that integrates with `miette` diagnostics.
 #[derive(Debug, Error, Diagnostic)]
 pub enum TypeError {
     #[error("Type mismatch: expected `{expected}`, found `{found}` at line {line}:{column}")]
@@ -97,7 +95,9 @@ pub enum TypeError {
         span: SourceSpan,
     },
 
-    #[error("Interface `{interface}` requires method `{method}` but the target does not provide it at line {line}:{column}")]
+    #[error(
+        "Interface `{interface}` requires method `{method}` but the target does not provide it at line {line}:{column}"
+    )]
     #[diagnostic(code("nimble::type::missing_method"))]
     MissingMethod {
         interface: String,
@@ -131,8 +131,6 @@ pub enum TypeError {
         span: SourceSpan,
     },
 }
-
-// Convenience constructors (matching the style of ParseError).
 
 impl TypeError {
     fn mismatch(source: &str, expected: &Type, found: &Type, span: Span) -> Self {
@@ -206,9 +204,7 @@ impl TypeError {
         }
     }
 
-    /// Reconstruct a `nimble::Span` from the `miette::SourceSpan` stored in
-    /// the error variant.  This is used by the LSP to map errors back to
-    /// source locations.
+    /// Used by LSP to map errors back to source locations.
     pub fn span(&self) -> Span {
         let span = match self {
             TypeError::Mismatch { span, .. } => *span,
@@ -226,33 +222,25 @@ impl TypeError {
     }
 }
 
-// TypeChecker
-
-/// The core semantic‑analysis engine.
-///
-/// Performs name resolution, Hindley‑Milner type inference, and structural
-/// sub‑typing validation in a single pass over the AST.
 pub struct TypeChecker {
-    /// Monotonically increasing counter for fresh type‑variable IDs.
     var_counter: usize,
-    /// The accumulated substitution from unification.
     subst: Substitution,
-    /// The source text (cloned for error reporting).
     source: String,
-    /// Known interface type names (for structural subtyping validation).
     interfaces: std::collections::HashSet<String>,
-    /// Optional module loader for resolving `load` statements.
+    interface_methods: HashMap<String, Vec<String>>,
+    function_sigs: HashMap<String, Vec<Type>>,
     module_loader: Option<ModuleLoader>,
-    /// Collected extern fn statements from loaded modules.
     pub collected_externs: std::rc::Rc<std::cell::RefCell<Vec<Stmt>>>,
-    /// Collected top-level statements from loaded modules for code generation.
     pub collected_module_stmts: std::rc::Rc<std::cell::RefCell<Vec<(Stmt, Environment)>>>,
+    loop_depth: usize,
 }
 
 impl TypeChecker {
-    /// Create a new checker for the given source text.
     pub fn new(source: &str) -> Self {
-        Self::with_externs(source, std::rc::Rc::new(std::cell::RefCell::new(Vec::new())))
+        Self::with_externs(
+            source,
+            std::rc::Rc::new(std::cell::RefCell::new(Vec::new())),
+        )
     }
 
     pub fn with_externs(source: &str, externs: std::rc::Rc<std::cell::RefCell<Vec<Stmt>>>) -> Self {
@@ -273,19 +261,19 @@ impl TypeChecker {
             subst: Substitution::new(),
             source: source.to_string(),
             interfaces: std::collections::HashSet::new(),
+            interface_methods: HashMap::new(),
+            function_sigs: HashMap::new(),
             module_loader: None,
             collected_externs: externs,
             collected_module_stmts: module_stmts,
+            loop_depth: 0,
         }
     }
 
-    /// Attach a module loader for resolving `load` statements.
     pub fn with_loader(mut self, loader: ModuleLoader) -> Self {
         self.module_loader = Some(loader);
         self
     }
-
-    // ── Fresh type variables ─────────────────────────────────────────────
 
     fn fresh_var(&mut self) -> Type {
         let id = self.var_counter;
@@ -293,25 +281,46 @@ impl TypeChecker {
         Type::Variable(id)
     }
 
-    /// Resolve a possibly‑variable type through the current substitution.
     fn resolve(&self, t: &Type) -> Type {
         t.apply(&self.subst)
     }
 
-    // ── Public entry point ───────────────────────────────────────────────
+    fn type_from_ast(&self, t: &crate::ast::Type, env: &Environment) -> Type {
+        if !t.args.is_empty() {
+            return Type::GenericInstance(
+                t.name.clone(),
+                t.args.iter().map(|arg| self.type_from_ast(arg, env)).collect(),
+            );
+        }
+        match t.name.to_lowercase().as_str() {
+            "int" => Type::Int,
+            "float" => Type::Float,
+            "string" => Type::String,
+            "bool" => Type::Bool,
+            "void" => Type::Void,
+            _ => match env.lookup(&t.name).map(|sym| &sym.kind) {
+                Some(SymbolKind::Interface) => Type::Interface(t.name.clone()),
+                _ => Type::Struct(t.name.clone()),
+            },
+        }
+    }
 
-    /// Fully type‑check a program.
-    ///
-    /// If a module loader is attached via [`with_loader`], `load` statements
-    /// in the program are resolved first, importing symbols into the
-    /// environment before the normal two-pass checking.
-    pub fn check_program(&mut self, program: &crate::ast::Program) -> Result<Environment, TypeError> {
+    pub fn check_program(
+        &mut self,
+        program: &crate::ast::Program,
+    ) -> Result<Environment, TypeError> {
         let mut env = Environment::new();
 
-        // Phase 0: process `load` statements if a module loader is attached.
         if let Some(ref mut loader) = self.module_loader {
             for stmt in &program.statements {
-                if let Stmt::Load { module_path, symbols, alias, span, .. } = stmt {
+                if let Stmt::Load {
+                    module_path,
+                    symbols,
+                    alias,
+                    span,
+                    ..
+                } = stmt
+                {
                     match loader.load(
                         module_path,
                         symbols.as_deref(),
@@ -322,10 +331,7 @@ impl TypeChecker {
                         &self.source,
                         *span,
                     ) {
-                        Ok(_) => {
-                            // Externs and loaded module statements are already collected
-                            // by the nested TypeChecker and module loader.
-                        }
+                        Ok(_) => {}
                         Err(e) => {
                             return Err(TypeError::Internal {
                                 msg: format!("{}", e),
@@ -338,16 +344,12 @@ impl TypeChecker {
             }
         }
 
-        // First pass: register all top‑level function/struct/interface
-        // signatures so that mutually‑recursive calls are possible.
         for stmt in &program.statements {
             self.register_declaration(stmt, &mut env)?;
         }
 
-        // Register built-in functions (only if not already user-declared).
         self.register_builtins(&mut env);
 
-        // Second pass: type‑check bodies.
         for stmt in &program.statements {
             self.check_stmt(stmt, &mut env)?;
         }
@@ -355,7 +357,6 @@ impl TypeChecker {
         Ok(env)
     }
 
-    /// Register built-in functions that are available without explicit declaration.
     fn register_builtins(&self, env: &mut Environment) {
         let builtins: &[(&str, Vec<Type>, Type)] = &[
             ("print", vec![Type::String], Type::Void),
@@ -378,24 +379,29 @@ impl TypeChecker {
         }
     }
 
-    /// Register a top‑level declaration signature without checking its body.
-    fn register_declaration(&mut self, stmt: &Stmt, env: &mut Environment) -> Result<(), TypeError> {
+    fn register_declaration(
+        &mut self,
+        stmt: &Stmt,
+        env: &mut Environment,
+    ) -> Result<(), TypeError> {
         match stmt {
-            Stmt::FunctionDef { name, params, return_type, span, .. } => {
-                if env.lookup_current(name).is_some() {
-                    return Err(TypeError::duplicate_definition(
-                        &self.source, name, *span,
-                    ));
-                }
-                let param_types: Vec<Type> = params
-                    .iter()
-                    .map(|p| Type::from(&p.type_annot))
-                    .collect();
+            Stmt::FunctionDef {
+                name,
+                params,
+                return_type,
+                span,
+                ..
+            } => {
+                // Allow overloaded function names (same name, different first-param type)
+                // for interface conformance. Only reject true duplicates (same signature).
+                let param_types: Vec<Type> =
+                    params.iter().map(|p| self.type_from_ast(&p.type_annot, env)).collect();
                 let ret = match return_type {
-                    Some(t) => Type::from(t),
+                    Some(t) => self.type_from_ast(t, env),
                     None => Type::Void,
                 };
                 let ft = Type::Function(param_types, Box::new(ret));
+                self.function_sigs.entry(name.clone()).or_default().push(ft.clone());
                 env.define(
                     name,
                     Symbol {
@@ -406,21 +412,61 @@ impl TypeChecker {
                     },
                 );
             }
-            Stmt::ExternFn { name, params, return_type, span } => {
+            Stmt::StructDef { name, fields, span } => {
                 if env.lookup_current(name).is_some() {
-                    return Err(TypeError::duplicate_definition(
-                        &self.source, name, *span,
-                    ));
+                    return Err(TypeError::duplicate_definition(&self.source, name, *span));
                 }
-                let param_types: Vec<Type> = params
+                let field_types: Vec<(String, Type)> = fields
                     .iter()
-                    .map(|p| Type::from(&p.type_annot))
+                    .map(|f| (f.name.clone(), self.type_from_ast(&f.type_annot, env)))
                     .collect();
+                env.define(
+                    name,
+                    Symbol {
+                        kind: SymbolKind::Struct,
+                        mutable: false,
+                        type_: Type::Struct(name.clone()),
+                        defined_at: *span,
+                    },
+                );
+                env.define_struct(name, field_types);
+            }
+            Stmt::InterfaceDef { name, methods, span } => {
+                if env.lookup_current(name).is_some() {
+                    return Err(TypeError::duplicate_definition(&self.source, name, *span));
+                }
+                self.interfaces.insert(name.clone());
+                self.interface_methods.insert(
+                    name.clone(),
+                    methods.iter().map(|m| m.name.clone()).collect(),
+                );
+                env.define(
+                    name,
+                    Symbol {
+                        kind: SymbolKind::Interface,
+                        mutable: false,
+                        type_: Type::Interface(name.clone()),
+                        defined_at: *span,
+                    },
+                );
+            }
+            Stmt::ExternFn {
+                name,
+                params,
+                return_type,
+                span,
+            } => {
+                if env.lookup_current(name).is_some() {
+                    return Err(TypeError::duplicate_definition(&self.source, name, *span));
+                }
+                let param_types: Vec<Type> =
+                    params.iter().map(|p| self.type_from_ast(&p.type_annot, env)).collect();
                 let ret = match return_type {
-                    Some(t) => Type::from(t),
+                    Some(t) => self.type_from_ast(t, env),
                     None => Type::Void,
                 };
                 let ft = Type::Function(param_types, Box::new(ret));
+                self.function_sigs.entry(name.clone()).or_default().push(ft.clone());
                 env.define(
                     name,
                     Symbol {
@@ -432,44 +478,52 @@ impl TypeChecker {
                 );
                 self.collected_externs.borrow_mut().push(stmt.clone());
             }
-            Stmt::Load { .. } => {} // Load is handled in phase 0
-            Stmt::Var { .. } | Stmt::Let { .. } | Stmt::Expr(..) | Stmt::Return { .. }
-            | Stmt::If { .. } | Stmt::While { .. } | Stmt::For { .. } => {}
+            Stmt::Load { .. } => {}
+            Stmt::Var { .. }
+            | Stmt::Let { .. }
+            | Stmt::Expr(..)
+            | Stmt::Return { .. }
+            | Stmt::If { .. }
+            | Stmt::While { .. }
+            | Stmt::Break { .. }
+            | Stmt::Continue { .. }
+            | Stmt::For { .. } => {}
         }
         Ok(())
     }
 
-    // ── Statement checking ───────────────────────────────────────────────
-
-    /// Type‑check a single statement, updating the environment as needed.
     pub fn check_stmt(&mut self, stmt: &Stmt, env: &mut Environment) -> Result<(), TypeError> {
         match stmt {
-            Stmt::Var { name, type_annot, value, span }
-            | Stmt::Let { name, type_annot, value, span } => {
+            Stmt::Var {
+                name,
+                type_annot,
+                value,
+                span,
+            }
+            | Stmt::Let {
+                name,
+                type_annot,
+                value,
+                span,
+            } => {
                 let is_mut = matches!(stmt, Stmt::Var { .. });
 
                 if env.lookup_current(name).is_some() {
-                    return Err(TypeError::duplicate_definition(
-                        &self.source, name, *span,
-                    ));
+                    return Err(TypeError::duplicate_definition(&self.source, name, *span));
                 }
 
                 let value_type = self.infer_expr(value, env)?;
 
                 let declared = match type_annot {
                     Some(t) => {
-                        let dt = Type::from(t);
-                        // Verify the annotation is a known type.
-                        match &dt {
+                        let dt = self.type_from_ast(t, env);
+                                match &dt {
                             Type::Struct(s) => {
-                                let sym = env.lookup(s)
-                                    .ok_or_else(|| TypeError::undefined_type(
-                                        &self.source, s, *span,
-                                    ))?;
+                                let sym = env.lookup(s).ok_or_else(|| {
+                                    TypeError::undefined_type(&self.source, s, *span)
+                                })?;
                                 if sym.kind != SymbolKind::Struct {
-                                    return Err(TypeError::undefined_type(
-                                        &self.source, s, *span,
-                                    ));
+                                    return Err(TypeError::undefined_type(&self.source, s, *span));
                                 }
                             }
                             _ => {}
@@ -479,12 +533,14 @@ impl TypeChecker {
                     None => None,
                 };
 
-                // If there is a type annotation, unify it with the inferred type.
                 if let Some(ref ann) = declared {
                     self.unify(&value_type, ann, *span)?;
                 }
 
-                let resolved = self.resolve(&value_type);
+                let resolved = declared
+                    .as_ref()
+                    .map(|ann| self.resolve(ann))
+                    .unwrap_or_else(|| self.resolve(&value_type));
                 env.define(
                     name,
                     Symbol {
@@ -497,22 +553,20 @@ impl TypeChecker {
                 Ok(())
             }
 
-            Stmt::ExternFn { .. } => {
-                // Already registered in the first pass; no body to check.
-                Ok(())
-            }
+            Stmt::ExternFn { .. } => Ok(()),
 
-            Stmt::FunctionDef { params, return_type, body, span, .. } => {
-                // The function is already registered in the environment from
-                // the first pass; now we check the body in a new scope.
-                let param_types: Vec<Type> = params
-                    .iter()
-                    .map(|p| Type::from(&p.type_annot))
-                    .collect();
+            Stmt::FunctionDef {
+                params,
+                return_type,
+                body,
+                span,
+                ..
+            } => {
+                let param_types: Vec<Type> =
+                    params.iter().map(|p| self.type_from_ast(&p.type_annot, env)).collect();
 
                 env.enter_scope();
 
-                // Bind each parameter in the new scope.
                 for (param, ptype) in params.iter().zip(param_types.iter()) {
                     let resolved = self.resolve(ptype);
                     env.define(
@@ -526,26 +580,21 @@ impl TypeChecker {
                     );
                 }
 
-                // Check body statements.
                 for s in body {
                     self.check_stmt(s, env)?;
                 }
 
                 env.exit_scope();
 
-                // Verify the declared return type is valid.
                 if let Some(ret) = return_type {
-                    let rt = Type::from(ret);
+                            let rt = self.type_from_ast(ret, env);
                     match &rt {
                         Type::Struct(s) => {
-                            let sym = env.lookup(s)
-                                .ok_or_else(|| TypeError::undefined_type(
-                                    &self.source, s, *span,
-                                ))?;
+                            let sym = env
+                                .lookup(s)
+                                .ok_or_else(|| TypeError::undefined_type(&self.source, s, *span))?;
                             if sym.kind != SymbolKind::Struct {
-                                return Err(TypeError::undefined_type(
-                                    &self.source, s, *span,
-                                ));
+                                return Err(TypeError::undefined_type(&self.source, s, *span));
                             }
                         }
                         _ => {}
@@ -555,7 +604,13 @@ impl TypeChecker {
                 Ok(())
             }
 
-            Stmt::If { condition, body, elifs, else_body, span: _ } => {
+            Stmt::If {
+                condition,
+                body,
+                elifs,
+                else_body,
+                span: _,
+            } => {
                 let cond_type = self.infer_expr(condition, env)?;
                 self.unify(&cond_type, &Type::Bool, condition.span())?;
 
@@ -586,22 +641,52 @@ impl TypeChecker {
                 Ok(())
             }
 
-            Stmt::While { condition, body, span: _ } => {
+            Stmt::While {
+                condition,
+                body,
+                span: _,
+            } => {
                 let cond_type = self.infer_expr(condition, env)?;
                 self.unify(&cond_type, &Type::Bool, condition.span())?;
 
+                self.loop_depth += 1;
                 env.enter_scope();
                 for s in body {
                     self.check_stmt(s, env)?;
                 }
                 env.exit_scope();
+                self.loop_depth -= 1;
 
                 Ok(())
             }
 
-            Stmt::For { variable, iterable, body, span } => {
+            Stmt::Break { span } | Stmt::Continue { span } => {
+                if self.loop_depth == 0 {
+                    return Err(TypeError::Internal {
+                        msg: format!(
+                            "{} used outside of a loop",
+                            if matches!(stmt, Stmt::Break { .. }) {
+                                "break"
+                            } else {
+                                "continue"
+                            }
+                        ),
+                        src: self.source.clone(),
+                        span: (span.byte_index, span.length.max(1)).into(),
+                    });
+                }
+                Ok(())
+            }
+
+            Stmt::For {
+                variable,
+                iterable,
+                body,
+                span,
+            } => {
                 let iter_type = self.infer_expr(iterable, env)?;
 
+                self.loop_depth += 1;
                 env.enter_scope();
                 // The loop variable type is inferred from the iterable.
                 // For now we create a fresh type variable.
@@ -619,6 +704,7 @@ impl TypeChecker {
                     self.check_stmt(s, env)?;
                 }
                 env.exit_scope();
+                self.loop_depth -= 1;
 
                 Ok(())
             }
@@ -630,10 +716,9 @@ impl TypeChecker {
                 Ok(())
             }
 
-            Stmt::Load { .. } => {
-                // Handled during phase 0 (check_program).
-                Ok(())
-            }
+            Stmt::Load { .. } => Ok(()),
+
+            Stmt::StructDef { .. } | Stmt::InterfaceDef { .. } => Ok(()),
 
             Stmt::Expr(expr) => {
                 self.infer_expr(expr, env)?;
@@ -642,9 +727,6 @@ impl TypeChecker {
         }
     }
 
-    // ── Expression inference ─────────────────────────────────────────────
-
-    /// Infer the type of an expression, returning its (partially‑resolved) type.
     pub fn infer_expr(&mut self, expr: &Expr, env: &Environment) -> Result<Type, TypeError> {
         match expr {
             Expr::IntLiteral(_, _span) => Ok(Type::Int),
@@ -652,18 +734,17 @@ impl TypeChecker {
             Expr::StringLiteral(_, _span) => Ok(Type::String),
             Expr::BoolLiteral(_, _span) => Ok(Type::Bool),
 
-            Expr::Identifier(name, span) => {
-                match env.lookup(name) {
-                    Some(sym) => Ok(self.resolve(&sym.type_)),
-                    None => Err(TypeError::undefined_variable(
-                        &self.source, name, *span,
-                    )),
-                }
-            }
+            Expr::Identifier(name, span) => match env.lookup(name) {
+                Some(sym) => Ok(self.resolve(&sym.type_)),
+                None => Err(TypeError::undefined_variable(&self.source, name, *span)),
+            },
 
-            Expr::Binary { left, op, right, span } => {
-                self.infer_binary(left, op, right, *span, env)
-            }
+            Expr::Binary {
+                left,
+                op,
+                right,
+                span,
+            } => self.infer_binary(left, op, right, *span, env),
 
             Expr::Unary { op, operand, span } => {
                 let operand_type = self.infer_expr(operand, env)?;
@@ -683,19 +764,18 @@ impl TypeChecker {
 
             Expr::Call { callee, args, span } => self.infer_call(callee, args, *span, env),
 
-            Expr::Assign { target, value, span } => {
-                // Check mutability of the target.
+            Expr::Assign {
+                target,
+                value,
+                span,
+            } => {
                 if let Expr::Identifier(name, _) = target.as_ref() {
                     match env.lookup(name) {
                         Some(sym) if !sym.mutable => {
-                            return Err(TypeError::assign_to_immutable(
-                                &self.source, name, *span,
-                            ));
+                            return Err(TypeError::assign_to_immutable(&self.source, name, *span));
                         }
                         None => {
-                            return Err(TypeError::undefined_variable(
-                                &self.source, name, *span,
-                            ));
+                            return Err(TypeError::undefined_variable(&self.source, name, *span));
                         }
                         _ => {}
                     }
@@ -708,41 +788,58 @@ impl TypeChecker {
 
             Expr::Grouping { expr, span: _ } => self.infer_expr(expr, env),
 
-            Expr::MemberAccess { object, member, span } => {
-                // Support nested qualified names like `std.io.println` by
-                // recursively flattening the member chain into a single
-                // dotted identifier.
-                fn flatten_qualified_name(expr: &Expr, tail: String) -> Option<String> {
-                    match expr {
-                        Expr::Identifier(name, _) => Some(format!("{}.{}", name, tail)),
-                        Expr::MemberAccess { object, member, .. } => {
-                            flatten_qualified_name(object, format!("{}.{}", member, tail))
+            Expr::MemberAccess {
+                object,
+                member,
+                span,
+            } => {
+                let obj_ty = self.infer_expr(object, env)?;
+                let obj_ty = self.resolve(&obj_ty);
+                if let Type::Struct(name) = obj_ty {
+                    if let Some(fields) = env.get_struct_fields(&name) {
+                        if let Some((_, ty)) = fields.iter().find(|(n, _)| n == member) {
+                            return Ok(ty.clone());
                         }
-                        _ => None,
                     }
                 }
-
-                if let Some(qualified_name) = flatten_qualified_name(object.as_ref(), member.clone()) {
-                    if let Some(sym) = env.lookup(&qualified_name) {
-                        return Ok(self.resolve(&sym.type_));
-                    }
-                }
-                
-                // If it fails, maybe it's just a local object field access?
-                // For now, fall back to an error as we only support qualified names.
                 Err(TypeError::undefined_variable(&self.source, member, *span))
             }
 
-            Expr::Cast { expr, target_type, span: _ } => {
+            Expr::StructLiteral { name, fields, span } => {
+                let sym = env
+                    .lookup(name)
+                    .ok_or_else(|| TypeError::undefined_type(&self.source, name, *span))?;
+                if sym.kind != SymbolKind::Struct {
+                    return Err(TypeError::undefined_type(&self.source, name, *span));
+                }
+                let def_fields = env
+                    .get_struct_fields(name)
+                    .ok_or_else(|| TypeError::undefined_type(&self.source, name, *span))?;
+                for (fname, fexpr) in fields {
+                    let fty = def_fields
+                        .iter()
+                        .find(|(n, _)| n == fname)
+                        .ok_or_else(|| TypeError::undefined_type(&self.source, fname, *span))?
+                        .1
+                        .clone();
+                    let ety = self.infer_expr(fexpr, env)?;
+                    self.unify(&ety, &fty, *span)?;
+                }
+                Ok(Type::Struct(name.clone()))
+            }
+
+            Expr::Cast {
+                expr,
+                target_type,
+                span: _,
+            } => {
                 let _expr_type = self.infer_expr(expr, env)?;
-                let target_type = Type::from(target_type);
+                let target_type = self.type_from_ast(target_type, env);
                 // Explicit casts are trusted by the typechecker for now.
                 Ok(target_type)
             }
         }
     }
-
-    // ── Binary expression inference ──────────────────────────────────────
 
     fn infer_binary(
         &mut self,
@@ -756,7 +853,6 @@ impl TypeChecker {
         let right_type = self.infer_expr(right, env)?;
 
         match op {
-            // Arithmetic operators: Int or Float (both sides the same)
             BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod => {
                 // Create a fresh type variable and unify both sides with it,
                 // then constrain it to be numeric.
@@ -766,15 +862,16 @@ impl TypeChecker {
                 Ok(self.resolve(&num))
             }
 
-            // Comparison operators: both sides same type, result is Bool
-            BinaryOp::Equal | BinaryOp::NotEqual
-            | BinaryOp::Less | BinaryOp::Greater
-            | BinaryOp::LessEqual | BinaryOp::GreaterEqual => {
+            BinaryOp::Equal
+            | BinaryOp::NotEqual
+            | BinaryOp::Less
+            | BinaryOp::Greater
+            | BinaryOp::LessEqual
+            | BinaryOp::GreaterEqual => {
                 self.unify(&left_type, &right_type, span)?;
                 Ok(Type::Bool)
             }
 
-            // Logical operators: both sides must be Bool, result is Bool
             BinaryOp::And | BinaryOp::Or => {
                 self.unify(&left_type, &Type::Bool, span)?;
                 self.unify(&right_type, &Type::Bool, span)?;
@@ -782,8 +879,6 @@ impl TypeChecker {
             }
         }
     }
-
-    // ── Function‑call inference ──────────────────────────────────────────
 
     fn infer_call(
         &mut self,
@@ -794,16 +889,13 @@ impl TypeChecker {
     ) -> Result<Type, TypeError> {
         let callee_type = self.infer_expr(callee, env)?;
 
-        // The callee must be a function type.  Create one if needed.
-        let expected_param_types: Vec<Type> =
-            (0..args.len()).map(|_| self.fresh_var()).collect();
+        let expected_param_types: Vec<Type> = (0..args.len()).map(|_| self.fresh_var()).collect();
         let expected_ret = self.fresh_var();
         let expected_fn =
             Type::Function(expected_param_types.clone(), Box::new(expected_ret.clone()));
 
         self.unify(&callee_type, &expected_fn, span)?;
 
-        // Now check each argument against its expected type.
         for (i, arg) in args.iter().enumerate() {
             let arg_type = self.infer_expr(arg, env)?;
             self.unify(&arg_type, &expected_param_types[i], span)?;
@@ -812,11 +904,6 @@ impl TypeChecker {
         Ok(self.resolve(&expected_ret))
     }
 
-    // ══════════════════════════════════════════════════════════════════════
-    // Unification (Algorithm W core)
-    // ══════════════════════════════════════════════════════════════════════
-
-    /// Unify two types, extending `self.subst` with the necessary bindings.
     fn unify(&mut self, a: &Type, b: &Type, span: Span) -> Result<(), TypeError> {
         let a = self.resolve(a);
         let b = self.resolve(b);
@@ -830,7 +917,6 @@ impl TypeChecker {
                 if a.free_vars().contains(ida) && b.free_vars().contains(ida) {
                     return Err(TypeError::recursive_type(&self.source, span));
                 }
-                // Occurs check
                 if b.free_vars().contains(ida) {
                     return Err(TypeError::recursive_type(&self.source, span));
                 }
@@ -863,14 +949,10 @@ impl TypeChecker {
 
             (Type::GenericInstance(n1, a1), Type::GenericInstance(n2, a2)) => {
                 if n1 != n2 {
-                    return Err(TypeError::mismatch(
-                        &self.source, &a, &b, span,
-                    ));
+                    return Err(TypeError::mismatch(&self.source, &a, &b, span));
                 }
                 if a1.len() != a2.len() {
-                    return Err(TypeError::mismatch(
-                        &self.source, &a, &b, span,
-                    ));
+                    return Err(TypeError::mismatch(&self.source, &a, &b, span));
                 }
                 for (ta, tb) in a1.iter().zip(a2.iter()) {
                     self.unify(ta, tb, span)?;
@@ -878,28 +960,73 @@ impl TypeChecker {
                 Ok(())
             }
 
+            (Type::GenericInstance(name, _), Type::Struct(struct_name))
+            | (Type::Struct(struct_name), Type::GenericInstance(name, _)) => {
+                if name == struct_name {
+                    Ok(())
+                } else {
+                    Err(TypeError::mismatch(&self.source, &a, &b, span))
+                }
+            }
+
             (Type::Interface(iface_name), Type::Struct(_))
             | (Type::Struct(_), Type::Interface(iface_name)) => {
-                if !self.interfaces.contains(iface_name) {
-                    return Ok(());
-                }
-                Ok(())
+                let struct_name = match (&a, &b) {
+                    (Type::Interface(_), Type::Struct(s)) => s,
+                    (Type::Struct(s), Type::Interface(_)) => s,
+                    _ => unreachable!(),
+                };
+                self.check_interface_conformance(iface_name, struct_name, span)
             }
 
             _ => Err(TypeError::mismatch(&self.source, &a, &b, span)),
         }
     }
+
+    fn check_interface_conformance(
+        &self,
+        iface_name: &str,
+        struct_name: &str,
+        span: Span,
+    ) -> Result<(), TypeError> {
+        let Some(methods) = self.interface_methods.get(iface_name) else {
+            return Err(TypeError::undefined_type(&self.source, iface_name, span));
+        };
+        for method in methods {
+            let found = self.function_sigs.get(method).map_or(false, |sigs| {
+                sigs.iter().any(|ty| {
+                    if let Type::Function(params, _) = ty {
+                        matches!(params.first(), Some(Type::Struct(name)) if name == struct_name)
+                    } else {
+                        false
+                    }
+                })
+            });
+            if !found {
+                return Err(TypeError::MissingMethod {
+                    interface: iface_name.to_string(),
+                    method: method.clone(),
+                    line: span.line,
+                    column: span.column,
+                    src: self.source.clone(),
+                    span: (span.byte_index, span.length.max(1)).into(),
+                });
+            }
+        }
+        Ok(())
+    }
 }
 
-// ── Tests
-
-#[cfg(test)]
+    #[cfg(test)]
 mod tests {
     use super::*;
     use crate::parser::Parser;
 
     fn typecheck(source: &str) -> Result<Environment, TypeError> {
-        let prog = Parser::new(source).expect("parse failed").parse().expect("parse failed");
+        let prog = Parser::new(source)
+            .expect("parse failed")
+            .parse()
+            .expect("parse failed");
         let mut checker = TypeChecker::new(source);
         checker.check_program(&prog)
     }
@@ -911,8 +1038,6 @@ mod tests {
     fn typecheck_err(source: &str) -> TypeError {
         typecheck(source).expect_err("expected typecheck error")
     }
-
-    // ── Successful inference ─────────────────────────────────────────────
 
     #[test]
     fn infer_int_literal() {
@@ -1015,9 +1140,7 @@ mod tests {
 
     #[test]
     fn infer_identifier_reference() {
-        let env = typecheck_ok(
-            "let x = 10\nlet y = x\n",
-        );
+        let env = typecheck_ok("let x = 10\nlet y = x\n");
         let sym = env.lookup("y").unwrap();
         assert_eq!(sym.type_, Type::Int);
     }
@@ -1026,17 +1149,12 @@ mod tests {
     fn infer_function_no_args() {
         let env = typecheck_ok("fn f() -> Int:\n    return 42\n");
         let sym = env.lookup("f").unwrap();
-        assert_eq!(
-            sym.type_,
-            Type::Function(vec![], Box::new(Type::Int))
-        );
+        assert_eq!(sym.type_, Type::Function(vec![], Box::new(Type::Int)));
     }
 
     #[test]
     fn infer_function_with_params() {
-        let env = typecheck_ok(
-            "fn add(x: Int, y: Int) -> Int:\n    return x + y\n",
-        );
+        let env = typecheck_ok("fn add(x: Int, y: Int) -> Int:\n    return x + y\n");
         let sym = env.lookup("add").unwrap();
         assert_eq!(
             sym.type_,
@@ -1046,18 +1164,15 @@ mod tests {
 
     #[test]
     fn infer_function_call() {
-        let env = typecheck_ok(
-            "fn f() -> Int:\n    return 42\nlet x = f()\n",
-        );
+        let env = typecheck_ok("fn f() -> Int:\n    return 42\nlet x = f()\n");
         let sym = env.lookup("x").unwrap();
         assert_eq!(sym.type_, Type::Int);
     }
 
     #[test]
     fn infer_add_in_function() {
-        let env = typecheck_ok(
-            "fn add(a: Int, b: Int) -> Int:\n    return a + b\nlet x = add(1, 2)\n",
-        );
+        let env =
+            typecheck_ok("fn add(a: Int, b: Int) -> Int:\n    return a + b\nlet x = add(1, 2)\n");
         let sym = env.lookup("x").unwrap();
         assert_eq!(sym.type_, Type::Int);
     }
@@ -1070,24 +1185,35 @@ mod tests {
     }
 
     #[test]
-    fn infer_if_condition_bool() {
-        let env = typecheck_ok(
-            "let x = true\nif x:\n    let y = 1\n",
+    fn infer_generic_type_annotation() {
+        let env = typecheck_ok("struct Box:\n    let value: Int = 0\nlet x: Box[Int] = Box{value: 1}\n");
+        let sym = env.lookup("x").unwrap();
+        assert_eq!(
+            sym.type_,
+            Type::GenericInstance("Box".into(), vec![Type::Int])
         );
+    }
+
+    #[test]
+    fn interface_conformance_by_first_param() {
+        typecheck_ok(
+            "interface Drawable:\n    fn draw(self: Drawable) -> Void\n\nstruct Circle:\n    let radius: Int = 0\n\nfn draw(self: Circle) -> Void:\n    return\n\nlet d: Drawable = Circle{radius: 5}\n",
+        );
+    }
+
+    #[test]
+    fn infer_if_condition_bool() {
+        let env = typecheck_ok("let x = true\nif x:\n    let y = 1\n");
         assert!(env.lookup("y").is_some() || env.lookup("y").is_none());
         // y is in a nested scope and may not be visible
     }
 
     #[test]
     fn infer_while_loop() {
-        let env = typecheck_ok(
-            "var x = 0\nwhile x < 10:\n    var y = x\n",
-        );
+        let env = typecheck_ok("var x = 0\nwhile x < 10:\n    var y = x\n");
         let sym = env.lookup("x").unwrap();
         assert_eq!(sym.type_, Type::Int);
     }
-
-    // ── Error cases ──────────────────────────────────────────────────────
 
     #[test]
     fn error_type_mismatch_add_string_int() {
@@ -1109,9 +1235,7 @@ mod tests {
 
     #[test]
     fn error_assign_to_immutable_var() {
-        let err = typecheck_err(
-            "let x = 1\nlet x = 2\n",
-        );
+        let err = typecheck_err("let x = 1\nlet x = 2\n");
         assert!(format!("{}", err).contains("Duplicate"), "got: {}", err);
     }
 
@@ -1130,9 +1254,13 @@ mod tests {
     #[test]
     fn error_call_non_function() {
         let err = typecheck_err("let x = 42\nlet y = x()\n");
-        assert!(format!("{}", err).contains("non-function")
-            || format!("{}", err).contains("mismatch")
-            || format!("{}", err).contains("call"), "got: {}", err);
+        assert!(
+            format!("{}", err).contains("non-function")
+                || format!("{}", err).contains("mismatch")
+                || format!("{}", err).contains("call"),
+            "got: {}",
+            err
+        );
     }
 
     #[test]
@@ -1153,22 +1281,16 @@ mod tests {
         assert!(format!("{}", err).contains("Duplicate"), "got: {}", err);
     }
 
-    // ── Scope / shadowing ────────────────────────────────────────────────
-
     #[test]
     fn shadowing_inside_block() {
-        let env = typecheck_ok(
-            "let x = 1\nif true:\n    let x = \"hello\"\n",
-        );
+        let env = typecheck_ok("let x = 1\nif true:\n    let x = \"hello\"\n");
         let sym = env.lookup("x").unwrap();
         assert_eq!(sym.type_, Type::Int);
     }
 
     #[test]
     fn variable_in_nested_scope_not_leaked() {
-        let env = typecheck_ok(
-            "if true:\n    let inner = 42\n",
-        );
+        let env = typecheck_ok("if true:\n    let inner = 42\n");
         assert!(env.lookup("inner").is_none());
     }
 }

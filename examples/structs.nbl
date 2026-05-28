@@ -1,0 +1,31 @@
+extern fn print_int(x: Int) -> Void
+extern fn print_str(x: String) -> Void
+
+struct Point:
+    let x: Int = 0
+    let y: Int = 0
+
+struct Rectangle:
+    let width: Int = 0
+    let height: Int = 0
+
+fn area(r: Rectangle) -> Int:
+    return r.width * r.height
+
+fn perimeter(r: Rectangle) -> Int:
+    return 2 * (r.width + r.height)
+
+fn main() -> Int:
+    let p = Point{x: 3, y: 4}
+    print_str("x: ")
+    print_int(p.x)
+    print_str("y: ")
+    print_int(p.y)
+
+    let rect = Rectangle{width: 10, height: 5}
+    print_str("area: ")
+    print_int(area(rect))
+    print_str("perimeter: ")
+    print_int(perimeter(rect))
+
+    return 0

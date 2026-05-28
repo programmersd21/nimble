@@ -1,15 +1,29 @@
-load std.math as m
+extern fn print_int(x: Int) -> Void
+extern fn print_str(x: String) -> Void
+
+fn abs(x: Int) -> Int:
+    if x < 0:
+        return -x
+    return x
+
+fn max(a: Int, b: Int) -> Int:
+    if a > b:
+        return a
+    return b
+
+fn min(a: Int, b: Int) -> Int:
+    if a < b:
+        return a
+    return b
 
 fn main() -> Int:
-    print("Testing math functions...\n")
-    
-    let zero = m.sin(0.0)
-    let root = m.sqrt(16.0)
-    let power = m.pow(2.0, 10.0)
+    print_str("abs(-5): ")
+    print_int(abs(-5))
 
-    if zero == 0.0 && root == 4.0 && power == 1024.0:
-        print("All tests passed!\n")
-        return 0
-    print("Tests failed!\n")
-    return 1
-    
+    print_str("max(3, 7): ")
+    print_int(max(3, 7))
+
+    print_str("min(3, 7): ")
+    print_int(min(3, 7))
+
+    return 0

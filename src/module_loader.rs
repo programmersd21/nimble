@@ -99,17 +99,20 @@ impl ModuleLoader {
         if module_path.len() >= 2 && module_path[0] == "c" {
             let fn_name = module_path[1..].join(".");
             // Register as an external function in the environment.
-            // We use a dummy Type::Function for now. 
+            // We use a dummy Type::Function for now.
             // In a real implementation, we might want to lookup the signature.
-            target_env.define(&fn_name, Symbol {
-                kind: SymbolKind::Function,
-                mutable: false,
-                type_: Type::Function(
-                    vec![], // Variadic or unknown
-                    Box::new(Type::Int),
-                ),
-                defined_at: span,
-            });
+            target_env.define(
+                &fn_name,
+                Symbol {
+                    kind: SymbolKind::Function,
+                    mutable: false,
+                    type_: Type::Function(
+                        vec![], // Variadic or unknown
+                        Box::new(Type::Int),
+                    ),
+                    defined_at: span,
+                },
+            );
             return Ok(Vec::new());
         }
 
@@ -118,9 +121,12 @@ impl ModuleLoader {
             // Relative import: `load ./lexer` or `load ../parser.ast`
             let rel: String = module_path.join("/");
             let rel = rel.trim_start_matches("./").to_string();
-            let dir = self.source_dir.as_ref().ok_or_else(|| ModuleError::NotFound {
-                name: module_key.clone(),
-            })?;
+            let dir = self
+                .source_dir
+                .as_ref()
+                .ok_or_else(|| ModuleError::NotFound {
+                    name: module_key.clone(),
+                })?;
             dir.join(&rel).with_extension("nbl")
         } else if module_path[0] == "crate" {
             // Crate-relative import: `load crate.parser`
@@ -131,9 +137,12 @@ impl ModuleLoader {
                     name: module_key.clone(),
                 });
             };
-            let dir = self.source_dir.as_ref().ok_or_else(|| ModuleError::NotFound {
-                name: module_key.clone(),
-            })?;
+            let dir = self
+                .source_dir
+                .as_ref()
+                .ok_or_else(|| ModuleError::NotFound {
+                    name: module_key.clone(),
+                })?;
             dir.join(&rel).with_extension("nbl")
         } else {
             // Stdlib import: look in stdlib_dirs.
@@ -153,13 +162,18 @@ impl ModuleLoader {
                             dir.join(&stripped).with_extension("nbl"),
                             dir.join(&stripped).join("mod").with_extension("nbl"),
                             dir.join("std").join(&stripped).with_extension("nbl"),
-                            dir.join("std").join(&stripped).join("mod").with_extension("nbl"),
+                            dir.join("std")
+                                .join(&stripped)
+                                .join("mod")
+                                .with_extension("nbl"),
                         ]
                     }
                 } else {
                     vec![
                         dir.join(&stdlib_path_base).with_extension("nbl"),
-                        dir.join(&stdlib_path_base).join("mod").with_extension("nbl"),
+                        dir.join(&stdlib_path_base)
+                            .join("mod")
+                            .with_extension("nbl"),
                     ]
                 };
 
@@ -187,19 +201,27 @@ impl ModuleLoader {
 
         // Load from cache if already loaded.
         if let Some(loaded) = self.state.borrow().loaded.get(&module_key) {
-            let pairs: Vec<(Stmt, Environment)> = loaded.stmts.iter()
+            let pairs: Vec<(Stmt, Environment)> = loaded
+                .stmts
+                .iter()
                 .filter(|s| matches!(s, Stmt::FunctionDef { .. }))
                 .map(|s| (s.clone(), loaded.env.clone()))
                 .collect();
             collected_module_stmts.borrow_mut().extend(pairs);
             Self::import_from_env(&loaded.env, target_env, symbols, alias, &module_path, span)?;
-            return Ok(loaded.stmts.iter().filter(|s| matches!(s, Stmt::ExternFn { .. })).cloned().collect());
+            return Ok(loaded
+                .stmts
+                .iter()
+                .filter(|s| matches!(s, Stmt::ExternFn { .. }))
+                .cloned()
+                .collect());
         }
 
         // Read and parse the file.
         self.state.borrow_mut().loading.push(module_key.clone());
-        let src = std::fs::read_to_string(&file_path)
-            .map_err(|_| ModuleError::NotFound { name: module_key.clone() })?;
+        let src = std::fs::read_to_string(&file_path).map_err(|_| ModuleError::NotFound {
+            name: module_key.clone(),
+        })?;
 
         // ...
         let prog = Parser::new(&src)
@@ -207,12 +229,22 @@ impl ModuleLoader {
             .parse()
             .map_err(|e| ModuleError::Parse(format!("{:?}", e)))?;
 
-        let externs: Vec<Stmt> = prog.statements.iter().filter(|s| matches!(s, Stmt::ExternFn { .. })).cloned().collect();
-        let fn_defs: Vec<Stmt> = prog.statements.iter().filter(|s| matches!(s, Stmt::FunctionDef { .. })).cloned().collect();
+        let externs: Vec<Stmt> = prog
+            .statements
+            .iter()
+            .filter(|s| matches!(s, Stmt::ExternFn { .. }))
+            .cloned()
+            .collect();
+        let fn_defs: Vec<Stmt> = prog
+            .statements
+            .iter()
+            .filter(|s| matches!(s, Stmt::FunctionDef { .. }))
+            .cloned()
+            .collect();
 
         let mut nested_loader = self.clone();
         nested_loader.source_dir = module_dir.clone();
-        
+
         let env = TypeChecker::with_externs(&src, collected_externs.clone())
             .with_loader(nested_loader)
             .check_program(&prog)
@@ -220,14 +252,18 @@ impl ModuleLoader {
 
         let mut state = self.state.borrow_mut();
         state.loading.retain(|n| n != &module_key);
-        state.loaded.insert(module_key.clone(), LoadedModule {
-            stmts: prog.statements.clone(),
-            env: env.clone(),
-        });
+        state.loaded.insert(
+            module_key.clone(),
+            LoadedModule {
+                stmts: prog.statements.clone(),
+                env: env.clone(),
+            },
+        );
 
         // Store the loaded module statements for later code generation.
         collected_externs.borrow_mut().extend(externs.clone());
-        let pairs: Vec<(Stmt, Environment)> = fn_defs.into_iter().map(|s| (s, env.clone())).collect();
+        let pairs: Vec<(Stmt, Environment)> =
+            fn_defs.into_iter().map(|s| (s, env.clone())).collect();
         collected_module_stmts.borrow_mut().extend(pairs);
 
         // Import symbols into the target environment.
@@ -261,7 +297,9 @@ impl ModuleLoader {
         } else {
             // Namespace import: `load std.io` or `load std.io as myio`
             // Prefix all symbols with the module path or alias.
-            let prefix = alias.map(|s| s.to_string()).unwrap_or_else(|| module_path.join("."));
+            let prefix = alias
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| module_path.join("."));
 
             // To ensure we get all symbols defined in the module, iterate over all
             // scopes in the module's environment and import them into the target.

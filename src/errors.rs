@@ -6,7 +6,6 @@ use crate::lexer::TokenKind;
 #[derive(Debug, Error, Diagnostic)]
 pub enum ParseError {
     // Token-level errors
-
     #[error("Expected `{expected}` but found `{found}` at line {line}:{column}")]
     #[diagnostic(code("nimble::parse::expected_token"))]
     ExpectedToken {
@@ -33,7 +32,6 @@ pub enum ParseError {
     },
 
     // Expression errors
-
     #[error("Expected expression at line {line}:{column}")]
     #[diagnostic(code("nimble::parse::expected_expression"))]
     ExpectedExpression {
@@ -57,7 +55,6 @@ pub enum ParseError {
     },
 
     // Block / indentation errors
-
     #[error("Expected indented block after `:` at line {line}:{column}")]
     #[diagnostic(code("nimble::parse::expected_indented_block"))]
     ExpectedIndentedBlock {
@@ -81,7 +78,6 @@ pub enum ParseError {
     },
 
     // Declaration errors
-
     #[error("Expected identifier at line {line}:{column}")]
     #[diagnostic(code("nimble::parse::expected_identifier"))]
     ExpectedIdentifier {
@@ -116,7 +112,6 @@ pub enum ParseError {
     },
 
     // Internal errors
-
     #[error("Internal error: {msg}")]
     #[diagnostic(code("nimble::parse::internal"))]
     Internal {
@@ -128,15 +123,8 @@ pub enum ParseError {
     },
 }
 
-
 impl ParseError {
-    /// Build an `ExpectedToken` error from a token that was found instead
-    /// of the expected kind.
-    pub(crate) fn expected_token(
-        source: &str,
-        token: &Token,
-        expected: &str,
-    ) -> Self {
+    pub(crate) fn expected_token(source: &str, token: &Token, expected: &str) -> Self {
         ParseError::ExpectedToken {
             expected: expected.to_string(),
             found: format_token_kind(&token.kind),
@@ -147,7 +135,6 @@ impl ParseError {
         }
     }
 
-    /// Build an `UnexpectedToken` error.
     pub(crate) fn unexpected_token(source: &str, token: &Token) -> Self {
         ParseError::UnexpectedToken {
             found: format_token_kind(&token.kind),
@@ -185,8 +172,7 @@ impl ParseError {
         }
     }
 
-    /// Reconstruct a `nimble::Span` from the `miette::SourceSpan` stored in
-    /// the error variant.
+    /// Reconstruct from `miette::SourceSpan` for LSP error mapping.
     pub fn span(&self) -> crate::lexer::Span {
         let span: SourceSpan = match self {
             ParseError::ExpectedToken { span, .. } => *span,
@@ -204,13 +190,13 @@ impl ParseError {
     }
 }
 
-
 pub fn format_token_kind(kind: &TokenKind) -> String {
     match kind {
         TokenKind::Indent => "INDENT".into(),
         TokenKind::Dedent => "DEDENT".into(),
         TokenKind::Newline => "NEWLINE".into(),
         TokenKind::Colon => "':'".into(),
+        TokenKind::ColonEqual => "':='".into(),
         TokenKind::Arrow => "'->'".into(),
         TokenKind::Equal => "'='".into(),
         TokenKind::LParen => "'('".into(),
@@ -230,6 +216,8 @@ pub fn format_token_kind(kind: &TokenKind) -> String {
         TokenKind::Pub => "'pub'".into(),
         TokenKind::Return => "'return'".into(),
         TokenKind::While => "'while'".into(),
+        TokenKind::Break => "'break'".into(),
+        TokenKind::Continue => "'continue'".into(),
         TokenKind::For => "'for'".into(),
         TokenKind::In => "'in'".into(),
         TokenKind::Extern => "'extern'".into(),
@@ -269,5 +257,4 @@ pub fn format_token_kind(kind: &TokenKind) -> String {
     }
 }
 
-// Re-export the lexer's Token type for convenience.
 pub use crate::lexer::Token;

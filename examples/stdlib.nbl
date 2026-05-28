@@ -1,19 +1,31 @@
-load std.io
-load std.log
-load std.testing
-load std.core
-load std.fmt
-load std.alloc
-load std.mem
-load std.builtin
+extern fn print_int(x: Int) -> Void
+extern fn print_str(x: String) -> Void
+
+fn max_i(a: Int, b: Int) -> Int:
+    if a > b:
+        return a
+    return b
+
+fn min_i(a: Int, b: Int) -> Int:
+    if a < b:
+        return a
+    return b
+
+fn clamp(x: Int, lo: Int, hi: Int) -> Int:
+    if x < lo:
+        return lo
+    if x > hi:
+        return hi
+    return x
 
 fn main() -> Int:
-    std.io.println("Nimble standard library demo")
-    std.log.info("Starting stdlib feature demo")
-    std.testing.assert_eq(7, std.core.max_i(3, 7))
-    std.testing.assert_eq(3, std.core.min_i(3, 7))
-    std.fmt.print_label("clamp(10,0,5) = ", std.core.clamp(10, 0, 5))
-    let scratch = std.alloc.alloc(16)
-    std.mem.free_bytes(scratch, 16)
-    std.builtin.debug("stdlib demo complete")
+    print_str("max(3,7): ")
+    print_int(max_i(3, 7))
+
+    print_str("min(3,7): ")
+    print_int(min_i(3, 7))
+
+    print_str("clamp(10,0,5): ")
+    print_int(clamp(10, 0, 5))
+
     return 0

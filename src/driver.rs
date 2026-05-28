@@ -9,7 +9,6 @@ use crate::module_loader::ModuleLoader;
 use crate::parser::Parser;
 use crate::typechecker::TypeChecker;
 
-/// Compilation options for the Nimble compiler driver.
 #[derive(Debug, Clone)]
 pub struct CompileOptions {
     /// Path to write the output object file (`.o` / `.obj`).
@@ -58,11 +57,11 @@ fn find_stdlib_dirs() -> Vec<PathBuf> {
     }
 
     // Relative to CWD (workspace root)
-    candidates.push(PathBuf::from("std"));
+    candidates.push(PathBuf::from("src/std"));
 
     // Relative to CARGO_MANIFEST_DIR
     if let Ok(dir) = std::env::var("CARGO_MANIFEST_DIR") {
-        candidates.push(PathBuf::from(dir).join("std"));
+        candidates.push(PathBuf::from(dir).join("src").join("std"));
     }
 
     let mut dirs: Vec<PathBuf> = candidates.into_iter().filter(|d| d.exists()).collect();
@@ -70,18 +69,11 @@ fn find_stdlib_dirs() -> Vec<PathBuf> {
     dirs.sort();
     dirs.dedup();
     if dirs.is_empty() {
-        dirs.push(PathBuf::from("std")); // fallback
+        dirs.push(PathBuf::from("src/std")); // fallback
     }
     dirs
 }
 
-/// Compile a Nimble source string into an object file.
-///
-/// This function:
-/// 1. Parses the source
-/// 2. Type-checks the AST (resolving `load` statements)
-/// 3. Generates LLVM IR (including loaded module externs)
-/// 4. Invokes `clang -c` to produce the object file
 pub fn compile(source: &str, options: &CompileOptions) -> Result<(), String> {
     let prog = Parser::new(source)
         .map_err(|e| format!("{:?}", Report::new(e)))?
@@ -89,19 +81,26 @@ pub fn compile(source: &str, options: &CompileOptions) -> Result<(), String> {
         .map_err(|e| format!("{:?}", Report::new(e)))?;
 
     let stdlib_dirs = find_stdlib_dirs();
-    let source_path = options.source_path.as_deref().unwrap_or(&options.output_path);
+    let source_path = options
+        .source_path
+        .as_deref()
+        .unwrap_or(&options.output_path);
     let source_dir = Path::new(source_path).parent().map(|p| p.to_path_buf());
     let loader = ModuleLoader::new(stdlib_dirs, source_dir);
 
     let externs_rc = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
     let module_stmts_rc = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
-    let mut checker = TypeChecker::with_externs_and_module_stmts(source, externs_rc.clone(), module_stmts_rc.clone())
-        .with_loader(loader);
+    let mut checker = TypeChecker::with_externs_and_module_stmts(
+        source,
+        externs_rc.clone(),
+        module_stmts_rc.clone(),
+    )
+    .with_loader(loader);
 
     let env = checker
         .check_program(&prog)
         .map_err(|e| format!("{:?}", Report::new(e)))?;
-    
+
     let mut cg = Codegen::new();
     cg.generate_with_externs_and_module_fns(&prog, &env, &externs_rc, &module_stmts_rc)
         .map_err(|e| format!("codegen error: {}", e))?;
@@ -148,10 +147,6 @@ pub fn compile(source: &str, options: &CompileOptions) -> Result<(), String> {
     Ok(())
 }
 
-// Compilation pipeline convenience function
-
-/// Run the full compilation pipeline: parse → type-check → codegen,
-/// returning the LLVM IR string.  Useful for testing and embedding.
 pub fn compile_to_ir(source: &str) -> Result<String, String> {
     let prog = Parser::new(source)
         .map_err(|e| format!("{:?}", Report::new(e)))?

@@ -1,0 +1,31 @@
+extern fn print_int(x: Int) -> Void
+extern fn print_str(x: String) -> Void
+
+# Generic wrapper struct - type parameter in annotation
+struct Box:
+    let value: Int = 0
+
+struct Pair:
+    let first: Int = 0
+    let second: Int = 0
+
+fn unwrap(b: Box) -> Int:
+    return b.value
+
+fn swap(p: Pair) -> Pair:
+    return Pair{first: p.second, second: p.first}
+
+fn main() -> Int:
+    # Box[Int] - generic instance annotation
+    let b: Box[Int] = Box{value: 42}
+    print_str("unwrapped: ")
+    print_int(unwrap(b))
+
+    let p = Pair{first: 1, second: 2}
+    let q = swap(p)
+    print_str("first: ")
+    print_int(q.first)
+    print_str("second: ")
+    print_int(q.second)
+
+    return 0

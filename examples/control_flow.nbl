@@ -1,4 +1,5 @@
 extern fn print_int(x: Int) -> Void
+extern fn print_str(x: String) -> Void
 
 fn classify(n: Int) -> Int:
     if n > 0:
@@ -20,9 +21,21 @@ fn main() -> Int:
 
     countdown(5)
 
-    var x = 0
-    while x < 3:
-        print_int(x)
-        x = x + 1
+    # break: exit loop early
+    var i = 0
+    while i < 10:
+        if i == 4:
+            break
+        print_int(i)
+        i = i + 1
+
+    # continue: skip odd numbers
+    print_str("evens: ")
+    var j = 0
+    while j < 8:
+        j = j + 1
+        if j % 2 != 0:
+            continue
+        print_int(j)
 
     return 0

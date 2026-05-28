@@ -1,0 +1,30 @@
+extern fn print_int(x: Int) -> Void
+extern fn print_str(x: String) -> Void
+
+interface Shape:
+    fn area(self: Shape) -> Int
+
+struct Square:
+    let side: Int = 0
+
+struct Rect:
+    let width: Int = 0
+    let height: Int = 0
+
+fn square_area(s: Square) -> Int:
+    return s.side * s.side
+
+fn rect_area(r: Rect) -> Int:
+    return r.width * r.height
+
+fn main() -> Int:
+    let sq = Square{side: 6}
+    let r = Rect{width: 4, height: 7}
+
+    print_str("square area: ")
+    print_int(square_area(sq))
+
+    print_str("rect area: ")
+    print_int(rect_area(r))
+
+    return 0

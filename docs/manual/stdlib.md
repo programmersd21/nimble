@@ -13,7 +13,7 @@ Nimble provides a standard library under the `std` namespace. Standard modules a
 
 ## Root `std` Module
 
-The root `std` module is defined in `std/mod.nbl` and imports every available standard library submodule. Use it when you want one import point for the standard library:
+The root `std` module is defined in `std/mod.nbl` and imports available standard library submodules. Use it when you want one import point for the standard library:
 
 ```nimble
 load std
@@ -67,9 +67,9 @@ For detailed information on each module, see the [stdlib documentation](../sdocs
 - [std.testing](../sdocs/testing.md) - `assert_eq`
 - [std.fmt](../sdocs/fmt.md) - `format`
 - `std.alloc` - `alloc`, `free`, `realloc`
-... (and so on)
+... and others as they are added.
 
-Many modules already provide stable API surfaces and runtime-backed extern declarations. Some namespaces reserve future runtime support while keeping the `std` import model consistent across the language.
+The stdlib is still evolving. Several namespaces are thin wrappers over runtime or host-provided symbols, and some are reserved for future APIs.
 
 ## Math module example
 

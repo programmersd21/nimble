@@ -28,44 +28,37 @@ pub struct Symbol {
     pub defined_at: Span,
 }
 
-/// A lexically-scoped symbol table built as a stack of frames.
-///
-/// Entering a new block pushes a fresh frame; leaving it pops that frame.
-/// Name lookups search from the innermost frame outward, implementing
-/// standard lexical scoping with shadowing.
+/// Lexically-scoped symbol table with stack of frames.
 #[derive(Debug, Clone)]
 pub struct Environment {
     pub scopes: Vec<HashMap<String, Symbol>>,
+    pub struct_fields: HashMap<String, Vec<(String, Type)>>,
 }
 
 impl Environment {
-    /// Create a new, empty global environment (one top-level frame).
     pub fn new() -> Self {
         Environment {
             scopes: vec![HashMap::new()],
+            struct_fields: HashMap::new(),
         }
     }
 
-    /// Push a new scope frame.
     pub fn enter_scope(&mut self) {
         self.scopes.push(HashMap::new());
     }
 
-    /// Pop the innermost scope frame.
     pub fn exit_scope(&mut self) {
         if self.scopes.len() > 1 {
             self.scopes.pop();
         }
     }
 
-    /// Define a new symbol in the innermost scope.
     pub fn define(&mut self, name: &str, symbol: Symbol) {
         if let Some(scope) = self.scopes.last_mut() {
             scope.insert(name.to_string(), symbol);
         }
     }
 
-    /// Look up a symbol by name, searching from the innermost scope outward.
     pub fn lookup(&self, name: &str) -> Option<&Symbol> {
         for scope in self.scopes.iter().rev() {
             if let Some(sym) = scope.get(name) {
@@ -75,21 +68,27 @@ impl Environment {
         None
     }
 
-    /// Check if a name is already defined in the *current* (innermost) scope.
-    /// Used to detect duplicate definitions in the same block.
+    /// Check innermost scope only (for duplicate detection).
     pub fn lookup_current(&self, name: &str) -> Option<&Symbol> {
         self.scopes.last()?.get(name)
     }
 
-    /// Access the global scope for function/type definitions that persist
-    /// across block boundaries.
     pub fn lookup_global(&self, name: &str) -> Option<&Symbol> {
         self.scopes.first()?.get(name)
     }
 
-    /// Return all symbols in the global (outermost) scope.
     pub fn get_globals(&self) -> &HashMap<String, Symbol> {
-        self.scopes.first().expect("Environment must have at least one scope")
+        self.scopes
+            .first()
+            .expect("Environment must have at least one scope")
+    }
+
+    pub fn define_struct(&mut self, name: &str, fields: Vec<(String, Type)>) {
+        self.struct_fields.insert(name.to_string(), fields);
+    }
+
+    pub fn get_struct_fields(&self, name: &str) -> Option<&Vec<(String, Type)>> {
+        self.struct_fields.get(name)
     }
 }
 
@@ -98,7 +97,6 @@ impl Default for Environment {
         Self::new()
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -165,10 +163,7 @@ mod tests {
         env.define("g", dummy_sym(Type::Int, false));
         env.enter_scope();
         env.define("g", dummy_sym(Type::Bool, false));
-        assert_eq!(
-            env.lookup_global("g").unwrap().type_,
-            Type::Int
-        );
+        assert_eq!(env.lookup_global("g").unwrap().type_, Type::Int);
     }
 
     #[test]

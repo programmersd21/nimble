@@ -28,6 +28,8 @@ fn swap(a: Int, b: Int) -> (Int, Int):
     return b               # only one return value supported
 ```
 
+Nimble currently supports exactly one return value. Tuple returns are not implemented.
+
 ## Return Values
 
 Use `return` to exit a function. The returned expression must match the declared return type.
@@ -62,6 +64,13 @@ The compiler driver (`smelt`) links the resulting object file against the `ember
 - Nested blocks (`if`, `while`, `for`) create inner scopes.
 - Inner scopes can shadow outer bindings.
 - Variables declared in inner scopes are not visible outside that scope.
+
+## Current Limitations
+
+- No keyword-only, default, or variadic parameters
+- No multiple return values
+- No closures or nested function definitions
+- No async functions or generators
 
 ```
 fn example(x: Int):

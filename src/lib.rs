@@ -1,18 +1,26 @@
-pub mod lexer;
 pub mod ast;
-pub mod errors;
-pub mod parser;
-pub mod types;
-pub mod env;
-pub mod typechecker;
 pub mod codegen;
-pub mod module_loader;
-pub mod pipeline;
 pub mod driver;
+pub mod env;
+pub mod errors;
+pub mod lexer;
+pub mod module_loader;
+pub mod parser;
+pub mod pipeline;
+pub mod typechecker;
+pub mod types;
+
+pub mod anvil;
+pub mod chisel;
+pub mod ember;
+pub mod forge;
+pub mod lantern;
+pub mod nim;
+pub mod smelt;
 
 pub use ast::*;
 pub use codegen::Codegen;
-pub use driver::{compile, compile_to_ir, CompileOptions};
+pub use driver::{CompileOptions, compile, compile_to_ir};
 pub use env::{Environment, Symbol, SymbolKind};
 pub use errors::ParseError;
 pub use lexer::{Lexer, Span, Token, TokenKind};

@@ -1,25 +1,25 @@
 # Nimble
 
-A systems programming language with Python-like syntax and LLVM-powered performance.
+A statically typed language with Python-style indentation, LLVM-based code generation, and an integrated toolchain.
 
 ## Features at a Glance
 
 - **Pythonic syntax** - indentation-based blocks, no curly braces or semicolons
-- **Static type system** with Hindley-Milner type inference and explicit casting (`as`)
+- **Static type system** with type inference for locals and explicit typing for functions/parameters
 - **LLVM codegen** - emits textual LLVM IR, assembles via `clang -c`
 - **Cross-platform linker** - auto-discovers `cc`, `clang`, `gcc`, or `link.exe`
 - **Built-in print** - `print("text")`, `print_int(42)`, `print_str("text")` backed by the ember runtime
 - **Standard library** - `load std.<module>` and `load std` for the unified stdlib namespace
 - **C FFI** - `extern fn printf(fmt: String) -> Int` for binding native libraries
 - **Rich diagnostics** - parse and type errors rendered with source context via miette
-- **Auto-run** - `smelt file.nbl -r` compiles and runs in one step
-- **Built-in tooling** - compiler (`smelt`), project manager (`anvil`), formatter (`chisel`), LSP (`lantern`), REPL (`forge`), runtime (`ember`)
+- **Auto-run** - `nimble compile file.nbl -r` compiles and runs in one step
+- **Unified Toolchain** - everything integrated into a single `nimble` crate
 
 ## Quick Start
 
 ```sh
-# Install LLVM / clang 18+
-# Ubuntu/Debian: sudo apt install llvm-18 clang
+# Install LLVM / clang
+# Ubuntu/Debian: sudo apt install llvm clang
 # macOS:         brew install llvm
 # Windows:       https://llvm.org/builds/
 
@@ -33,7 +33,7 @@ fn main() -> Int:
     return 0
 EOF
 
-./target/release/smelt hello.nbl -r
+./target/release/nimble compile hello.nbl -r
 ```
 
 ## Language
@@ -72,7 +72,7 @@ fn main() -> Int:
 
 ### Standard Library
 
-The standard library lives under `std/` and can be imported with:
+The standard library lives under `src/std/` and can be imported with:
 
 - `load std` - root `std` aggregator module
 - `load std.io` - I/O helpers
@@ -82,20 +82,24 @@ The standard library lives under `std/` and can be imported with:
 - `load std.log` - logging helpers
 - `load std.testing` - assertion helpers
 
-See `docs/stdlib.md` for the full stdlib overview and API reference.
+See [`docs/manual/stdlib.md`](docs/manual/stdlib.md) for the full stdlib overview and API reference.
 
 ## Toolchain
 
-| Crate | Name     | Role                              |
-|-------|----------|-----------------------------------|
-| -     | `nimble` | Core compiler library (lexer, parser, typechecker, codegen) |
-| `smelt`| Compiler | Compile `.nbl` → executable. Flags: `-o <file>`, `--emit-llvm`, `-r` / `--run` |
-| `anvil`| Project  | `init`, `build`, `run`. Build accepts `-r` to auto-run after compile |
-| `nim`| Package Manager | `fetch`, `pkg install`, `install`. Decentralized URI-driven dependency and binary management |
-| `ember`| Runtime  | Static library linked into every executable (print, alloc, string ops) |
-| `lantern`| LSP    | Language server protocol implementation |
-| `chisel`| Formatter| Canonical source code formatting |
-| `forge` | REPL    | Interactive REPL with JIT compilation |
+The entire Nimble toolchain is integrated into a single `nimble` binary.
+
+| Command | Role | Description |
+|---------|------|-------------|
+| `nimble init` | Project Init | Create a new Nimble project with a default layout |
+| `nimble build` | Build System | Build the current project using the manifest |
+| `nimble run` | Project Runner | Run the current project |
+| `nimble compile` | Compiler | Compile a single `.nbl` file to an executable. Flags: `-o <file>`, `--emit-llvm`, `-r` / `--run` |
+| `nimble fmt` | Formatter | Format Nimble source code canonically |
+| `nimble repl` | REPL | Start an interactive Nimble REPL |
+| `nimble lsp` | LSP Server | Start the Language Server for IDE support |
+| `nimble install` | Package Manager | Install standalone binaries from remote URIs |
+| `nimble pkg` | Package Manager | Manage library dependencies |
+| `ember` | Runtime | Runtime primitives (now a module in `src/ember`) |
 
 ## Pipeline
 
@@ -107,27 +111,30 @@ source.nbl  →  lexer  →  parser  →  typechecker  →  codegen  →  .ll  �
                                                                                      a.exe  ←  ember.lib
 ```
 
-## Recent Changes
+## Current Status
 
-- **Replaced `llc` with `clang -c`** for assembly - no LLVM opt/llc dependency needed
-- **Named LLVM parameters** - function params use `%name` instead of unnamed `%0`/`%1`, fixing register numbering conflicts with string literal globals
-- **String literals at module level** - pre-pass collects all string constants and emits them before function bodies
-- **Register type tracking** - new `register_types` HashMap replaces fragile IR-text-scanning heuristic for type resolution
-- **Terminator-aware codegen** - `if`/`elif`/`else` and `while` only emit branch instructions when the block isn't already terminated by `ret`
-- **Built-in `print`/`print_int`/`print_str`** - registered by the typechecker, mapped to ember runtime symbols in codegen
-- **`nimble_print_str`** - new runtime function for string output without trailing newline (unlike `nimble_print` which uses `writeln!`)
-- **`nimble_print_i64`** - changed from `writeln!` to `write!` for piecewise output construction
-- **Rich error diagnostics** - miette with `fancy` feature renders `ParseError`/`TypeError` with source snippets, colors, and labels
-- **`--run` / `-r` flag** - on both `smelt` and `anvil build` for compile-and-run in one step
-- **Runtime discovery** - smelt walks up from its own executable path to find `ember/Cargo.toml`, with `NIMBLE_RUNTIME` env var override
-- **Windows linker libs** - added `ws2_32`, `ntdll`, `bcrypt`, `ole32`, `oleaut32`, `userenv`, `msi`, `cfgmgr32` for MinGW Rust std linking
-- **chisel writes files** - formatter output goes back to the source file, not stdout
-- **anvil init template** - generates current-syntax source (`fn main() -> Int: ...`)
+Implemented:
+
+- Lexer, parser, AST, type checker, code generator
+- `if` / `elif` / `else`, `while`, `for`, `break`, `continue`, `return`, `load`, `extern fn`
+- Immutable `let` and mutable `var`
+- Struct declarations, struct literals, and field access
+- Interface declarations with structural conformance checks
+- Generic type syntax and generic instance unification
+- Function definitions and basic module loading
+- REPL, formatter, and LSP scaffolding
+- Project tooling (`init`, `build`, `run`, `pkg`, `install`, `fetch`)
+
+Still early:
+
+- A documented package registry protocol
+- Stable semantics for ownership, mutation, and concurrency
+- A broader standard library
 
 ## Build Options
 
 ```sh
-cargo build --release --workspace
+cargo build --release
 ```
 
 The release profile enables LTO, single codegen unit, panic=abort, and symbol stripping.

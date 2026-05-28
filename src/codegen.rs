@@ -5,12 +5,6 @@ use crate::env::Environment;
 use crate::lexer::Span;
 use crate::types::Type;
 
-// Codegen – LLVM IR textual emitter
-
-/// Translates a type-checked Nimble AST into textual LLVM IR (`.ll`).
-///
-/// This generator emits human-readable LLVM IR that can be compiled with
-/// standard tools like `clang -c`.
 pub struct Codegen {
     ir: String,
     indent: u32,
@@ -18,11 +12,14 @@ pub struct Codegen {
     reg_counter: u32,
     symbols: HashMap<String, String>,
     symbol_types: HashMap<String, String>,
+    symbol_struct_types: HashMap<String, String>,
     register_types: HashMap<String, String>,
+    register_struct_types: HashMap<String, String>,
     string_globals: Vec<String>,
     string_global_names: HashMap<String, String>,
     current_fn: Option<String>,
     declared_externs: std::collections::HashSet<String>,
+    loop_stack: Vec<(String, String)>,
 }
 
 impl Codegen {
@@ -34,20 +31,20 @@ impl Codegen {
             reg_counter: 0,
             symbols: HashMap::new(),
             symbol_types: HashMap::new(),
+            symbol_struct_types: HashMap::new(),
             register_types: HashMap::new(),
+            register_struct_types: HashMap::new(),
             string_globals: Vec::new(),
             string_global_names: HashMap::new(),
             current_fn: None,
             declared_externs: std::collections::HashSet::new(),
+            loop_stack: Vec::new(),
         }
     }
 
-    /// Consume the generator and return the generated LLVM IR as a string.
     pub fn into_ir(self) -> String {
         self.ir
     }
-
-    // ── Registration helpers ─────────────────────────────────────────────
 
     fn fresh_reg(&mut self) -> String {
         let r = self.reg_counter;
@@ -79,8 +76,7 @@ impl Codegen {
         self.push("\n");
     }
 
-    /// Returns `true` if the last emitted instruction is a terminator
-    /// (`ret` or `br`).  Used to avoid emitting dead code.
+    /// Avoid emitting dead code after ret/br.
     fn last_is_terminator(&self) -> bool {
         for line in self.ir.lines().rev() {
             let trimmed = line.trim();
@@ -92,9 +88,6 @@ impl Codegen {
         false
     }
 
-    // ── Type mapping ─────────────────────────────────────────────────────
-
-    /// Map a Nimble type to its LLVM IR type string.
     fn llvm_type(&self, ty: &Type) -> String {
         match ty {
             Type::Int => "i64".to_string(),
@@ -104,8 +97,7 @@ impl Codegen {
             Type::Void => "void".to_string(),
             Type::Function(params, ret) => {
                 let ret_ty = self.llvm_type(ret);
-                let param_tys: Vec<String> =
-                    params.iter().map(|p| self.llvm_type(p)).collect();
+                let param_tys: Vec<String> = params.iter().map(|p| self.llvm_type(p)).collect();
                 if param_tys.is_empty() {
                     format!("{} ()", ret_ty)
                 } else {
@@ -117,8 +109,6 @@ impl Codegen {
         }
     }
 
-    // ── Initializer constant ─────────────────────────────────────────────
-
     fn llvm_zero(&self, ty: &Type) -> String {
         match ty {
             Type::Int => "0".to_string(),
@@ -129,23 +119,20 @@ impl Codegen {
         }
     }
 
-    // ── Public entry point ───────────────────────────────────────────────
+    fn llvm_struct_type(&self, name: &str, env: &Environment) -> Result<String, String> {
+        let fields = env
+            .get_struct_fields(name)
+            .ok_or_else(|| format!("unknown struct `{}`", name))?;
+        let field_tys: Vec<String> = fields.iter().map(|(_, ty)| self.llvm_type(ty)).collect();
+        Ok(format!("{{ {} }}", field_tys.join(", ")))
+    }
 
-    /// Generate LLVM IR for the entire program, optionally with extern fn
-    /// statements collected from loaded modules.
-    ///
-    /// Returns the IR text on success, or a human-readable error string.
-    pub fn generate(
-        &mut self,
-        program: &Program,
-        env: &Environment,
-    ) -> Result<&str, String> {
+    pub fn generate(&mut self, program: &Program, env: &Environment) -> Result<&str, String> {
         let empty_externs = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
         self.generate_with_externs(program, env, &empty_externs)
     }
 
-    /// Same as [`generate_with_externs`], but also emits function bodies
-    /// from loaded modules (non-extern Nimble functions).
+    /// Also emits function bodies from loaded modules.
     pub fn generate_with_externs_and_module_fns(
         &mut self,
         program: &Program,
@@ -158,8 +145,7 @@ impl Codegen {
         self.generate_with_externs_internal(program, env, &externs, &fns)
     }
 
-    /// Same as [`generate`], but also emits `declare` for extern fn
-    /// statements collected from loaded modules.
+    /// Also emits `declare` for extern fn statements from loaded modules.
     pub fn generate_with_externs(
         &mut self,
         program: &Program,
@@ -177,27 +163,21 @@ impl Codegen {
         module_externs: &[Stmt],
         module_fns: &[(Stmt, Environment)],
     ) -> Result<&str, String> {
-        // Module header
         self.push("; ModuleID = 'nimble_program'\n");
         self.push("source_filename = \"nimble_program.nimble\"\n");
         self.push("target datalayout = \"e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128\"\n");
         self.push("target triple = \"x86_64-pc-windows-msvc\"\n");
         self.push_blank();
 
-        // Built-in extern declarations from the ember runtime.
         self.push("declare void @nimble_print(ptr)\n");
         self.push("declare void @nimble_print_str(ptr)\n");
         self.push("declare void @nimble_print_i64(i64)\n");
         self.push("declare void @nimble_print_f64(double)\n");
 
-        // Emit extern fn declarations from loaded modules.
         for ext in module_externs {
-            // Re-generate the stmt, this time for codegen, ensuring it has the correct name.
             self.gen_stmt(ext, env)?;
         }
 
-        // Pre-pass: collect all string literals from the AST so their globals
-        // are emitted at module level (before any function body).
         self.collect_string_literals(program);
         for (fn_stmt, _) in module_fns {
             self.collect_stmt_strings(fn_stmt);
@@ -209,12 +189,10 @@ impl Codegen {
         }
         self.push_blank();
 
-        // Emit function bodies from loaded modules (using each module's own env).
         for (fn_stmt, fn_env) in module_fns {
             self.gen_stmt(fn_stmt, fn_env)?;
         }
 
-        // Generate code for each top‑level statement.
         for stmt in &program.statements {
             self.gen_stmt(stmt, env)?;
         }
@@ -222,10 +200,7 @@ impl Codegen {
         Ok("ok")
     }
 
-    // ── String literal pre-pass ──────────────────────────────────────────
-
-    /// Walk the AST and collect all string literal expressions, emitting
-    /// their global constant definitions into `string_globals`.
+    /// Pre-pass for string literal global constants.
     fn collect_string_literals(&mut self, program: &Program) {
         for stmt in &program.statements {
             self.collect_stmt_strings(stmt);
@@ -242,7 +217,13 @@ impl Codegen {
                     self.collect_stmt_strings(s);
                 }
             }
-            Stmt::If { condition, body, elifs, else_body, .. } => {
+            Stmt::If {
+                condition,
+                body,
+                elifs,
+                else_body,
+                ..
+            } => {
                 self.collect_expr_strings(condition);
                 for s in body {
                     self.collect_stmt_strings(s);
@@ -259,7 +240,9 @@ impl Codegen {
                     }
                 }
             }
-            Stmt::While { condition, body, .. } => {
+            Stmt::While {
+                condition, body, ..
+            } => {
                 self.collect_expr_strings(condition);
                 for s in body {
                     self.collect_stmt_strings(s);
@@ -271,6 +254,8 @@ impl Codegen {
                     self.collect_stmt_strings(s);
                 }
             }
+            Stmt::Break { .. } | Stmt::Continue { .. } => {}
+            Stmt::StructDef { .. } | Stmt::InterfaceDef { .. } => {}
             Stmt::Return { value, .. } => {
                 if let Some(v) = value {
                     self.collect_expr_strings(v);
@@ -301,8 +286,7 @@ impl Codegen {
                         s.len() + 1,
                         escaped
                     ));
-                    self.string_global_names
-                        .insert(s.clone(), global_name);
+                    self.string_global_names.insert(s.clone(), global_name);
                 }
             }
             Expr::Binary { left, right, .. } => {
@@ -322,30 +306,40 @@ impl Codegen {
             }
             Expr::Grouping { expr: inner, .. } => self.collect_expr_strings(inner),
             Expr::MemberAccess { object, .. } => self.collect_expr_strings(object),
+            Expr::StructLiteral { fields, .. } => {
+                for (_, expr) in fields {
+                    self.collect_expr_strings(expr);
+                }
+            }
             Expr::Cast { expr, .. } => self.collect_expr_strings(expr),
-            Expr::IntLiteral(..) | Expr::FloatLiteral(..) | Expr::BoolLiteral(..) | Expr::Identifier(..) => {}
+            Expr::IntLiteral(..)
+            | Expr::FloatLiteral(..)
+            | Expr::BoolLiteral(..)
+            | Expr::Identifier(..) => {}
         }
     }
 
-    // ── Statement generation ─────────────────────────────────────────────
-
     fn gen_stmt(&mut self, stmt: &Stmt, env: &Environment) -> Result<(), String> {
         match stmt {
-            Stmt::ExternFn { name, params, return_type, .. } => {
-                // Skip extern declarations for built-in functions - they are
-                // declared by the codegen itself (mapped to ember runtime).
-                if matches!(name.as_str(), "print" | "print_int" | "print_str" | "print_float") {
+            Stmt::ExternFn {
+                name,
+                params,
+                return_type,
+                ..
+            } => {
+                if matches!(
+                    name.as_str(),
+                    "print" | "print_int" | "print_str" | "print_float"
+                ) {
                     return Ok(());
                 }
-                
+
                 if self.declared_externs.contains(name) {
                     return Ok(());
                 }
-                
-                let param_types: Vec<Type> = params
-                    .iter()
-                    .map(|p| Type::from(&p.type_annot))
-                    .collect();
+
+                let param_types: Vec<Type> =
+                    params.iter().map(|p| Type::from(&p.type_annot)).collect();
                 let ret = match return_type {
                     Some(t) => Type::from(t),
                     None => Type::Void,
@@ -353,30 +347,34 @@ impl Codegen {
                 let ret_llvm = self.llvm_type(&ret);
                 let param_llvm: Vec<String> =
                     param_types.iter().map(|p| self.llvm_type(p)).collect();
-                
+
                 let param_str = if param_llvm.is_empty() {
                     String::new()
                 } else {
                     param_llvm.join(", ")
                 };
-                self.push_indent(&format!(
-                    "declare {} @{}({})",
-                    ret_llvm, name, param_str
-                ));
+                self.push_indent(&format!("declare {} @{}({})", ret_llvm, name, param_str));
                 self.declared_externs.insert(name.clone());
                 Ok(())
             }
 
-            Stmt::Var { name, value, span: _, .. }
-            | Stmt::Let { name, value, span: _, .. } => {
+            Stmt::Var {
+                name,
+                value,
+                span: _,
+                ..
+            }
+            | Stmt::Let {
+                name,
+                value,
+                span: _,
+                ..
+            } => {
                 let value_reg = self.gen_expr(value, env)?;
                 let llvm_ty = self.resolve_ir_type(&value_reg);
 
                 let ptr_reg = self.fresh_reg();
-                self.push_indent(&format!(
-                    "{} = alloca {}, align 8",
-                    ptr_reg, llvm_ty
-                ));
+                self.push_indent(&format!("{} = alloca {}, align 8", ptr_reg, llvm_ty));
                 self.push_indent(&format!(
                     "store {} {}, ptr {}, align 8",
                     llvm_ty, value_reg, ptr_reg
@@ -384,6 +382,15 @@ impl Codegen {
 
                 self.symbols.insert(name.clone(), ptr_reg.clone());
                 self.symbol_types.insert(ptr_reg, llvm_ty);
+                // Propagate struct type from the value register (set by StructLiteral gen)
+                // or from the env (for function-scope params visible at top level).
+                if let Some(struct_name) = self.register_struct_types.get(&value_reg).cloned() {
+                    self.symbol_struct_types.insert(name.clone(), struct_name);
+                } else if let Some(sym) = env.lookup(name) {
+                    if let Type::Struct(struct_name) = &sym.type_ {
+                        self.symbol_struct_types.insert(name.clone(), struct_name.clone());
+                    }
+                }
                 Ok(())
             }
 
@@ -394,9 +401,9 @@ impl Codegen {
                 body,
                 ..
             } => {
-                let sym = env.lookup(name).ok_or_else(|| {
-                    format!("internal: function `{}` not found in env", name)
-                })?;
+                let sym = env
+                    .lookup(name)
+                    .ok_or_else(|| format!("internal: function `{}` not found in env", name))?;
                 let ft = match &sym.type_ {
                     Type::Function(p, r) => (p.clone(), *r.clone()),
                     other => {
@@ -413,8 +420,7 @@ impl Codegen {
                 self.register_types.clear();
 
                 let ret_llvm = self.llvm_type(&ft.1);
-                let param_llvm: Vec<String> =
-                    ft.0.iter().map(|p| self.llvm_type(p)).collect();
+                let param_llvm: Vec<String> = ft.0.iter().map(|p| self.llvm_type(p)).collect();
 
                 // Define the function with named parameters.
                 let named_params: Vec<String> = params
@@ -427,10 +433,7 @@ impl Codegen {
                 } else {
                     named_params.join(", ")
                 };
-                self.push_indent(&format!(
-                    "define {} @{}({}) {{",
-                    ret_llvm, name, param_str
-                ));
+                self.push_indent(&format!("define {} @{}({}) {{", ret_llvm, name, param_str));
                 self.indent += 1;
 
                 self.current_fn = Some(name.clone());
@@ -442,20 +445,16 @@ impl Codegen {
                 // Alloca + store each parameter.
                 for (param, param_ty) in params.iter().zip(param_llvm.iter()) {
                     let ptr_reg = self.fresh_reg();
-                    self.push_indent(&format!(
-                        "{} = alloca {}, align 8",
-                        ptr_reg, param_ty
-                    ));
+                    self.push_indent(&format!("{} = alloca {}, align 8", ptr_reg, param_ty));
                     self.push_indent(&format!(
                         "store {} %{}, ptr {}, align 8",
                         param_ty, param.name, ptr_reg
                     ));
-                    self.symbols.insert(
-                        param.name.clone(),
-                        ptr_reg.clone(),
-                    );
-                    self.symbol_types
-                        .insert(ptr_reg, param_ty.clone());
+                    self.symbols.insert(param.name.clone(), ptr_reg.clone());
+                    self.symbol_types.insert(ptr_reg, param_ty.clone());
+                    if let Type::Struct(struct_name) = crate::types::Type::from(&param.type_annot) {
+                        self.symbol_struct_types.insert(param.name.clone(), struct_name);
+                    }
                 }
 
                 // Generate body statements.
@@ -473,7 +472,8 @@ impl Codegen {
                         } else {
                             self.push_indent(&format!(
                                 "ret {} {}",
-                                ret_llvm, self.llvm_zero(&ft.1)
+                                ret_llvm,
+                                self.llvm_zero(&ft.1)
                             ));
                         }
                     }
@@ -537,7 +537,9 @@ impl Codegen {
                 Ok(())
             }
 
-            Stmt::While { condition, body, .. } => {
+            Stmt::While {
+                condition, body, ..
+            } => {
                 let header_label = self.fresh_label();
                 let body_label = self.fresh_label();
                 let exit_label = self.fresh_label();
@@ -552,9 +554,12 @@ impl Codegen {
                 ));
 
                 self.push_indent(&format!("{}:", body_label));
+                self.loop_stack
+                    .push((header_label.clone(), exit_label.clone()));
                 for s in body {
                     self.gen_stmt(s, env)?;
                 }
+                self.loop_stack.pop();
                 if !self.last_is_terminator() {
                     self.push_indent(&format!("br label %{}", header_label));
                 }
@@ -583,10 +588,7 @@ impl Codegen {
                 let start_reg = self.gen_expr(iterable, env)?;
 
                 let ptr_reg = self.fresh_reg();
-                self.push_indent(&format!(
-                    "{} = alloca {}, align 8",
-                    ptr_reg, llvm_ty
-                ));
+                self.push_indent(&format!("{} = alloca {}, align 8", ptr_reg, llvm_ty));
                 self.push_indent(&format!(
                     "store {} {}, ptr {}, align 8",
                     llvm_ty, start_reg, ptr_reg
@@ -595,11 +597,37 @@ impl Codegen {
                 self.symbol_types.insert(ptr_reg, llvm_ty);
 
                 // Body is generated once (the user can mutate the loop var).
+                let exit_label = self.fresh_label();
+                self.loop_stack
+                    .push((exit_label.clone(), exit_label.clone()));
                 for s in body {
                     self.gen_stmt(s, env)?;
                 }
+                self.loop_stack.pop();
+                if !self.last_is_terminator() {
+                    self.push_indent(&format!("br label %{}", exit_label));
+                }
+                self.push_indent(&format!("{}:", exit_label));
 
                 Ok(())
+            }
+
+            Stmt::Break { .. } => {
+                if let Some((_, break_label)) = self.loop_stack.last() {
+                    self.push_indent(&format!("br label %{}", break_label));
+                    Ok(())
+                } else {
+                    Err("break used outside loop".to_string())
+                }
+            }
+
+            Stmt::Continue { .. } => {
+                if let Some((continue_label, _)) = self.loop_stack.last() {
+                    self.push_indent(&format!("br label %{}", continue_label));
+                    Ok(())
+                } else {
+                    Err("continue used outside loop".to_string())
+                }
             }
 
             Stmt::Return { value, .. } => {
@@ -615,10 +643,9 @@ impl Codegen {
                 Ok(())
             }
 
-            Stmt::Load { .. } => {
-                // Already processed by the typechecker; no codegen needed.
-                Ok(())
-            }
+            Stmt::Load { .. } => Ok(()),
+
+            Stmt::StructDef { .. } | Stmt::InterfaceDef { .. } => Ok(()),
 
             Stmt::Expr(expr) => {
                 self.gen_expr(expr, env)?;
@@ -626,8 +653,6 @@ impl Codegen {
             }
         }
     }
-
-    // ── Elif / else chain helper ─────────────────────────────────────────
 
     fn gen_elif_chain(
         &mut self,
@@ -637,7 +662,6 @@ impl Codegen {
         env: &Environment,
     ) -> Result<(), String> {
         if elifs.is_empty() {
-            // Emit the else body (if any).
             if let Some(ebody) = else_body {
                 for s in *ebody {
                     self.gen_stmt(s, env)?;
@@ -646,8 +670,6 @@ impl Codegen {
                     self.push_indent(&format!("br label %{}", merge_label));
                 }
             } else {
-                // No else body - branch straight to merge to keep the block
-                // terminated.
                 self.push_indent(&format!("br label %{}", merge_label));
             }
             return Ok(());
@@ -679,48 +701,38 @@ impl Codegen {
         self.gen_elif_chain(elifs, else_body, merge_label, env)
     }
 
-    // ── Expression generation ────────────────────────────────────────────
-
-    fn gen_expr(
-        &mut self,
-        expr: &Expr,
-        env: &Environment,
-    ) -> Result<String, String> {
+    fn gen_expr(&mut self, expr: &Expr, env: &Environment) -> Result<String, String> {
         match expr {
             Expr::IntLiteral(n, _) => {
                 let reg = self.fresh_reg();
-                self.push_indent(&format!(
-                    "{} = add i64 0, {}",
-                    reg, n
-                ));
+                self.push_indent(&format!("{} = add i64 0, {}", reg, n));
                 self.register_types.insert(reg.clone(), "i64".to_string());
                 Ok(reg)
             }
 
             Expr::FloatLiteral(f, _) => {
                 let reg = self.fresh_reg();
-                self.push_indent(&format!(
-                    "{} = fadd double 0.0, {:.20}",
-                    reg, f
-                ));
-                self.register_types.insert(reg.clone(), "double".to_string());
+                self.push_indent(&format!("{} = fadd double 0.0, {:.20}", reg, f));
+                self.register_types
+                    .insert(reg.clone(), "double".to_string());
                 Ok(reg)
             }
 
             Expr::BoolLiteral(b, _) => {
                 let reg = self.fresh_reg();
                 let val = if *b { "true" } else { "false" };
-                self.push_indent(&format!(
-                    "{} = add i1 0, {}",
-                    reg, val
-                ));
+                self.push_indent(&format!("{} = add i1 0, {}", reg, val));
                 self.register_types.insert(reg.clone(), "i1".to_string());
                 Ok(reg)
             }
 
             Expr::StringLiteral(s, _) => {
                 // Look up pre-assigned global name from the pre-pass.
-                let global_name = self.string_global_names.get(s).expect("string literal not found in pre-pass; this is a bug").clone();
+                let global_name = self
+                    .string_global_names
+                    .get(s)
+                    .expect("string literal not found in pre-pass; this is a bug")
+                    .clone();
 
                 let reg = self.fresh_reg();
                 self.push_indent(&format!(
@@ -748,6 +760,10 @@ impl Codegen {
                             val_reg, ty, ptr
                         ));
                         self.register_types.insert(val_reg.clone(), ty.clone());
+                        if let Some(struct_name) = self.symbol_struct_types.get(name) {
+                            self.register_struct_types
+                                .insert(val_reg.clone(), struct_name.clone());
+                        }
                         Ok(val_reg)
                     }
                     None => Err(format!("variable `{}` not in codegen scope", name)),
@@ -763,11 +779,7 @@ impl Codegen {
 
             Expr::Unary { op, operand, span } => self.gen_unary(op, operand, span, env),
 
-            Expr::Call {
-                callee,
-                args,
-                span,
-            } => self.gen_call(callee, args, span, env),
+            Expr::Call { callee, args, span } => self.gen_call(callee, args, span, env),
 
             Expr::Assign {
                 target,
@@ -787,16 +799,15 @@ impl Codegen {
                     .get(
                         self.symbols
                             .get(&target_name)
-                            .ok_or_else(|| {
-                                format!("variable `{}` not found", target_name)
-                            })?,
+                            .ok_or_else(|| format!("variable `{}` not found", target_name))?,
                     )
                     .cloned()
                     .unwrap_or_else(|| "i64".to_string());
 
-                let ptr_reg = self.symbols.get(&target_name).ok_or_else(|| {
-                    format!("variable `{}` not found", target_name)
-                })?;
+                let ptr_reg = self
+                    .symbols
+                    .get(&target_name)
+                    .ok_or_else(|| format!("variable `{}` not found", target_name))?;
                 self.push_indent(&format!(
                     "store {} {}, ptr {}, align 8",
                     ty, val_reg, ptr_reg
@@ -805,15 +816,65 @@ impl Codegen {
             }
 
             Expr::Grouping { expr, .. } => self.gen_expr(expr, env),
-
-            Expr::MemberAccess { object, member, .. } => {
-                if let Some(qualified_name) = self.flatten_qualified_name(object.as_ref(), member.clone()) {
-                    return self.gen_identifier(&qualified_name, env);
+            Expr::StructLiteral { name, fields, .. } => {
+                let struct_ty = self.llvm_struct_type(name, env)?;
+                let field_defs = env
+                    .get_struct_fields(name)
+                    .ok_or_else(|| format!("unknown struct `{}`", name))?;
+                let ptr_reg = self.fresh_reg();
+                self.push_indent(&format!("{} = alloca {}, align 8", ptr_reg, struct_ty));
+                for (fname, fexpr) in fields {
+                    let idx = field_defs
+                        .iter()
+                        .position(|(n, _)| n == fname)
+                        .ok_or_else(|| format!("unknown field `{}` on `{}`", fname, name))?;
+                    let field_ptr = self.fresh_reg();
+                    self.push_indent(&format!(
+                        "{} = getelementptr inbounds {}, ptr {}, i32 0, i32 {}",
+                        field_ptr, struct_ty, ptr_reg, idx
+                    ));
+                    let fval = self.gen_expr(fexpr, env)?;
+                    let fty = self.llvm_type(&field_defs[idx].1);
+                    self.push_indent(&format!("store {} {}, ptr {}, align 8", fty, fval, field_ptr));
                 }
-                Err("non-identifier member access not yet supported".to_string())
+                self.register_types.insert(ptr_reg.clone(), "ptr".to_string());
+                self.register_struct_types.insert(ptr_reg.clone(), name.clone());
+                Ok(ptr_reg)
             }
 
-            Expr::Cast { expr, target_type, .. } => {
+            Expr::MemberAccess { object, member, .. } => {
+                let obj_reg = self.gen_expr(object, env)?;
+                let struct_name = self
+                    .register_struct_types
+                    .get(&obj_reg)
+                    .cloned()
+                    .ok_or_else(|| "member access on non-struct value".to_string())?;
+                let field_defs = env
+                    .get_struct_fields(&struct_name)
+                    .ok_or_else(|| format!("unknown struct `{}`", struct_name))?;
+                let idx = field_defs
+                    .iter()
+                    .position(|(n, _)| n == member)
+                    .ok_or_else(|| format!("unknown field `{}` on `{}`", member, struct_name))?;
+                let struct_ty = self.llvm_struct_type(&struct_name, env)?;
+                let field_ptr = self.fresh_reg();
+                self.push_indent(&format!(
+                    "{} = getelementptr inbounds {}, ptr {}, i32 0, i32 {}",
+                    field_ptr, struct_ty, obj_reg, idx
+                ));
+                let field_ty = self.llvm_type(&field_defs[idx].1);
+                let result = self.fresh_reg();
+                self.push_indent(&format!(
+                    "{} = load {}, ptr {}, align 8",
+                    result, field_ty, field_ptr
+                ));
+                self.register_types.insert(result.clone(), field_ty);
+                Ok(result)
+            }
+
+            Expr::Cast {
+                expr, target_type, ..
+            } => {
                 let val_reg = self.gen_expr(expr, env)?;
                 let from_ty = self.resolve_ir_type(&val_reg);
                 let to_ty = self.llvm_type(&crate::types::Type::from(target_type));
@@ -854,24 +915,6 @@ impl Codegen {
             }
         }
     }
-
-    fn gen_identifier(&mut self, name: &str, _env: &Environment) -> Result<String, String> {
-        if let Some(ptr_reg) = self.symbols.get(name).cloned() {
-            let ty = self.symbol_types.get(&ptr_reg).cloned().unwrap_or_else(|| "i64".to_string());
-            let val_reg = self.fresh_reg();
-            self.push_indent(&format!(
-                "{} = load {}, ptr {}, align 8",
-                val_reg, ty, ptr_reg
-            ));
-            self.register_types.insert(val_reg.clone(), ty.clone());
-            Ok(val_reg)
-        } else {
-            Err(format!("variable `{}` not in codegen scope", name))
-        }
-    }
-
-    // ── Binary operations ────────────────────────────────────────────────
-
     fn gen_binary(
         &mut self,
         left: &Expr,
@@ -883,8 +926,6 @@ impl Codegen {
         let left_reg = self.gen_expr(left, env)?;
         let right_reg = self.gen_expr(right, env)?;
 
-        // Determine if this is an integer or float operation based on the
-        // left operand type (both should be the same after type checking).
         let left_ir_type = self.resolve_ir_type(&left_reg);
 
         let result = self.fresh_reg();
@@ -913,7 +954,8 @@ impl Codegen {
                     ));
                     "i64"
                 };
-                self.register_types.insert(result.clone(), result_type.to_string());
+                self.register_types
+                    .insert(result.clone(), result_type.to_string());
                 Ok(result)
             }
 
@@ -927,12 +969,48 @@ impl Codegen {
                 let is_float = left_ir_type == "double";
 
                 let cmp = match op {
-                    BinaryOp::Equal => if is_float { "oeq" } else { "eq" },
-                    BinaryOp::NotEqual => if is_float { "one" } else { "ne" },
-                    BinaryOp::Less => if is_float { "olt" } else { "slt" },
-                    BinaryOp::Greater => if is_float { "ogt" } else { "sgt" },
-                    BinaryOp::LessEqual => if is_float { "ole" } else { "sle" },
-                    BinaryOp::GreaterEqual => if is_float { "oge" } else { "sge" },
+                    BinaryOp::Equal => {
+                        if is_float {
+                            "oeq"
+                        } else {
+                            "eq"
+                        }
+                    }
+                    BinaryOp::NotEqual => {
+                        if is_float {
+                            "one"
+                        } else {
+                            "ne"
+                        }
+                    }
+                    BinaryOp::Less => {
+                        if is_float {
+                            "olt"
+                        } else {
+                            "slt"
+                        }
+                    }
+                    BinaryOp::Greater => {
+                        if is_float {
+                            "ogt"
+                        } else {
+                            "sgt"
+                        }
+                    }
+                    BinaryOp::LessEqual => {
+                        if is_float {
+                            "ole"
+                        } else {
+                            "sle"
+                        }
+                    }
+                    BinaryOp::GreaterEqual => {
+                        if is_float {
+                            "oge"
+                        } else {
+                            "sge"
+                        }
+                    }
                     _ => unreachable!(),
                 };
 
@@ -953,7 +1031,6 @@ impl Codegen {
             }
 
             BinaryOp::And | BinaryOp::Or => {
-                // Boolean AND / OR using select.
                 if matches!(op, BinaryOp::And) {
                     // result = select i1 %left, i1 %right, i1 false
                     self.push_indent(&format!(
@@ -973,8 +1050,6 @@ impl Codegen {
         }
     }
 
-    // ── Unary operations ─────────────────────────────────────────────────
-
     fn gen_unary(
         &mut self,
         op: &UnaryOp,
@@ -989,32 +1064,23 @@ impl Codegen {
             UnaryOp::Negate => {
                 let op_type = self.resolve_ir_type(&operand_reg);
                 if op_type == "double" {
-                    self.push_indent(&format!(
-                        "{} = fsub double 0.0, {}",
-                        result, operand_reg
-                    ));
-                    self.register_types.insert(result.clone(), "double".to_string());
+                    self.push_indent(&format!("{} = fsub double 0.0, {}", result, operand_reg));
+                    self.register_types
+                        .insert(result.clone(), "double".to_string());
                 } else {
-                    self.push_indent(&format!(
-                        "{} = sub i64 0, {}",
-                        result, operand_reg
-                    ));
-                    self.register_types.insert(result.clone(), "i64".to_string());
+                    self.push_indent(&format!("{} = sub i64 0, {}", result, operand_reg));
+                    self.register_types
+                        .insert(result.clone(), "i64".to_string());
                 }
                 Ok(result)
             }
             UnaryOp::Not => {
-                self.push_indent(&format!(
-                    "{} = xor i1 {}, true",
-                    result, operand_reg
-                ));
+                self.push_indent(&format!("{} = xor i1 {}, true", result, operand_reg));
                 self.register_types.insert(result.clone(), "i1".to_string());
                 Ok(result)
             }
         }
     }
-
-    // ── Function calls ───────────────────────────────────────────────────
 
     fn flatten_qualified_name(&self, expr: &Expr, tail: String) -> Option<String> {
         match expr {
@@ -1034,22 +1100,19 @@ impl Codegen {
         _span: &Span,
         env: &Environment,
     ) -> Result<String, String> {
-        // Resolve the callee name.
         let (fn_name, full_name) = match callee {
             Expr::Identifier(name, _) => (name.clone(), name.clone()),
             Expr::MemberAccess { .. } => {
-                let qualified_name = self.flatten_qualified_name(callee, String::new())
-                    .ok_or_else(|| "calls on complex member access not yet supported".to_string())?;
-                
-                // Trim trailing dots from the qualified name if it was a chain like "m.sin."
+                let qualified_name = self
+                    .flatten_qualified_name(callee, String::new())
+                    .ok_or_else(|| {
+                        "calls on complex member access not yet supported".to_string()
+                    })?;
+
                 let clean_name = qualified_name.trim_end_matches('.');
-                
-                let target_name = clean_name
-                    .rsplit('.')
-                    .next()
-                    .unwrap()
-                    .to_string();
-                
+
+                let target_name = clean_name.rsplit('.').next().unwrap().to_string();
+
                 (target_name, clean_name.to_string())
             }
             _ => {
@@ -1061,7 +1124,6 @@ impl Codegen {
             args.iter().map(|a| self.gen_expr(a, env)).collect();
         let arg_regs = arg_regs?;
 
-        // Map built-in Nimble function names to their LLVM runtime symbols.
         let llvm_fn_name = match fn_name.as_str() {
             "print" => "nimble_print".to_string(),
             "print_int" => "nimble_print_i64".to_string(),
@@ -1070,22 +1132,26 @@ impl Codegen {
             _ => fn_name.clone(),
         };
 
-        // Look up the function type from the environment using the full qualified name.
         let fn_lookup_name = fn_name.clone();
         let (param_types, ret_type) = match env.lookup(&full_name) {
             Some(sym) => match &sym.type_ {
                 Type::Function(params, ret) => (params.clone(), *ret.clone()),
                 other => {
-                    return Err(format!("`{}` is not a function (type: {})", full_name, other));
+                    return Err(format!(
+                        "`{}` is not a function (type: {})",
+                        full_name, other
+                    ));
                 }
             },
             None => {
-                // If not in env, check if the function exists without the prefix in the global scope.
                 if let Some(sym) = env.lookup(&fn_lookup_name) {
-                     match &sym.type_ {
+                    match &sym.type_ {
                         Type::Function(params, ret) => (params.clone(), *ret.clone()),
                         other => {
-                            return Err(format!("`{}` is not a function (type: {})", fn_lookup_name, other));
+                            return Err(format!(
+                                "`{}` is not a function (type: {})",
+                                fn_lookup_name, other
+                            ));
                         }
                     }
                 } else {
@@ -1097,7 +1163,6 @@ impl Codegen {
         let _arg_types: Vec<String> = param_types.iter().map(|t| self.llvm_type(t)).collect();
         let ret_llvm = self.llvm_type(&ret_type);
 
-        // Build the argument list for the call instruction.
         let mut call_args = Vec::new();
         for (reg, ty) in arg_regs.iter().zip(param_types.iter()) {
             let llvm_ty = self.llvm_type(ty);
@@ -1113,7 +1178,6 @@ impl Codegen {
                 llvm_fn_name.trim_start_matches('@'),
                 call_args.join(", ")
             ));
-            // Return a dummy i64 0 for void calls used in expressions.
             let dummy = self.fresh_reg();
             self.push_indent(&format!("{} = add i64 0, 0", dummy));
             self.register_types.insert(dummy.clone(), "i64".to_string());
@@ -1127,18 +1191,17 @@ impl Codegen {
                 call_args.join(", ")
             ));
             self.register_types.insert(result.clone(), ret_llvm.clone());
+            if let Type::Struct(struct_name) = &ret_type {
+                self.register_struct_types.insert(result.clone(), struct_name.clone());
+            }
             Ok(result)
         }
     }
 
-    // ── Type resolution helpers ──────────────────────────────────────────
-
-    /// Determine the LLVM IR type of an SSA register.
     fn resolve_ir_type(&self, reg: &str) -> String {
         if let Some(ty) = self.register_types.get(reg) {
             return ty.clone();
         }
-        // Fallback: check the symbol table.
         for (_name, ptr_reg) in &self.symbols {
             if let Some(ty) = self.symbol_types.get(ptr_reg) {
                 if !ty.is_empty() {
@@ -1149,7 +1212,6 @@ impl Codegen {
         "i64".to_string()
     }
 
-    /// Get the LLVM IR type string for a register.
     fn type_of(&self, reg: &str) -> String {
         if let Some(ty) = self.register_types.get(reg) {
             return ty.clone();
@@ -1175,15 +1237,16 @@ impl Codegen {
                 {
                     return "double".to_string();
                 }
-                if rhs.starts_with("load i1") || rhs.starts_with("add i1")
-                    || rhs.starts_with("icmp") || rhs.starts_with("fcmp")
-                    || rhs.starts_with("select i1") || rhs.starts_with("xor i1")
+                if rhs.starts_with("load i1")
+                    || rhs.starts_with("add i1")
+                    || rhs.starts_with("icmp")
+                    || rhs.starts_with("fcmp")
+                    || rhs.starts_with("select i1")
+                    || rhs.starts_with("xor i1")
                 {
                     return "i1".to_string();
                 }
-                if rhs.starts_with("getelementptr")
-                    || rhs.starts_with("load ptr")
-                {
+                if rhs.starts_with("getelementptr") || rhs.starts_with("load ptr") {
                     return "ptr".to_string();
                 }
                 // Fallback: extract type from the instruction.
@@ -1229,13 +1292,15 @@ mod tests {
         Ok(cg.into_ir())
     }
 
-    // ── Basic structural tests ───────────────────────────────────────────
-
     #[test]
     fn ir_contains_module_header() {
         let ir = generate_ir("let x = 42\n").unwrap();
         assert!(ir.contains("ModuleID"), "missing ModuleID: {}", ir);
-        assert!(ir.contains("target triple"), "missing target triple: {}", ir);
+        assert!(
+            ir.contains("target triple"),
+            "missing target triple: {}",
+            ir
+        );
     }
 
     #[test]
@@ -1262,7 +1327,11 @@ mod tests {
     fn ir_string_literal() {
         let ir = generate_ir("let x = \"hello\"\n").unwrap();
         assert!(ir.contains("getelementptr"), "no getelementptr: {}", ir);
-        assert!(ir.contains("private unnamed_addr constant"), "no global: {}", ir);
+        assert!(
+            ir.contains("private unnamed_addr constant"),
+            "no global: {}",
+            ir
+        );
     }
 
     #[test]
@@ -1304,15 +1373,14 @@ mod tests {
 
     #[test]
     fn ir_function_call() {
-        let ir = generate_ir("fn f() -> Int:\n    return 42\nfn g() -> Int:\n    return f()\n")
-            .unwrap();
+        let ir =
+            generate_ir("fn f() -> Int:\n    return 42\nfn g() -> Int:\n    return f()\n").unwrap();
         assert!(ir.contains("call i64 @f"), "no call: {}", ir);
     }
 
     #[test]
     fn ir_function_with_params() {
-        let ir = generate_ir("fn add(a: Int, b: Int) -> Int:\n    return a + b\n")
-            .unwrap();
+        let ir = generate_ir("fn add(a: Int, b: Int) -> Int:\n    return a + b\n").unwrap();
         assert!(
             ir.contains("define i64 @add(i64 %a, i64 %b)"),
             "bad fn signature: {}",
@@ -1326,8 +1394,6 @@ mod tests {
         let ir = generate_ir("var x = 10\nx = 20\n").unwrap();
         assert!(ir.contains("store"), "no store for assignment: {}", ir);
     }
-
-    // ── Control flow tests ───────────────────────────────────────────────
 
     #[test]
     fn ir_if_basic() {
@@ -1354,7 +1420,10 @@ mod tests {
         assert!(ir.contains("br i1"), "no conditional branch: {}", ir);
         // Should have a backward branch (loop backedge).
         assert!(
-            ir.lines().filter(|l| l.trim().starts_with("br label %")).count() >= 2,
+            ir.lines()
+                .filter(|l| l.trim().starts_with("br label %"))
+                .count()
+                >= 2,
             "expected at least 2 unconditional branches (loop entry + backedge): {}",
             ir
         );
@@ -1372,8 +1441,6 @@ mod tests {
         assert!(ir.contains("ret void"), "no void return: {}", ir);
     }
 
-    // ── Error cases ──────────────────────────────────────────────────────
-
     #[test]
     fn ir_empty_program() {
         let source = "";
@@ -1382,10 +1449,11 @@ mod tests {
         let mut cg = Codegen::new();
         assert!(cg.generate(&prog, &env).is_ok());
         let ir = cg.into_ir();
-        assert!(ir.contains("ModuleID"), "empty program should still emit header");
+        assert!(
+            ir.contains("ModuleID"),
+            "empty program should still emit header"
+        );
     }
-
-    // ── Example file compilation tests ──────────────────────────────────
 
     #[test]
     fn example_hello_world() {
@@ -1408,17 +1476,29 @@ mod tests {
     fn example_fizzbuzz() {
         let source = "extern fn print_int(x: Int) -> Void\n\nfn fizzbuzz(n: Int) -> Void:\n    if n % 3 == 0 && n % 5 == 0:\n        print_int(1)\n    elif n % 3 == 0:\n        print_int(2)\n    elif n % 5 == 0:\n        print_int(3)\n    else:\n        print_int(4)\n\nfn main() -> Int:\n    var i = 1\n    while i <= 100:\n        fizzbuzz(i)\n        i = i + 1\n    return 0\n";
         let ir = generate_ir(source).unwrap();
-        assert!(ir.contains("define void @fizzbuzz"), "no fizzbuzz fn: {}", ir);
+        assert!(
+            ir.contains("define void @fizzbuzz"),
+            "no fizzbuzz fn: {}",
+            ir
+        );
         assert!(ir.contains("define i64 @main"), "no main fn: {}", ir);
         assert!(ir.contains("br i1"), "no conditional branch in IR: {}", ir);
-        assert!(ir.contains("call void @fizzbuzz"), "no fizzbuzz call: {}", ir);
+        assert!(
+            ir.contains("call void @fizzbuzz"),
+            "no fizzbuzz call: {}",
+            ir
+        );
     }
 
     #[test]
     fn example_extern_fn() {
         let source = "extern fn printf(fmt: String) -> Int\n\nfn main() -> Int:\n    printf(\"hello\")\n    return 0\n";
         let ir = generate_ir(source).unwrap();
-        assert!(ir.contains("declare i64 @printf"), "no printf declare: {}", ir);
+        assert!(
+            ir.contains("declare i64 @printf"),
+            "no printf declare: {}",
+            ir
+        );
         assert!(ir.contains("call i64 @printf"), "no printf call: {}", ir);
     }
 
@@ -1471,7 +1551,11 @@ mod tests {
         let ir = generate_ir(source).unwrap();
         assert!(ir.contains("@double("), "no double: {}", ir);
         assert!(ir.contains("@recursive("), "no recursive: {}", ir);
-        assert!(ir.contains("call i64 @recursive"), "no recursive call: {}", ir);
+        assert!(
+            ir.contains("call i64 @recursive"),
+            "no recursive call: {}",
+            ir
+        );
     }
 
     #[test]
@@ -1482,14 +1566,22 @@ mod tests {
         assert!(ir.contains("@test_or"), "no test_or fn: {}", ir);
         assert!(ir.contains("@test_not"), "no test_not fn: {}", ir);
         assert!(ir.contains("@main("), "no main fn: {}", ir);
-        assert!(ir.contains("call void @nimble_print_i64"), "no print_int in main: {}", ir);
+        assert!(
+            ir.contains("call void @nimble_print_i64"),
+            "no print_int in main: {}",
+            ir
+        );
     }
 
     #[test]
     fn example_strings() {
         let source = "extern fn printf(fmt: String) -> Int\n\nfn main() -> Int:\n    printf(\"hello\")\n    return 0\n";
         let ir = generate_ir(source).unwrap();
-        assert!(ir.contains("private unnamed_addr constant"), "no string constant: {}", ir);
+        assert!(
+            ir.contains("private unnamed_addr constant"),
+            "no string constant: {}",
+            ir
+        );
         assert!(ir.contains("getelementptr"), "no gep: {}", ir);
     }
 
@@ -1498,5 +1590,15 @@ mod tests {
         let ir = generate_ir("let x = 42\nlet y = x as Float\nlet z = y as Int\n").unwrap();
         assert!(ir.contains("sitofp i64"), "no sitofp: {}", ir);
         assert!(ir.contains("fptosi double"), "no fptosi: {}", ir);
+    }
+
+    #[test]
+    fn ir_struct_literal_and_field_access() {
+        let ir = generate_ir(
+            "struct Point:\n    let x: Int = 0\n    let y: Int = 0\n\nlet p = Point{x: 1, y: 2}\nlet n = p.x\n",
+        )
+        .unwrap();
+        assert!(ir.contains("getelementptr inbounds { i64, i64 }"), "no struct GEP: {}", ir);
+        assert!(ir.contains("load i64"), "no field load: {}", ir);
     }
 }

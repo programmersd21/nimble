@@ -2,39 +2,36 @@ use crate::ast::*;
 use crate::errors::ParseError;
 use crate::lexer::{Lexer, Span, Token, TokenKind};
 
-// Parser
-
-/// A hand‑written recursive‑descent parser for the Nimble language.
-///
-/// The parser consumes a token stream produced by [`Lexer`] and builds an
-/// AST ([`Program`]).  It uses Pratt‑style precedence climbing for
-/// expressions and explicit `Indent` / `Dedent` tokens for block structure.
+/// Recursive-descent parser with Pratt precedence climbing.
 pub struct Parser<'a> {
     lexer: Lexer<'a>,
-    /// One‑token look‑ahead buffer.
     current: Token,
     next: Token,
-    /// The raw source, used for diagnostic messages.
+    /// Used for diagnostic messages.
     source: &'a str,
 }
 
 impl<'a> Parser<'a> {
-    /// Create a new parser from a source string.
-    ///
-    /// # Errors
-    /// Returns a lexer error if the first two tokens cannot be read.
     pub fn new(source: &'a str) -> Result<Self, ParseError> {
         let mut lexer = Lexer::new(source);
-        let current = lexer.next_token().map_err(|msg| {
-            ParseError::Internal { src: source.to_string(), span: (0usize, 0usize).into(), msg }
+        let current = lexer.next_token().map_err(|msg| ParseError::Internal {
+            src: source.to_string(),
+            span: (0usize, 0usize).into(),
+            msg,
         })?;
-        let next = lexer.next_token().map_err(|msg| {
-            ParseError::Internal { src: source.to_string(), span: (0usize, 0usize).into(), msg }
+        let next = lexer.next_token().map_err(|msg| ParseError::Internal {
+            src: source.to_string(),
+            span: (0usize, 0usize).into(),
+            msg,
         })?;
-        Ok(Parser { lexer, current, next, source })
+        Ok(Parser {
+            lexer,
+            current,
+            next,
+            source,
+        })
     }
 
-    /// Parse the entire source into a [`Program`].
     pub fn parse(&mut self) -> Result<Program, ParseError> {
         let start_span = self.current.span;
         let mut statements = Vec::new();
@@ -44,9 +41,6 @@ impl<'a> Parser<'a> {
                 break;
             }
             if self.check(&TokenKind::Dedent) {
-                // A top‑level Dedent means we have an extra dedent – this
-                // can happen if the file starts with indented content, which
-                // is not valid Nimble at the top level.
                 let tok = self.current.clone();
                 return Err(ParseError::unexpected_token(self.source, &tok));
             }
@@ -68,11 +62,6 @@ impl<'a> Parser<'a> {
         })
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    // Statement dispatch
-    // ═══════════════════════════════════════════════════════════════════
-
-    /// Route to the appropriate `parse_*` method based on the current token.
     fn parse_statement(&mut self) -> Result<Stmt, ParseError> {
         let is_pub = if self.check(&TokenKind::Pub) {
             self.advance();
@@ -84,10 +73,14 @@ impl<'a> Parser<'a> {
         let stmt = match &self.current.kind {
             TokenKind::Fn => self.parse_function_def(),
             TokenKind::Extern => self.parse_extern_fn(),
+            TokenKind::Struct => self.parse_struct_def(),
+            TokenKind::Interface => self.parse_interface_def(),
             TokenKind::Let => self.parse_let_or_var(false),
             TokenKind::Var => self.parse_let_or_var(true),
             TokenKind::If => self.parse_if(),
             TokenKind::While => self.parse_while(),
+            TokenKind::Break => self.parse_break(),
+            TokenKind::Continue => self.parse_continue(),
             TokenKind::For => self.parse_for(),
             TokenKind::Return => self.parse_return(),
             TokenKind::Load => self.parse_load(is_pub),
@@ -103,9 +96,6 @@ impl<'a> Parser<'a> {
         Ok(stmt)
     }
 
-    // ── Block helper ───────────────────────────────────────────────────
-
-    /// Parse a block: `: [Newline] Indent stmts+ Dedent`
     fn parse_block(&mut self) -> Result<Vec<Stmt>, ParseError> {
         // The `:` has already been consumed by the caller.
         if self.check(&TokenKind::Newline) {
@@ -130,8 +120,6 @@ impl<'a> Parser<'a> {
         }
         Ok(stmts)
     }
-
-    // ── `extern fn name(params) [-> RetType]` ─────────────────────────
 
     fn parse_extern_fn(&mut self) -> Result<Stmt, ParseError> {
         let start = self.current.span;
@@ -174,7 +162,82 @@ impl<'a> Parser<'a> {
         })
     }
 
-    // ── `fn name(params) [-> RetType]:` ────────────────────────────────
+    fn parse_struct_def(&mut self) -> Result<Stmt, ParseError> {
+        let start = self.current.span;
+        self.advance();
+        let name = self.expect_identifier()?;
+        if !self.check(&TokenKind::Colon) {
+            return Err(ParseError::expected_token(self.source, &self.current, "':'"));
+        }
+        self.advance();
+        let body = self.parse_block()?;
+        let mut fields = Vec::new();
+        for stmt in body {
+            match stmt {
+                Stmt::Let { name, type_annot: Some(type_annot), span, .. }
+                | Stmt::Var { name, type_annot: Some(type_annot), span, .. } => {
+                    fields.push(Param { name, type_annot, span });
+                }
+                _ => return Err(ParseError::unexpected_token(self.source, &self.current)),
+            }
+        }
+        Ok(Stmt::StructDef { name, fields, span: self.merge_span(&start, &self.current.span) })
+    }
+
+    fn parse_interface_def(&mut self) -> Result<Stmt, ParseError> {
+        let start = self.current.span;
+        self.advance();
+        let name = self.expect_identifier()?;
+        if !self.check(&TokenKind::Colon) {
+            return Err(ParseError::expected_token(self.source, &self.current, "':'"));
+        }
+        self.advance();
+        let mut methods = Vec::new();
+        if self.check(&TokenKind::Newline) {
+            self.advance();
+        }
+        if !self.check(&TokenKind::Indent) {
+            return Err(ParseError::expected_indented_block(self.source, &self.current));
+        }
+        self.advance();
+        while !self.check(&TokenKind::Dedent) && !self.check(&TokenKind::Eof) {
+            let method_span = self.current.span;
+            if !self.check(&TokenKind::Fn) {
+                return Err(ParseError::expected_token(self.source, &self.current, "'fn'"));
+            }
+            self.advance();
+            let method_name = self.expect_identifier()?;
+            if !self.check(&TokenKind::LParen) {
+                return Err(ParseError::expected_token(self.source, &self.current, "'('"));
+            }
+            self.advance();
+            let params = self.parse_params()?;
+            if !self.check(&TokenKind::RParen) {
+                return Err(ParseError::expected_token(self.source, &self.current, "')'"));
+            }
+            self.advance();
+            if self.check(&TokenKind::Arrow) {
+                self.advance();
+                let _ = self.parse_type()?;
+            }
+            if let Some(first) = params.into_iter().next() {
+                methods.push(Param {
+                    name: method_name,
+                    type_annot: first.type_annot,
+                    span: method_span,
+                });
+            } else {
+                return Err(ParseError::expected_identifier(self.source, &self.current));
+            }
+            if self.check(&TokenKind::Newline) {
+                self.advance();
+            }
+        }
+        if self.check(&TokenKind::Dedent) {
+            self.advance();
+        }
+        Ok(Stmt::InterfaceDef { name, methods, span: self.merge_span(&start, &self.current.span) })
+    }
 
     fn parse_function_def(&mut self) -> Result<Stmt, ParseError> {
         let start = self.current.span;
@@ -184,11 +247,7 @@ impl<'a> Parser<'a> {
 
         if !self.check(&TokenKind::LParen) {
             let tok = self.current.clone();
-            return Err(ParseError::expected_token(
-                self.source,
-                &tok,
-                "'('",
-            ));
+            return Err(ParseError::expected_token(self.source, &tok, "'('"));
         }
         self.advance(); // consume `(`
 
@@ -225,7 +284,6 @@ impl<'a> Parser<'a> {
         })
     }
 
-    /// Parse `param ("," param)*` inside a function signature.
     fn parse_params(&mut self) -> Result<Vec<Param>, ParseError> {
         let mut params = Vec::new();
         loop {
@@ -257,8 +315,6 @@ impl<'a> Parser<'a> {
         Ok(params)
     }
 
-    // ── `let` / `var` declarations ─────────────────────────────────────
-
     fn parse_let_or_var(&mut self, mutable: bool) -> Result<Stmt, ParseError> {
         let start = self.current.span;
         self.advance(); // consume `let` / `var`
@@ -283,13 +339,21 @@ impl<'a> Parser<'a> {
 
         let span = self.merge_span(&start, &self.current.span);
         if mutable {
-            Ok(Stmt::Var { name, type_annot, value, span })
+            Ok(Stmt::Var {
+                name,
+                type_annot,
+                value,
+                span,
+            })
         } else {
-            Ok(Stmt::Let { name, type_annot, value, span })
+            Ok(Stmt::Let {
+                name,
+                type_annot,
+                value,
+                span,
+            })
         }
     }
-
-    // ── `if` / `elif` / `else` ─────────────────────────────────────────
 
     fn parse_if(&mut self) -> Result<Stmt, ParseError> {
         let start = self.current.span;
@@ -308,8 +372,7 @@ impl<'a> Parser<'a> {
         // Parse `elif` branches
         let mut elifs = Vec::new();
         while self.check(&TokenKind::Elif) {
-            let _elif_span = self.current.span;
-            self.advance(); // consume `elif`
+            self.advance();
 
             let elif_cond = self.parse_expr()?;
 
@@ -348,8 +411,6 @@ impl<'a> Parser<'a> {
         })
     }
 
-    // ── `while` ────────────────────────────────────────────────────────
-
     fn parse_while(&mut self) -> Result<Stmt, ParseError> {
         let start = self.current.span;
         self.advance(); // consume `while`
@@ -371,7 +432,17 @@ impl<'a> Parser<'a> {
         })
     }
 
-    // ── `for` ──────────────────────────────────────────────────────────
+    fn parse_break(&mut self) -> Result<Stmt, ParseError> {
+        let span = self.current.span;
+        self.advance();
+        Ok(Stmt::Break { span })
+    }
+
+    fn parse_continue(&mut self) -> Result<Stmt, ParseError> {
+        let span = self.current.span;
+        self.advance();
+        Ok(Stmt::Continue { span })
+    }
 
     fn parse_for(&mut self) -> Result<Stmt, ParseError> {
         let start = self.current.span;
@@ -381,11 +452,7 @@ impl<'a> Parser<'a> {
 
         if !self.check(&TokenKind::In) {
             let tok = self.current.clone();
-            return Err(ParseError::expected_token(
-                self.source,
-                &tok,
-                "'in'",
-            ));
+            return Err(ParseError::expected_token(self.source, &tok, "'in'"));
         }
         self.advance(); // consume `in`
 
@@ -407,8 +474,6 @@ impl<'a> Parser<'a> {
         })
     }
 
-    // ── `return` ───────────────────────────────────────────────────────
-
     fn parse_return(&mut self) -> Result<Stmt, ParseError> {
         let start = self.current.span;
         self.advance(); // consume `return`
@@ -426,8 +491,6 @@ impl<'a> Parser<'a> {
             span: self.merge_span(&start, &self.current.span),
         })
     }
-
-    // ── `load` module import ──────────────────────────────────────────
 
     fn parse_load(&mut self, is_pub: bool) -> Result<Stmt, ParseError> {
         let start = self.current.span;
@@ -500,7 +563,11 @@ impl<'a> Parser<'a> {
             self.advance(); // consume second `.`
             if !self.check(&TokenKind::Slash) {
                 let tok = self.current.clone();
-                return Err(ParseError::expected_token(self.source, &tok, "'/' after '..'"));
+                return Err(ParseError::expected_token(
+                    self.source,
+                    &tok,
+                    "'/' after '..'",
+                ));
             }
             self.advance(); // consume `/`
             Ok("..".to_string())
@@ -509,11 +576,13 @@ impl<'a> Parser<'a> {
             Ok(".".to_string())
         } else {
             let tok = self.current.clone();
-            Err(ParseError::expected_token(self.source, &tok, "'/' after '.'"))
+            Err(ParseError::expected_token(
+                self.source,
+                &tok,
+                "'/' after '.'",
+            ))
         }
     }
-
-    // ── Expression statement ───────────────────────────────────────────
 
     fn parse_expr_stmt(&mut self) -> Result<Stmt, ParseError> {
         if !self.can_start_expr() {
@@ -524,23 +593,7 @@ impl<'a> Parser<'a> {
         Ok(Stmt::Expr(expr))
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    // Expression parser (Pratt / precedence climbing)
-    // ═══════════════════════════════════════════════════════════════════
-
-    /// Expression precedence levels.
-    ///
-    /// | Level | Operators           | Assoc |
-    /// |-------|---------------------|-------|
-    /// | 1     | `=`                 | right |
-    /// | 2     | `\|\|`              | left  |
-    /// | 3     | `&&`                | left  |
-    /// | 4     | `==` `!=`           | left  |
-    /// | 5     | `<` `>` `<=` `>=`   | left  |
-    /// | 6     | `+` `-`             | left  |
-    /// | 7     | `*` `/`             | left  |
-    /// | 8     | unary `-` `!`       | right (prefix) |
-    /// | 9     | `()` call           | left  |
+    /// Precedence: 1=assign, 2=||, 3=&&, 4=eq, 5=comp, 6=add, 7=mul, 8=unary
     fn get_prefix_precedence(kind: &TokenKind) -> Option<u8> {
         match kind {
             TokenKind::Minus | TokenKind::Bang => Some(8),
@@ -549,7 +602,6 @@ impl<'a> Parser<'a> {
     }
 
     fn get_infix_precedence(kind: &TokenKind) -> Option<(u8, bool)> {
-        // Returns (precedence, right_associative)
         match kind {
             TokenKind::Dot => Some((10, false)),
             TokenKind::Equal
@@ -586,12 +638,10 @@ impl<'a> Parser<'a> {
         )
     }
 
-    /// Parse any expression (entry point).
     fn parse_expr(&mut self) -> Result<Expr, ParseError> {
         self.parse_expr_prec(0)
     }
 
-    /// Core Pratt‑parsing loop with minimum precedence `min_prec`.
     fn parse_expr_prec(&mut self, min_prec: u8) -> Result<Expr, ParseError> {
         let mut left = self.parse_prefix()?;
 
@@ -616,7 +666,7 @@ impl<'a> Parser<'a> {
 
             if self.check(&TokenKind::As) {
                 self.advance(); // consume `as`
-                let target_type = self.parse_type()?;
+                let target_type = self.parse_type()?; 
                 let span = self.merge_span(&left.span(), &target_type.span);
                 left = Expr::Cast {
                     expr: Box::new(left),
@@ -624,6 +674,13 @@ impl<'a> Parser<'a> {
                     span,
                 };
                 continue;
+            }
+
+            if self.check(&TokenKind::LBrace) {
+                if let Expr::Identifier(ref name, _) = left {
+                    left = self.parse_struct_literal(name.clone(), left.span())?;
+                    continue;
+                }
             }
 
             // Check for binary operators.
@@ -641,12 +698,14 @@ impl<'a> Parser<'a> {
                             value: Box::new(right),
                             span,
                         };
-                    } else if matches!(&op_token.kind, TokenKind::PlusEqual
-                        | TokenKind::MinusEqual
-                        | TokenKind::StarEqual
-                        | TokenKind::SlashEqual
-                        | TokenKind::PercentEqual)
-                    {
+                    } else if matches!(
+                        &op_token.kind,
+                        TokenKind::PlusEqual
+                            | TokenKind::MinusEqual
+                            | TokenKind::StarEqual
+                            | TokenKind::SlashEqual
+                            | TokenKind::PercentEqual
+                    ) {
                         let compound_op = match &op_token.kind {
                             TokenKind::PlusEqual => BinaryOp::Add,
                             TokenKind::MinusEqual => BinaryOp::Sub,
@@ -683,7 +742,6 @@ impl<'a> Parser<'a> {
         Ok(left)
     }
 
-    /// Parse a prefix (primary / unary) expression.
     fn parse_prefix(&mut self) -> Result<Expr, ParseError> {
         // Unary operators: `-expr`, `!expr`
         if let Some(prec) = Self::get_prefix_precedence(&self.current.kind) {
@@ -701,20 +759,15 @@ impl<'a> Parser<'a> {
         self.parse_primary()
     }
 
-    /// Parse a primary expression: literals, identifiers, grouping.
     fn parse_primary(&mut self) -> Result<Expr, ParseError> {
         let token = self.current.clone();
         let expr = match &token.kind {
             TokenKind::IntLiteral(n) => Expr::IntLiteral(*n, token.span),
             TokenKind::FloatLiteral(f) => Expr::FloatLiteral(*f, token.span),
-            TokenKind::StringLiteral(s) => {
-                Expr::StringLiteral(s.clone(), token.span)
-            }
+            TokenKind::StringLiteral(s) => Expr::StringLiteral(s.clone(), token.span),
             TokenKind::True => Expr::BoolLiteral(true, token.span),
             TokenKind::False => Expr::BoolLiteral(false, token.span),
-            TokenKind::Identifier(s) => {
-                Expr::Identifier(s.clone(), token.span)
-            }
+            TokenKind::Identifier(s) => Expr::Identifier(s.clone(), token.span),
             TokenKind::LParen => {
                 self.advance(); // consume `(`
                 let inner = self.parse_expr()?;
@@ -744,7 +797,6 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    /// Parse a function / method call: `callee(args...)`
     fn parse_call(&mut self, callee: Expr) -> Result<Expr, ParseError> {
         let lparen = self.current.span;
         self.advance(); // consume `(`
@@ -783,7 +835,33 @@ impl<'a> Parser<'a> {
         })
     }
 
-    // ── Type parsing ───────────────────────────────────────────────────
+    fn parse_struct_literal(&mut self, name: String, start: Span) -> Result<Expr, ParseError> {
+        self.advance(); // consume {
+        let mut fields = Vec::new();
+        loop {
+            if self.check(&TokenKind::RBrace) || self.check(&TokenKind::Eof) {
+                break;
+            }
+            let field_name = self.expect_identifier()?;
+            if !self.check(&TokenKind::Colon) {
+                return Err(ParseError::expected_token(self.source, &self.current, "':'"));
+            }
+            self.advance();
+            let expr = self.parse_expr()?;
+            fields.push((field_name, expr));
+            if self.check(&TokenKind::Comma) {
+                self.advance();
+            } else {
+                break;
+            }
+        }
+        if !self.check(&TokenKind::RBrace) {
+            return Err(ParseError::expected_token(self.source, &self.current, "'}'"));
+        }
+        let end = self.current.span;
+        self.advance();
+        Ok(Expr::StructLiteral { name, fields, span: self.merge_span(&start, &end) })
+    }
 
     fn parse_type(&mut self) -> Result<Type, ParseError> {
         if !matches!(&self.current.kind, TokenKind::Identifier(_)) {
@@ -802,27 +880,44 @@ impl<'a> Parser<'a> {
             unreachable!()
         };
         self.advance();
-        Ok(Type { name, span: token.span })
+        let mut args = Vec::new();
+        if self.check(&TokenKind::LBracket) {
+            self.advance();
+            loop {
+                if self.check(&TokenKind::RBracket) || self.check(&TokenKind::Eof) {
+                    break;
+                }
+                args.push(self.parse_type()?);
+                if self.check(&TokenKind::Comma) {
+                    self.advance();
+                } else {
+                    break;
+                }
+            }
+            if !self.check(&TokenKind::RBracket) {
+                return Err(ParseError::expected_token(self.source, &self.current, "']'"));
+            }
+            self.advance();
+        }
+        Ok(Type {
+            name,
+            args,
+            span: token.span,
+        })
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    // Token helpers
-    // ═══════════════════════════════════════════════════════════════════
-
-    /// Check if the current token matches `kind`.
     fn check(&self, kind: &TokenKind) -> bool {
         &self.current.kind == kind
     }
 
-    /// Advance to the next token, returning the old current token.
     fn advance(&mut self) -> Token {
         let prev = std::mem::replace(
             &mut self.current,
             std::mem::replace(
                 &mut self.next,
-                self.lexer.next_token().unwrap_or_else(|_| {
-                    Token::new(TokenKind::Eof, Span::new(1, 1, 0))
-                }),
+                self.lexer
+                    .next_token()
+                    .unwrap_or_else(|_| Token::new(TokenKind::Eof, Span::new(1, 1, 0))),
             ),
         );
         prev
@@ -877,10 +972,7 @@ impl<'a> Parser<'a> {
     }
 }
 
-
 impl Expr {
-    /// Convenience accessor to borrow the `Span` stored in any expression
-    /// variant.
     pub fn span(&self) -> Span {
         match self {
             Expr::IntLiteral(_, s)
@@ -894,6 +986,7 @@ impl Expr {
             | Expr::Assign { span, .. }
             | Expr::Grouping { span, .. }
             | Expr::MemberAccess { span, .. }
+            | Expr::StructLiteral { span, .. }
             | Expr::Cast { span, .. } => *span,
         }
     }
@@ -903,13 +996,11 @@ impl Expr {
 mod tests {
     use super::*;
 
-    /// Parse `source`, panicking on errors.
     fn parse(source: &str) -> Program {
         let mut parser = Parser::new(source).expect("parser creation failed");
         parser.parse().expect("parse failed")
     }
 
-    /// Parse `source` and return just the statement kinds.
     fn stmt_kinds(source: &str) -> Vec<&'static str> {
         let prog = parse(source);
         prog.statements.iter().map(|s| stmt_tag(s)).collect()
@@ -920,8 +1011,12 @@ mod tests {
             Stmt::Let { .. } => "let",
             Stmt::Var { .. } => "var",
             Stmt::FunctionDef { .. } => "fn",
+            Stmt::StructDef { .. } => "struct",
+            Stmt::InterfaceDef { .. } => "interface",
             Stmt::If { .. } => "if",
             Stmt::While { .. } => "while",
+            Stmt::Break { .. } => "break",
+            Stmt::Continue { .. } => "continue",
             Stmt::For { .. } => "for",
             Stmt::Return { .. } => "return",
             Stmt::ExternFn { .. } => "extern fn",
@@ -929,8 +1024,6 @@ mod tests {
             Stmt::Expr(_) => "expr",
         }
     }
-
-    // ── Declarations ───────────────────────────────────────────────────
 
     #[test]
     fn load_statement() {
@@ -949,7 +1042,11 @@ mod tests {
         let src = "pub load std.io\n";
         let prog = parse(src);
         match &prog.statements[0] {
-            Stmt::Load { module_path, is_pub, .. } => {
+            Stmt::Load {
+                module_path,
+                is_pub,
+                ..
+            } => {
                 assert_eq!(module_path, &["std", "io"]);
                 assert!(*is_pub);
             }
@@ -981,7 +1078,12 @@ mod tests {
         let prog = parse("let x = 5\n");
         assert_eq!(prog.statements.len(), 1);
         match &prog.statements[0] {
-            Stmt::Let { name, type_annot, value, .. } => {
+            Stmt::Let {
+                name,
+                type_annot,
+                value,
+                ..
+            } => {
                 assert_eq!(name, "x");
                 assert!(type_annot.is_none());
                 assert!(matches!(value, Expr::IntLiteral(5, _)));
@@ -994,7 +1096,9 @@ mod tests {
     fn let_with_type() {
         let prog = parse("let x: Int = 5\n");
         match &prog.statements[0] {
-            Stmt::Let { name, type_annot, .. } => {
+            Stmt::Let {
+                name, type_annot, ..
+            } => {
                 assert_eq!(name, "x");
                 assert_eq!(type_annot.as_ref().unwrap().name, "Int");
             }
@@ -1003,10 +1107,40 @@ mod tests {
     }
 
     #[test]
+    fn let_with_generic_type() {
+        let prog = parse("let xs: Box[Int] = value\n");
+        match &prog.statements[0] {
+            Stmt::Let { type_annot, .. } => {
+                let ty = type_annot.as_ref().unwrap();
+                assert_eq!(ty.name, "Box");
+                assert_eq!(ty.args[0].name, "Int");
+            }
+            _ => panic!("expected Let"),
+        }
+    }
+
+    #[test]
+    fn interface_signature() {
+        let prog = parse("interface Drawable:\n    fn draw(self: Drawable) -> Void\n");
+        match &prog.statements[0] {
+            Stmt::InterfaceDef { name, methods, .. } => {
+                assert_eq!(name, "Drawable");
+                assert_eq!(methods[0].name, "draw");
+            }
+            _ => panic!("expected InterfaceDef"),
+        }
+    }
+
+    #[test]
     fn var_decl() {
         let prog = parse("var name: String = \"hello\"\n");
         match &prog.statements[0] {
-            Stmt::Var { name, type_annot, value, .. } => {
+            Stmt::Var {
+                name,
+                type_annot,
+                value,
+                ..
+            } => {
                 assert_eq!(name, "name");
                 assert_eq!(type_annot.as_ref().unwrap().name, "String");
                 assert!(matches!(value, Expr::StringLiteral(s, _) if s == "hello"));
@@ -1015,14 +1149,18 @@ mod tests {
         }
     }
 
-    // ── Function definitions ───────────────────────────────────────────
-
     #[test]
     fn function_no_args() {
         let prog = parse("fn main():\n    return 0\n");
         assert_eq!(stmt_kinds("fn main():\n    return 0\n"), vec!["fn"]);
         match &prog.statements[0] {
-            Stmt::FunctionDef { name, params, return_type, body, .. } => {
+            Stmt::FunctionDef {
+                name,
+                params,
+                return_type,
+                body,
+                ..
+            } => {
                 assert_eq!(name, "main");
                 assert!(params.is_empty());
                 assert!(return_type.is_none());
@@ -1038,7 +1176,13 @@ mod tests {
         let src = "fn add(a: Int, b: Int) -> Int:\n    return a + b\n";
         let prog = parse(src);
         match &prog.statements[0] {
-            Stmt::FunctionDef { name, params, return_type, body, .. } => {
+            Stmt::FunctionDef {
+                name,
+                params,
+                return_type,
+                body,
+                ..
+            } => {
                 assert_eq!(name, "add");
                 assert_eq!(params.len(), 2);
                 assert_eq!(params[0].name, "a");
@@ -1052,14 +1196,18 @@ mod tests {
         }
     }
 
-    // ── If / elif / else ───────────────────────────────────────────────
-
     #[test]
     fn if_statement() {
         let src = "if x > 10:\n    let y = 1\n";
         let prog = parse(src);
         match &prog.statements[0] {
-            Stmt::If { condition, body, elifs, else_body, .. } => {
+            Stmt::If {
+                condition,
+                body,
+                elifs,
+                else_body,
+                ..
+            } => {
                 assert!(matches!(condition, Expr::Binary { .. }));
                 assert_eq!(body.len(), 1);
                 assert!(elifs.is_empty());
@@ -1081,7 +1229,12 @@ else:
 ";
         let prog = parse(src);
         match &prog.statements[0] {
-            Stmt::If { body, elifs, else_body, .. } => {
+            Stmt::If {
+                body,
+                elifs,
+                else_body,
+                ..
+            } => {
                 assert_eq!(body.len(), 1);
                 assert_eq!(elifs.len(), 1);
                 assert!(else_body.is_some());
@@ -1091,14 +1244,14 @@ else:
         }
     }
 
-    // ── While / for ────────────────────────────────────────────────────
-
     #[test]
     fn while_loop() {
         let src = "while x > 0:\n    x = x - 1\n";
         let prog = parse(src);
         match &prog.statements[0] {
-            Stmt::While { condition, body, .. } => {
+            Stmt::While {
+                condition, body, ..
+            } => {
                 assert!(matches!(condition, Expr::Binary { .. }));
                 assert_eq!(body.len(), 1);
             }
@@ -1111,7 +1264,12 @@ else:
         let src = "for i in range:\n    print(i)\n";
         let prog = parse(src);
         match &prog.statements[0] {
-            Stmt::For { variable, iterable, body, .. } => {
+            Stmt::For {
+                variable,
+                iterable,
+                body,
+                ..
+            } => {
                 assert_eq!(variable, "i");
                 assert!(matches!(iterable, Expr::Identifier(name, _) if name == "range"));
                 assert_eq!(body.len(), 1);
@@ -1120,20 +1278,24 @@ else:
         }
     }
 
-    // ── Expressions ────────────────────────────────────────────────────
-
     #[test]
     fn binary_expression_precedence() {
         let prog = parse("let x = 1 + 2 * 3\n");
         match &prog.statements[0] {
             Stmt::Let { value, .. } => {
-                // 1 + (2 * 3) – multiplication binds tighter.
                 match value {
-                    Expr::Binary { left, op, right, .. } => {
+                    Expr::Binary {
+                        left, op, right, ..
+                    } => {
                         assert_eq!(*op, BinaryOp::Add);
                         assert!(matches!(left.as_ref(), Expr::IntLiteral(1, _)));
                         match right.as_ref() {
-                            Expr::Binary { left: rl, op: rop, right: rr, .. } => {
+                            Expr::Binary {
+                                left: rl,
+                                op: rop,
+                                right: rr,
+                                ..
+                            } => {
                                 assert_eq!(*rop, BinaryOp::Mul);
                                 assert!(matches!(rl.as_ref(), Expr::IntLiteral(2, _)));
                                 assert!(matches!(rr.as_ref(), Expr::IntLiteral(3, _)));
@@ -1155,7 +1317,10 @@ else:
             Stmt::Let { value, .. } => {
                 assert!(matches!(
                     value,
-                    Expr::Binary { op: BinaryOp::Equal, .. }
+                    Expr::Binary {
+                        op: BinaryOp::Equal,
+                        ..
+                    }
                 ));
             }
             _ => panic!("expected Let"),
@@ -1167,14 +1332,17 @@ else:
         let prog = parse("let r = a && b || c\n");
         match &prog.statements[0] {
             Stmt::Let { value, .. } => {
-                // `&&` binds tighter than `||`
-                match value {
-                    Expr::Binary { op: BinaryOp::Or, left, .. } => {
-                        match left.as_ref() {
-                            Expr::Binary { op: BinaryOp::And, .. } => {}
-                            _ => panic!("expected And left"),
-                        }
-                    }
+        match value {
+                    Expr::Binary {
+                        op: BinaryOp::Or,
+                        left,
+                        ..
+                    } => match left.as_ref() {
+                        Expr::Binary {
+                            op: BinaryOp::And, ..
+                        } => {}
+                        _ => panic!("expected And left"),
+                    },
                     _ => panic!("expected Or at top"),
                 }
             }
@@ -1186,18 +1354,16 @@ else:
     fn function_call() {
         let prog = parse("let r = foo(x, y + 1)\n");
         match &prog.statements[0] {
-            Stmt::Let { value, .. } => {
-                match value {
-                    Expr::Call { callee, args, .. } => {
-                        assert!(matches!(
-                            callee.as_ref(),
-                            Expr::Identifier(name, _) if name == "foo"
-                        ));
-                        assert_eq!(args.len(), 2);
-                    }
-                    _ => panic!("expected Call"),
+            Stmt::Let { value, .. } => match value {
+                Expr::Call { callee, args, .. } => {
+                    assert!(matches!(
+                        callee.as_ref(),
+                        Expr::Identifier(name, _) if name == "foo"
+                    ));
+                    assert_eq!(args.len(), 2);
                 }
-            }
+                _ => panic!("expected Call"),
+            },
             _ => panic!("expected Let"),
         }
     }
@@ -1226,17 +1392,17 @@ else:
         let prog = parse("let r = (1 + 2) * 3\n");
         match &prog.statements[0] {
             Stmt::Let { value, .. } => match value {
-                Expr::Binary { op, left, right, .. } => {
+                Expr::Binary {
+                    op, left, right, ..
+                } => {
                     assert_eq!(*op, BinaryOp::Mul);
                     match left.as_ref() {
-                        Expr::Grouping { expr, .. } => {
-                            match expr.as_ref() {
-                                Expr::Binary { op: add_op, .. } => {
-                                    assert_eq!(*add_op, BinaryOp::Add);
-                                }
-                                _ => panic!("expected Add inside grouping"),
+                        Expr::Grouping { expr, .. } => match expr.as_ref() {
+                            Expr::Binary { op: add_op, .. } => {
+                                assert_eq!(*add_op, BinaryOp::Add);
                             }
-                        }
+                            _ => panic!("expected Add inside grouping"),
+                        },
                         _ => panic!("expected Grouping"),
                     }
                     assert!(matches!(right.as_ref(), Expr::IntLiteral(3, _)));
@@ -1246,8 +1412,6 @@ else:
             _ => panic!("expected Let"),
         }
     }
-
-    // ── Unary ──────────────────────────────────────────────────────────
 
     #[test]
     fn unary_minus() {
@@ -1271,10 +1435,7 @@ else:
             Stmt::Let { value, .. } => match value {
                 Expr::Unary { op, operand, .. } => {
                     assert_eq!(*op, UnaryOp::Not);
-                    assert!(matches!(
-                        operand.as_ref(),
-                        Expr::BoolLiteral(true, _)
-                    ));
+                    assert!(matches!(operand.as_ref(), Expr::BoolLiteral(true, _)));
                 }
                 _ => panic!("expected Unary"),
             },
@@ -1282,25 +1443,19 @@ else:
         }
     }
 
-    // ── Return ─────────────────────────────────────────────────────────
-
     #[test]
     fn bare_return() {
         let prog = parse("fn f():\n    return\n");
         match &prog.statements[0] {
-            Stmt::FunctionDef { body, .. } => {
-                match &body[0] {
-                    Stmt::Return { value, .. } => {
-                        assert!(value.is_none());
-                    }
-                    _ => panic!("expected Return"),
+            Stmt::FunctionDef { body, .. } => match &body[0] {
+                Stmt::Return { value, .. } => {
+                    assert!(value.is_none());
                 }
-            }
+                _ => panic!("expected Return"),
+            },
             _ => panic!("expected FunctionDef"),
         }
     }
-
-    // ── Error recovery ─────────────────────────────────────────────────
 
     #[test]
     fn error_unclosed_paren() {

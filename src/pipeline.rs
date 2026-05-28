@@ -1,5 +1,3 @@
-// LLVM optimisation pipeline flags.
-
 /// Optimisation levels mapped to `clang` -O flags.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum OptLevel {

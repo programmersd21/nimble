@@ -1,12 +1,6 @@
 use std::collections::VecDeque;
 
-// Span
-
-/// A location span in the source text.
-///
-/// `line` and `column` are 1‑based; `byte_index` is a 0‑based absolute byte
-/// offset from the beginning of the source; `length` is the byte length of
-/// the span (0 for structural / virtual tokens).
+/// `line`/`column` are 1‑based; `byte_index` is a 0‑based byte offset; `length` is the byte length (0 for virtual tokens).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Span {
     pub line: usize,
@@ -17,7 +11,12 @@ pub struct Span {
 
 impl Span {
     pub const fn new(line: usize, column: usize, byte_index: usize) -> Self {
-        Span { line, column, byte_index, length: 0 }
+        Span {
+            line,
+            column,
+            byte_index,
+            length: 0,
+        }
     }
 
     pub const fn new_with_len(
@@ -26,13 +25,15 @@ impl Span {
         byte_index: usize,
         length: usize,
     ) -> Self {
-        Span { line, column, byte_index, length }
+        Span {
+            line,
+            column,
+            byte_index,
+            length,
+        }
     }
 }
 
-// TokenKind
-
-/// Every kind of token the Nimble lexer can produce.
 #[derive(Debug, Clone, PartialEq)]
 pub enum TokenKind {
     Indent,
@@ -49,6 +50,7 @@ pub enum TokenKind {
     RBracket,
     LBrace,
     RBrace,
+    ColonEqual,
 
     Fn,
     Let,
@@ -61,6 +63,8 @@ pub enum TokenKind {
     Pub,
     Return,
     While,
+    Break,
+    Continue,
     For,
     In,
     Extern,
@@ -101,9 +105,6 @@ pub enum TokenKind {
     Eof,
 }
 
-// Token
-
-/// A complete token binding a [`TokenKind`] to its source [`Span`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct Token {
     pub kind: TokenKind,
@@ -116,26 +117,19 @@ impl Token {
     }
 }
 
-// Helpers
-
-/// Count leading whitespace (spaces only) in `s`.
-/// Tabs are rejected in indentation – callers should bail with an error.
+/// Tabs are rejected in indentation.
 fn count_leading_whitespace(s: &str) -> usize {
     s.bytes().take_while(|&b| b == b' ').count()
 }
 
-/// Determine whether `byte` can start an identifier or keyword.
 fn is_ident_start(b: u8) -> bool {
     b.is_ascii_alphabetic() || b == b'_'
 }
 
-/// Determine whether `byte` can continue an identifier or keyword.
 fn is_ident_continue(b: u8) -> bool {
     b.is_ascii_alphanumeric() || b == b'_'
 }
 
-/// Try to match `source` at position `pos` against a multi-character token.
-/// Returns the number of bytes consumed and the `TokenKind` on success.
 fn try_multi_char_op(source: &str, pos: usize) -> Option<(usize, TokenKind)> {
     let bytes = source.as_bytes();
     if pos + 1 >= bytes.len() {
@@ -156,66 +150,37 @@ fn try_multi_char_op(source: &str, pos: usize) -> Option<(usize, TokenKind)> {
         (b'&', b'&') => TokenKind::AmpersandAmpersand,
         (b'|', b'|') => TokenKind::PipePipe,
         (b':', b':') => TokenKind::DoubleColon,
+        (b':', b'=') => TokenKind::ColonEqual,
         _ => return None,
     };
     Some((2, kind))
 }
 
-fn is_dec_digit(b: u8) -> bool {
-    b.is_ascii_digit()
-}
-
-// Lexer
-
-/// A tokeniser that emits a flat stream of [`Token`]s with full positional
-/// information.
-///
-/// The lexer tracks Python‑style indentation via an internal `indent_stack`
-/// and emits explicit `Indent` / `Dedent` / `Newline` tokens.  While
-/// structural delimiters (`(`, `[`, `{`) are open, layout tokens are
-/// suppressed (implicit continuation).
+/// Python-style indentation-aware tokeniser with delimiter tracking.
 pub struct Lexer<'a> {
     source: &'a str,
-    /// One entry per line in the source (excluding newline characters).
     lines: Vec<&'a str>,
-    /// Byte offset of each line inside `source`.
     line_starts: Vec<usize>,
 
-    /// Index into `lines` currently being processed.
     line_idx: usize,
-    /// Byte cursor within the current line.
     pos: usize,
 
-    /// 1‑based line number.
     line_num: usize,
-    /// 1‑based column number.
     col: usize,
 
-    /// Stack of active indentation widths.  Initialised with `0`.
     indent_stack: Vec<usize>,
 
-    /// Number of unclosed `(`, `[`, `{` pairs.  When > 0, layout tokens
-    /// are suppressed.
+    /// Unclosed `(`, `[`, `{` count; >0 suppresses layout tokens.
     delimiter_count: usize,
 
-    /// Tokens that have been generated but not yet yielded.
     pending: VecDeque<Token>,
 
-    /// Set to `true` when the end of the source has been reached and all
-    /// final `Dedent` / `Eof` tokens have been emitted.
     eof_emitted: bool,
 
-    /// `true` while the end‑of‑line finalisation has not yet been
-    /// processed for the current line (i.e. we are still inside it).
     line_active: bool,
 }
 
-
 impl<'a> Lexer<'a> {
-    /// Build a new `Lexer` from a source string.
-    ///
-    /// The constructor pre‑computes a line table so that we can freely
-    /// peek at the content and byte offset of any line.
     pub fn new(source: &'a str) -> Self {
         let (lines, line_starts) = build_line_table(source);
 
@@ -234,18 +199,14 @@ impl<'a> Lexer<'a> {
             line_active: false,
         };
 
-        // Skip any blank / comment lines at the very beginning and handle
-        // the indentation of the first meaningful line.
         if lex.line_idx < lex.lines.len() {
             lex.skip_to_meaningful_line();
             if lex.line_idx < lex.lines.len() {
                 let indent = count_leading_whitespace(lex.current_line());
-                // Indent the first line if it is indented.
                 if indent > 0 {
                     lex.indent_stack.push(indent);
                     let span = Span::new(1, 1, 0);
-                    lex.pending
-                        .push_back(Token::new(TokenKind::Indent, span));
+                    lex.pending.push_back(Token::new(TokenKind::Indent, span));
                 }
                 lex.pos = indent;
                 lex.col = indent + 1;
@@ -255,10 +216,6 @@ impl<'a> Lexer<'a> {
         lex
     }
 
-    /// Advance the lexer by one token.
-    ///
-    /// Returns `Err(String)` on malformed input (illegal characters,
-    /// indentation mismatches, unterminated strings, etc.).
     pub fn next_token(&mut self) -> Result<Token, String> {
         loop {
             if let Some(tok) = self.pending.pop_front() {
@@ -272,37 +229,26 @@ impl<'a> Lexer<'a> {
                 ));
             }
 
-            //    advance to the next line.
             if self.needs_next_line() {
                 let has_next = self.line_idx + 1 < self.lines.len();
 
-                // 3a. Emit Newline only when the physical newline exists
-                //     (there is at least one more raw line in the table).
                 if self.line_active && self.delimiter_count == 0 && has_next {
                     self.line_active = false;
-                    return Ok(Token::new(
-                        TokenKind::Newline,
-                        self.newline_span(),
-                    ));
+                    return Ok(Token::new(TokenKind::Newline, self.newline_span()));
                 }
                 self.line_active = false;
 
-                // 3b. Advance to the next raw line.
                 if has_next {
                     self.pos = 0;
                     self.col = 1;
 
-                    // Move to the next meaningful line (skipping blanks).
-                    if self.advance_to_meaningful_line()
-                        && self.delimiter_count == 0
-                    {
+                    if self.advance_to_meaningful_line() && self.delimiter_count == 0 {
                         self.handle_indentation()?;
                     }
 
                     continue;
                 }
 
-                // 3c. No more lines at all – flush pending DEDENTs, then EOF.
                 self.flush_dedents_at_eof()?;
                 continue;
             }
@@ -317,9 +263,6 @@ impl<'a> Lexer<'a> {
         }
     }
 
-
-    /// Drain all remaining tokens from the lexer; the final token will be
-    /// `Eof`.
     pub fn tokenize_all(&mut self) -> Result<Vec<Token>, String> {
         let mut tokens = Vec::new();
         loop {
@@ -334,9 +277,7 @@ impl<'a> Lexer<'a> {
     }
 }
 
-
 impl<'a> Lexer<'a> {
-
     fn current_line(&self) -> &'a str {
         self.lines[self.line_idx]
     }
@@ -346,8 +287,7 @@ impl<'a> Lexer<'a> {
     }
 
     fn needs_next_line(&self) -> bool {
-        self.line_idx >= self.lines.len()
-            || self.pos >= self.current_line().len()
+        self.line_idx >= self.lines.len() || self.pos >= self.current_line().len()
     }
 
     fn span_at_current_pos(&self, len: usize) -> Span {
@@ -369,9 +309,6 @@ impl<'a> Lexer<'a> {
         )
     }
 
-
-    /// Skip empty / comment‑only lines starting from (and including)
-    /// [`self.line_idx`].  Each line visited increments `line_num`.
     fn skip_to_meaningful_line(&mut self) {
         while self.line_idx < self.lines.len() {
             let trimmed = self.lines[self.line_idx].trim();
@@ -384,10 +321,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    /// Advance [`self.line_idx`] and [`self.line_num`] to the next
-    /// meaningful line, skipping blank / comment lines.
-    ///
-    /// Returns `false` when the end of the line table has been reached.
+    /// Returns `false` when the end of line table reached.
     fn advance_to_meaningful_line(&mut self) -> bool {
         loop {
             let next = self.line_idx + 1;
@@ -403,10 +337,6 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    /// Flush all remaining `Dedent` tokens at end‑of‑file.
-    ///
-    /// Pushes each required dedent into `pending` and finally sets
-    /// `eof_emitted` so that the next call yields `Eof`.
     fn flush_dedents_at_eof(&mut self) -> Result<(), String> {
         while self.indent_stack.len() > 1 {
             self.indent_stack.pop();
@@ -419,9 +349,6 @@ impl<'a> Lexer<'a> {
         Ok(())
     }
 
-
-    /// Compare the current line's indentation against the stack and emit
-    /// any necessary `Indent` or `Dedent` tokens into `pending`.
     fn handle_indentation(&mut self) -> Result<(), String> {
         let raw = self.current_line();
         let indent = count_leading_whitespace(raw);
@@ -431,19 +358,14 @@ impl<'a> Lexer<'a> {
         if indent > top {
             self.indent_stack.push(indent);
             let span = Span::new(self.line_num, 1, self.current_line_start());
-            self.pending
-                .push_back(Token::new(TokenKind::Indent, span));
+            self.pending.push_back(Token::new(TokenKind::Indent, span));
         } else if indent < top {
             // Pop until the level matches.
             while *self.indent_stack.last().unwrap() > indent {
                 self.indent_stack.pop().unwrap();
-                let span =
-                    Span::new(self.line_num, 1, self.current_line_start());
-                self.pending
-                    .push_back(Token::new(TokenKind::Dedent, span));
+                let span = Span::new(self.line_num, 1, self.current_line_start());
+                self.pending.push_back(Token::new(TokenKind::Dedent, span));
             }
-            // The stack should never become empty since we always have the
-            // initial `0` entry, but guard anyway.
             if self.indent_stack.is_empty() {
                 self.indent_stack.push(0);
             }
@@ -459,46 +381,34 @@ impl<'a> Lexer<'a> {
             }
         }
 
-        // Position the cursor past the leading whitespace.
         self.pos = indent;
         self.col = indent + 1;
 
         Ok(())
     }
 
-
-    /// Advance past spaces and horizontal tabs (tabs are treated as a
-    /// single space for column tracking).
     fn skip_inline_whitespace(&mut self) {
         let bytes = self.current_line().as_bytes();
         while self.pos < bytes.len() {
             match bytes[self.pos] {
-                b' ' => {
-                    self.pos += 1;
-                    self.col += 1;
-                }
-                b'\t' => {
-                    return; // tabs are not allowed mid‑line – let tokenize_next report it
-                }
+                b' ' => { self.pos += 1; self.col += 1; }
+                b'\t' => return,
                 _ => break,
             }
         }
     }
-
 
     /// Tokenise the next lexeme at [`self.pos`].
     fn tokenize_next(&mut self) -> Result<Token, String> {
         let bytes = self.current_line().as_bytes();
         let ch = bytes[self.pos];
 
-        // ── Multi‑character operators ──────────────────────────────────
         if let Some((width, kind)) = try_multi_char_op(self.current_line(), self.pos) {
             let span = self.span_at_current_pos(width);
             self.advance_pos(width);
             return Ok(Token::new(kind, span));
         }
 
-        // ── Single‑character tokens ────────────────────────────────────
         let (width, kind) = match ch {
             b'(' => (1, TokenKind::LParen),
             b')' => (1, TokenKind::RParen),
@@ -542,14 +452,11 @@ impl<'a> Lexer<'a> {
 
         let span = self.span_at_current_pos(width);
 
-        // Update delimiter count.
         match kind {
-            TokenKind::LParen
-            | TokenKind::LBracket
-            | TokenKind::LBrace => self.delimiter_count += 1,
-            TokenKind::RParen
-            | TokenKind::RBracket
-            | TokenKind::RBrace => {
+            TokenKind::LParen | TokenKind::LBracket | TokenKind::LBrace => {
+                self.delimiter_count += 1
+            }
+            TokenKind::RParen | TokenKind::RBracket | TokenKind::RBrace => {
                 if self.delimiter_count == 0 {
                     return Err(format!(
                         "Unmatched closing delimiter at line {}, column {}",
@@ -565,24 +472,21 @@ impl<'a> Lexer<'a> {
         Ok(Token::new(kind, span))
     }
 
-
     fn tokenize_number(&mut self) -> Result<Token, String> {
         let start_pos = self.pos;
         let bytes = self.current_line().as_bytes();
 
-        // Consume integer part.
-        while self.pos < bytes.len() && is_dec_digit(bytes[self.pos]) {
+        while self.pos < bytes.len() && bytes[self.pos].is_ascii_digit() {
             self.pos += 1;
         }
 
-        // Check for float.
         if self.pos < bytes.len()
             && bytes[self.pos] == b'.'
             && self.pos + 1 < bytes.len()
-            && is_dec_digit(bytes[self.pos + 1])
+            && bytes[self.pos + 1].is_ascii_digit()
         {
-            self.pos += 1; // consume '.'
-            while self.pos < bytes.len() && is_dec_digit(bytes[self.pos]) {
+            self.pos += 1;
+            while self.pos < bytes.len() && bytes[self.pos].is_ascii_digit() {
                 self.pos += 1;
             }
             let raw = &self.current_line()[start_pos..self.pos];
@@ -600,9 +504,9 @@ impl<'a> Lexer<'a> {
             Ok(Token::new(TokenKind::FloatLiteral(value), span))
         } else {
             let raw = &self.current_line()[start_pos..self.pos];
-            let value: i64 = raw.parse().map_err(|_| {
-                format!("Integer literal '{}' out of range", raw)
-            })?;
+            let value: i64 = raw
+                .parse()
+                .map_err(|_| format!("Integer literal '{}' out of range", raw))?;
             let len = self.pos - start_pos;
             let span = Span::new_with_len(
                 self.line_num,
@@ -615,11 +519,9 @@ impl<'a> Lexer<'a> {
         }
     }
 
-
     fn tokenize_string(&mut self) -> Result<Token, String> {
         let start_pos = self.pos;
         let byte_offset = self.current_line_start() + start_pos;
-        // Skip the opening '"'
         self.pos += 1;
         self.col += 1;
 
@@ -630,7 +532,8 @@ impl<'a> Lexer<'a> {
             if self.pos >= bytes.len() {
                 return Err(format!(
                     "Unterminated string literal starting at line {}, column {}",
-                    self.line_num, start_pos + 1,
+                    self.line_num,
+                    start_pos + 1,
                 ));
             }
             match bytes[self.pos] {
@@ -638,19 +541,10 @@ impl<'a> Lexer<'a> {
                     self.pos += 1;
                     self.col += 1;
                     let len = self.pos - start_pos;
-                    let span = Span::new_with_len(
-                        self.line_num,
-                        start_pos + 1,
-                        byte_offset,
-                        len,
-                    );
-                    return Ok(Token::new(
-                        TokenKind::StringLiteral(value),
-                        span,
-                    ));
+                    let span = Span::new_with_len(self.line_num, start_pos + 1, byte_offset, len);
+                    return Ok(Token::new(TokenKind::StringLiteral(value), span));
                 }
                 b'\\' => {
-                    // Escape sequence.
                     self.pos += 1;
                     self.col += 1;
                     if self.pos >= bytes.len() {
@@ -693,7 +587,6 @@ impl<'a> Lexer<'a> {
         }
     }
 
-
     fn tokenize_identifier_or_keyword(&mut self) -> Result<Token, String> {
         let start_pos = self.pos;
         let bytes = self.current_line().as_bytes();
@@ -724,6 +617,8 @@ impl<'a> Lexer<'a> {
             "pub" => TokenKind::Pub,
             "return" => TokenKind::Return,
             "while" => TokenKind::While,
+            "break" => TokenKind::Break,
+            "continue" => TokenKind::Continue,
             "for" => TokenKind::For,
             "in" => TokenKind::In,
             "extern" => TokenKind::Extern,
@@ -737,13 +632,11 @@ impl<'a> Lexer<'a> {
         Ok(Token::new(kind, span))
     }
 
-
     fn advance_pos(&mut self, width: usize) {
         self.pos += width;
         self.col += width;
     }
 }
-
 
 impl<'a> Iterator for Lexer<'a> {
     type Item = Result<Token, String>;
@@ -755,8 +648,6 @@ impl<'a> Iterator for Lexer<'a> {
         }
     }
 }
-
-// Line‑table construction
 
 fn build_line_table(source: &str) -> (Vec<&str>, Vec<usize>) {
     let src_len = source.len();
@@ -799,9 +690,6 @@ fn build_line_table(source: &str) -> (Vec<&str>, Vec<usize>) {
 mod tests {
     use super::*;
 
-
-    /// Lex `source` fully and return a vector of `(kind, span)` tuples,
-    /// panicking on error.
     fn lex(source: &str) -> Vec<(TokenKind, Span)> {
         let mut lex = Lexer::new(source);
         let mut result = Vec::new();
@@ -816,7 +704,6 @@ mod tests {
         result
     }
 
-    /// Strip spans for easier pattern matching.
     fn kinds(source: &str) -> Vec<TokenKind> {
         let mut lex = Lexer::new(source);
         let mut result = Vec::new();
@@ -833,10 +720,9 @@ mod tests {
 
     fn kinds_no_eof(source: &str) -> Vec<TokenKind> {
         let mut v = kinds(source);
-        v.pop(); // remove Eof
+        v.pop();
         v
     }
-
 
     #[test]
     fn empty_source() {
@@ -871,7 +757,6 @@ mod tests {
         );
     }
 
-
     #[test]
     fn all_keywords() {
         let toks = kinds_no_eof(
@@ -899,7 +784,6 @@ mod tests {
             ],
         );
     }
-
 
     #[test]
     fn delimiters() {
@@ -952,7 +836,6 @@ mod tests {
         );
     }
 
-
     #[test]
     fn integer_literals() {
         let toks = kinds_no_eof("0 42 100");
@@ -981,15 +864,8 @@ mod tests {
 
     #[test]
     fn float_must_have_digit_after_dot() {
-        // "42." should be IntLiteral(42) then Dot
         let toks = kinds_no_eof("42.");
-        assert_eq!(
-            toks,
-            vec![
-                TokenKind::IntLiteral(42),
-                TokenKind::Dot,
-            ],
-        );
+        assert_eq!(toks, vec![TokenKind::IntLiteral(42), TokenKind::Dot,],);
     }
 
     #[test]
@@ -1007,10 +883,7 @@ mod tests {
     #[test]
     fn string_with_escapes() {
         let toks = kinds_no_eof(r#""a\nb\tc\\d\"""#);
-        assert_eq!(
-            toks,
-            vec![TokenKind::StringLiteral("a\nb\tc\\d\"".into())],
-        );
+        assert_eq!(toks, vec![TokenKind::StringLiteral("a\nb\tc\\d\"".into())],);
     }
 
     #[test]
@@ -1018,7 +891,6 @@ mod tests {
         let mut lex = Lexer::new(r#""hello"#);
         assert!(lex.next_token().is_err());
     }
-
 
     #[test]
     fn full_line_comment() {
@@ -1028,15 +900,10 @@ mod tests {
 
     #[test]
     fn inline_comment_is_not_special() {
-        // In this lexer, '#' mid‑line is an unrecognised character (error).
-        // Full‑line comments are only recognised when the *whole* line is
-        // a comment (after trimming).  This matches the spec: "full‑line
-        // comments (#)".
         let mut lex = Lexer::new("42 # not a comment");
         assert!(lex.next_token().is_ok()); // 42
         assert!(lex.next_token().is_err()); // #
     }
-
 
     #[test]
     fn single_indent_dedent() {
@@ -1114,7 +981,6 @@ mod tests {
         assert!(lex.next_token().is_err()); // error on "  c"
     }
 
-
     #[test]
     fn blank_lines_between_code() {
         let src = "a\n\n\nb";
@@ -1142,7 +1008,6 @@ mod tests {
             ],
         );
     }
-
 
     #[test]
     fn parens_suppress_newline() {
@@ -1178,7 +1043,6 @@ mod tests {
 
     #[test]
     fn mixed_brackets() {
-        // Multiple bracket types supressing layout together.
         let src = "x = [\n    1,\n    2,\n]";
         let toks = kinds_no_eof(src);
         assert_eq!(
@@ -1198,8 +1062,6 @@ mod tests {
 
     #[test]
     fn indent_inside_continuation_off() {
-        // Inside brackets, indentation changes should NOT produce
-        // Indent / Dedent tokens.
         let src = "a = [\n    1\n  ]";
         let toks = kinds_no_eof(src);
         assert_eq!(
@@ -1219,7 +1081,6 @@ mod tests {
         let mut lex = Lexer::new(")");
         assert!(lex.next_token().is_err());
     }
-
 
     #[test]
     fn full_function_definition() {
@@ -1280,7 +1141,6 @@ mod tests {
         );
     }
 
-
     #[test]
     fn span_positions_single_line() {
         let toks = lex("fn foo(x)");
@@ -1316,7 +1176,6 @@ mod tests {
         // Eof (len 0)
         assert_eq!(toks[6].1, Span::new(3, 1, 8));
     }
-
 
     #[test]
     fn file_ends_without_newline() {
@@ -1372,16 +1231,13 @@ mod tests {
     fn only_comments_and_blanks() {
         let src = "# just a comment\n\n  # indented comment\n";
         let toks = kinds_no_eof(src);
-        // Nothing meaningful → only Eof
         assert!(toks.is_empty());
     }
-
 
     #[test]
     fn tokenize_all_trait_eof_is_none() {
         let mut lex = Lexer::new("42");
         let tokens: Vec<_> = lex.by_ref().collect::<Result<Vec<_>, _>>().unwrap();
-        // Iterator returns None for Eof, so we get all tokens except Eof.
         let kinds: Vec<_> = tokens.into_iter().map(|t| t.kind).collect();
         assert_eq!(kinds, vec![TokenKind::IntLiteral(42)]);
     }
