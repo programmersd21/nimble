@@ -1,14 +1,44 @@
-# Nimble Standard Library - Synchronization primitives
+# Nimble Standard Library — Synchronization primitives
 
-extern fn nimble_mutex_new() -> Int
-extern fn nimble_mutex_lock(mutex: Int) -> Void
-extern fn nimble_mutex_unlock(mutex: Int) -> Void
+extern fn nimble_atomic_load(ptr: String) -> Int
+extern fn nimble_atomic_store(ptr: String, val: Int) -> Void
+extern fn nimble_atomic_add(ptr: String, val: Int) -> Int
 
-fn mutex_new() -> Int:
-    return nimble_mutex_new()
+struct AtomicInt:
+    let ptr: String = ""
 
-fn mutex_lock(mutex: Int) -> Void:
-    nimble_mutex_lock(mutex)
+fn atomic_int(initial: Int) -> AtomicInt:
+    let ptr = alloc(8)
+    nimble_atomic_store(ptr, initial)
+    return AtomicInt{ptr: ptr}
 
-fn mutex_unlock(mutex: Int) -> Void:
-    nimble_mutex_unlock(mutex)
+fn load(self: AtomicInt) -> Int:
+    return nimble_atomic_load(self.ptr)
+
+fn store(self: AtomicInt, val: Int) -> Void:
+    nimble_atomic_store(self.ptr, val)
+
+fn add(self: AtomicInt, val: Int) -> Int:
+    return nimble_atomic_add(self.ptr, val)
+
+# Simple Arc (atomic reference counter)
+struct Arc[T]:
+    let data: String
+    let refcount: String
+
+fn arc_new[T](value: T) -> Arc[T]:
+    let data = alloc(size_of(T))
+    # store value in data
+    let refcount = alloc(8)
+    nimble_atomic_store(refcount, 1)
+    return Arc[T]{data: data, refcount: refcount}
+
+fn clone[T](self: Arc[T]) -> Arc[T]:
+    nimble_atomic_add(self.refcount, 1)
+    return Arc[T]{data: self.data, refcount: self.refcount}
+
+fn drop[T](self: Arc[T]) -> Void:
+    let old = nimble_atomic_add(self.refcount, -1)
+    if old <= 1:
+        free(self.data, size_of(T))
+        free(self.refcount, 8)

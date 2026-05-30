@@ -1,10 +1,12 @@
-# Nimble Standard Library - Threading
+# Nimble Standard Library — Threading support
 
-extern fn nimble_thread_create(entry: String) -> Int
-extern fn nimble_thread_join(thread: Int) -> Void
+load std.async::{spawn, join, sleep}
 
-fn create(entry: String) -> Int:
-    return nimble_thread_create(entry)
+struct Thread:
+    let id: Int = 0
 
-fn join(thread: Int) -> Void:
-    nimble_thread_join(thread)
+fn new[T](f: fn() -> T) -> Thread:
+    return Thread{id: spawn(f)}
+
+fn join(self: Thread) -> Void:
+    join(self.id)

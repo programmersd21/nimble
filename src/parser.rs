@@ -71,7 +71,16 @@ impl<'a> Parser<'a> {
         };
 
         let stmt = match &self.current.kind {
-            TokenKind::Fn => self.parse_function_def(),
+            TokenKind::Fn => {
+                if matches!(&self.next.kind, TokenKind::LParen) {
+                    let expr = self.parse_lambda()?;
+                    Ok(Stmt::Expr(expr))
+                } else {
+                    self.parse_function_def()
+                }
+            }
+            TokenKind::Defer => self.parse_defer(),
+            TokenKind::Macro => self.parse_macro_def(),
             TokenKind::Extern => self.parse_extern_fn(),
             TokenKind::Struct => self.parse_struct_def(),
             TokenKind::Interface => self.parse_interface_def(),
@@ -167,21 +176,43 @@ impl<'a> Parser<'a> {
         self.advance();
         let name = self.expect_identifier()?;
         if !self.check(&TokenKind::Colon) {
-            return Err(ParseError::expected_token(self.source, &self.current, "':'"));
+            return Err(ParseError::expected_token(
+                self.source,
+                &self.current,
+                "':'",
+            ));
         }
         self.advance();
         let body = self.parse_block()?;
         let mut fields = Vec::new();
         for stmt in body {
             match stmt {
-                Stmt::Let { name, type_annot: Some(type_annot), span, .. }
-                | Stmt::Var { name, type_annot: Some(type_annot), span, .. } => {
-                    fields.push(Param { name, type_annot, span });
+                Stmt::Let {
+                    name,
+                    type_annot: Some(type_annot),
+                    span,
+                    ..
+                }
+                | Stmt::Var {
+                    name,
+                    type_annot: Some(type_annot),
+                    span,
+                    ..
+                } => {
+                    fields.push(Param {
+                        name,
+                        type_annot,
+                        span,
+                    });
                 }
                 _ => return Err(ParseError::unexpected_token(self.source, &self.current)),
             }
         }
-        Ok(Stmt::StructDef { name, fields, span: self.merge_span(&start, &self.current.span) })
+        Ok(Stmt::StructDef {
+            name,
+            fields,
+            span: self.merge_span(&start, &self.current.span),
+        })
     }
 
     fn parse_interface_def(&mut self) -> Result<Stmt, ParseError> {
@@ -189,7 +220,11 @@ impl<'a> Parser<'a> {
         self.advance();
         let name = self.expect_identifier()?;
         if !self.check(&TokenKind::Colon) {
-            return Err(ParseError::expected_token(self.source, &self.current, "':'"));
+            return Err(ParseError::expected_token(
+                self.source,
+                &self.current,
+                "':'",
+            ));
         }
         self.advance();
         let mut methods = Vec::new();
@@ -197,23 +232,38 @@ impl<'a> Parser<'a> {
             self.advance();
         }
         if !self.check(&TokenKind::Indent) {
-            return Err(ParseError::expected_indented_block(self.source, &self.current));
+            return Err(ParseError::expected_indented_block(
+                self.source,
+                &self.current,
+            ));
         }
         self.advance();
         while !self.check(&TokenKind::Dedent) && !self.check(&TokenKind::Eof) {
             let method_span = self.current.span;
             if !self.check(&TokenKind::Fn) {
-                return Err(ParseError::expected_token(self.source, &self.current, "'fn'"));
+                return Err(ParseError::expected_token(
+                    self.source,
+                    &self.current,
+                    "'fn'",
+                ));
             }
             self.advance();
             let method_name = self.expect_identifier()?;
             if !self.check(&TokenKind::LParen) {
-                return Err(ParseError::expected_token(self.source, &self.current, "'('"));
+                return Err(ParseError::expected_token(
+                    self.source,
+                    &self.current,
+                    "'('",
+                ));
             }
             self.advance();
             let params = self.parse_params()?;
             if !self.check(&TokenKind::RParen) {
-                return Err(ParseError::expected_token(self.source, &self.current, "')'"));
+                return Err(ParseError::expected_token(
+                    self.source,
+                    &self.current,
+                    "')'",
+                ));
             }
             self.advance();
             if self.check(&TokenKind::Arrow) {
@@ -236,7 +286,11 @@ impl<'a> Parser<'a> {
         if self.check(&TokenKind::Dedent) {
             self.advance();
         }
-        Ok(Stmt::InterfaceDef { name, methods, span: self.merge_span(&start, &self.current.span) })
+        Ok(Stmt::InterfaceDef {
+            name,
+            methods,
+            span: self.merge_span(&start, &self.current.span),
+        })
     }
 
     fn parse_function_def(&mut self) -> Result<Stmt, ParseError> {
@@ -635,6 +689,7 @@ impl<'a> Parser<'a> {
                 | TokenKind::LParen
                 | TokenKind::Minus
                 | TokenKind::Bang
+                | TokenKind::Fn
         )
     }
 
@@ -666,7 +721,7 @@ impl<'a> Parser<'a> {
 
             if self.check(&TokenKind::As) {
                 self.advance(); // consume `as`
-                let target_type = self.parse_type()?; 
+                let target_type = self.parse_type()?;
                 let span = self.merge_span(&left.span(), &target_type.span);
                 left = Expr::Cast {
                     expr: Box::new(left),
@@ -676,16 +731,15 @@ impl<'a> Parser<'a> {
                 continue;
             }
 
-            if self.check(&TokenKind::LBrace) {
-                if let Expr::Identifier(ref name, _) = left {
+            if self.check(&TokenKind::LBrace)
+                && let Expr::Identifier(ref name, _) = left {
                     left = self.parse_struct_literal(name.clone(), left.span())?;
                     continue;
                 }
-            }
 
             // Check for binary operators.
-            if let Some((prec, right_assoc)) = Self::get_infix_precedence(&self.current.kind) {
-                if prec >= min_prec {
+            if let Some((prec, right_assoc)) = Self::get_infix_precedence(&self.current.kind)
+                && prec >= min_prec {
                     let next_min = if right_assoc { prec } else { prec + 1 };
                     let op_token = self.current.clone();
                     self.advance();
@@ -761,13 +815,31 @@ impl<'a> Parser<'a> {
 
     fn parse_primary(&mut self) -> Result<Expr, ParseError> {
         let token = self.current.clone();
-        let expr = match &token.kind {
-            TokenKind::IntLiteral(n) => Expr::IntLiteral(*n, token.span),
-            TokenKind::FloatLiteral(f) => Expr::FloatLiteral(*f, token.span),
-            TokenKind::StringLiteral(s) => Expr::StringLiteral(s.clone(), token.span),
-            TokenKind::True => Expr::BoolLiteral(true, token.span),
-            TokenKind::False => Expr::BoolLiteral(false, token.span),
-            TokenKind::Identifier(s) => Expr::Identifier(s.clone(), token.span),
+        match &token.kind {
+            TokenKind::IntLiteral(n) => {
+                self.advance();
+                Ok(Expr::IntLiteral(*n, token.span))
+            }
+            TokenKind::FloatLiteral(f) => {
+                self.advance();
+                Ok(Expr::FloatLiteral(*f, token.span))
+            }
+            TokenKind::StringLiteral(s) => {
+                self.advance();
+                Ok(Expr::StringLiteral(s.clone(), token.span))
+            }
+            TokenKind::True => {
+                self.advance();
+                Ok(Expr::BoolLiteral(true, token.span))
+            }
+            TokenKind::False => {
+                self.advance();
+                Ok(Expr::BoolLiteral(false, token.span))
+            }
+            TokenKind::Identifier(s) => {
+                self.advance();
+                Ok(Expr::Identifier(s.clone(), token.span))
+            }
             TokenKind::LParen => {
                 self.advance(); // consume `(`
                 let inner = self.parse_expr()?;
@@ -783,18 +855,14 @@ impl<'a> Parser<'a> {
                 let rparen = self.current.span;
                 self.advance(); // consume `)`
                 let span = self.merge_span(&token.span, &rparen);
-                return Ok(Expr::Grouping {
+                Ok(Expr::Grouping {
                     expr: Box::new(inner),
                     span,
-                });
+                })
             }
-            _ => {
-                return Err(ParseError::expected_expression(self.source, &token));
-            }
-        };
-
-        self.advance();
-        Ok(expr)
+            TokenKind::Fn => self.parse_lambda(),
+            _ => Err(ParseError::expected_expression(self.source, &token)),
+        }
     }
 
     fn parse_call(&mut self, callee: Expr) -> Result<Expr, ParseError> {
@@ -844,7 +912,11 @@ impl<'a> Parser<'a> {
             }
             let field_name = self.expect_identifier()?;
             if !self.check(&TokenKind::Colon) {
-                return Err(ParseError::expected_token(self.source, &self.current, "':'"));
+                return Err(ParseError::expected_token(
+                    self.source,
+                    &self.current,
+                    "':'",
+                ));
             }
             self.advance();
             let expr = self.parse_expr()?;
@@ -856,11 +928,19 @@ impl<'a> Parser<'a> {
             }
         }
         if !self.check(&TokenKind::RBrace) {
-            return Err(ParseError::expected_token(self.source, &self.current, "'}'"));
+            return Err(ParseError::expected_token(
+                self.source,
+                &self.current,
+                "'}'",
+            ));
         }
         let end = self.current.span;
         self.advance();
-        Ok(Expr::StructLiteral { name, fields, span: self.merge_span(&start, &end) })
+        Ok(Expr::StructLiteral {
+            name,
+            fields,
+            span: self.merge_span(&start, &end),
+        })
     }
 
     fn parse_type(&mut self) -> Result<Type, ParseError> {
@@ -895,7 +975,11 @@ impl<'a> Parser<'a> {
                 }
             }
             if !self.check(&TokenKind::RBracket) {
-                return Err(ParseError::expected_token(self.source, &self.current, "']'"));
+                return Err(ParseError::expected_token(
+                    self.source,
+                    &self.current,
+                    "']'",
+                ));
             }
             self.advance();
         }
@@ -911,7 +995,7 @@ impl<'a> Parser<'a> {
     }
 
     fn advance(&mut self) -> Token {
-        let prev = std::mem::replace(
+        std::mem::replace(
             &mut self.current,
             std::mem::replace(
                 &mut self.next,
@@ -919,8 +1003,7 @@ impl<'a> Parser<'a> {
                     .next_token()
                     .unwrap_or_else(|_| Token::new(TokenKind::Eof, Span::new(1, 1, 0))),
             ),
-        );
-        prev
+        )
     }
 
     fn expect_identifier(&mut self) -> Result<String, ParseError> {
@@ -970,6 +1053,121 @@ impl<'a> Parser<'a> {
             _ => UnaryOp::Negate,
         }
     }
+
+    fn parse_lambda(&mut self) -> Result<Expr, ParseError> {
+        let start = self.current.span;
+        self.advance(); // consume `fn`
+
+        if !self.check(&TokenKind::LParen) {
+            let tok = self.current.clone();
+            return Err(ParseError::expected_token(self.source, &tok, "'('"));
+        }
+        self.advance(); // consume `(`
+
+        let params = self.parse_params()?;
+
+        if !self.check(&TokenKind::RParen) {
+            let tok = self.current.clone();
+            return Err(ParseError::expected_token(self.source, &tok, "')'"));
+        }
+        self.advance(); // consume `)`
+
+        let return_type = if self.check(&TokenKind::Arrow) {
+            self.advance(); // consume `->`
+            Some(self.parse_type()?)
+        } else {
+            None
+        };
+
+        if !self.check(&TokenKind::Colon) {
+            let tok = self.current.clone();
+            return Err(ParseError::expected_token(self.source, &tok, "':'"));
+        }
+        self.advance(); // consume `:`
+
+        let body = self.parse_block()?;
+
+        Ok(Expr::Lambda {
+            params,
+            return_type,
+            body,
+            span: self.merge_span(&start, &self.current.span),
+        })
+    }
+
+    fn parse_defer(&mut self) -> Result<Stmt, ParseError> {
+        let start = self.current.span;
+        self.advance(); // consume `defer`
+
+        if self.check(&TokenKind::Colon) {
+            self.advance(); // consume `:`
+            let body = self.parse_block()?;
+            Ok(Stmt::Defer {
+                body,
+                span: self.merge_span(&start, &self.current.span),
+            })
+        } else {
+            let expr = self.parse_expr_stmt()?;
+            let body = vec![expr];
+            Ok(Stmt::Defer {
+                body,
+                span: self.merge_span(&start, &self.current.span),
+            })
+        }
+    }
+
+    fn parse_macro_params(&mut self) -> Result<Vec<String>, ParseError> {
+        let mut params = Vec::new();
+        loop {
+            if self.check(&TokenKind::RParen) || self.check(&TokenKind::Eof) {
+                break;
+            }
+            let name = self.expect_identifier()?;
+            params.push(name);
+            if self.check(&TokenKind::Comma) {
+                self.advance();
+            } else {
+                break;
+            }
+        }
+        Ok(params)
+    }
+
+    fn parse_macro_def(&mut self) -> Result<Stmt, ParseError> {
+        let start = self.current.span;
+        self.advance(); // consume `macro`
+
+        let name = self.expect_identifier()?;
+
+        if !self.check(&TokenKind::LParen) {
+            let tok = self.current.clone();
+            return Err(ParseError::expected_token(self.source, &tok, "'('"));
+        }
+        self.advance(); // consume `(`
+
+        let params = self.parse_macro_params()?;
+
+        if !self.check(&TokenKind::RParen) {
+            let tok = self.current.clone();
+            return Err(ParseError::expected_token(self.source, &tok, "')'"));
+        }
+        self.advance(); // consume `)`
+
+        if !self.check(&TokenKind::Colon) {
+            let tok = self.current.clone();
+            return Err(ParseError::expected_token(self.source, &tok, "':'"));
+        }
+        self.advance(); // consume `:`
+
+        let body = self.parse_block()?;
+
+        Ok(Stmt::MacroDef {
+            name,
+            params,
+            body,
+            span: self.merge_span(&start, &self.current.span),
+        })
+    }
 }
 
 impl Expr {
@@ -987,7 +1185,9 @@ impl Expr {
             | Expr::Grouping { span, .. }
             | Expr::MemberAccess { span, .. }
             | Expr::StructLiteral { span, .. }
-            | Expr::Cast { span, .. } => *span,
+            | Expr::Cast { span, .. }
+            | Expr::Lambda { span, .. }
+            | Expr::MacroInvocation { span, .. } => *span,
         }
     }
 }
@@ -1022,6 +1222,8 @@ mod tests {
             Stmt::ExternFn { .. } => "extern fn",
             Stmt::Load { .. } => "load",
             Stmt::Expr(_) => "expr",
+            Stmt::Defer { .. } => "defer",
+            Stmt::MacroDef { .. } => "macro",
         }
     }
 
@@ -1282,30 +1484,28 @@ else:
     fn binary_expression_precedence() {
         let prog = parse("let x = 1 + 2 * 3\n");
         match &prog.statements[0] {
-            Stmt::Let { value, .. } => {
-                match value {
-                    Expr::Binary {
-                        left, op, right, ..
-                    } => {
-                        assert_eq!(*op, BinaryOp::Add);
-                        assert!(matches!(left.as_ref(), Expr::IntLiteral(1, _)));
-                        match right.as_ref() {
-                            Expr::Binary {
-                                left: rl,
-                                op: rop,
-                                right: rr,
-                                ..
-                            } => {
-                                assert_eq!(*rop, BinaryOp::Mul);
-                                assert!(matches!(rl.as_ref(), Expr::IntLiteral(2, _)));
-                                assert!(matches!(rr.as_ref(), Expr::IntLiteral(3, _)));
-                            }
-                            _ => panic!("expected Mul binary"),
+            Stmt::Let { value, .. } => match value {
+                Expr::Binary {
+                    left, op, right, ..
+                } => {
+                    assert_eq!(*op, BinaryOp::Add);
+                    assert!(matches!(left.as_ref(), Expr::IntLiteral(1, _)));
+                    match right.as_ref() {
+                        Expr::Binary {
+                            left: rl,
+                            op: rop,
+                            right: rr,
+                            ..
+                        } => {
+                            assert_eq!(*rop, BinaryOp::Mul);
+                            assert!(matches!(rl.as_ref(), Expr::IntLiteral(2, _)));
+                            assert!(matches!(rr.as_ref(), Expr::IntLiteral(3, _)));
                         }
+                        _ => panic!("expected Mul binary"),
                     }
-                    _ => panic!("expected Add binary"),
                 }
-            }
+                _ => panic!("expected Add binary"),
+            },
             _ => panic!("expected Let"),
         }
     }
@@ -1331,21 +1531,19 @@ else:
     fn logical_operators() {
         let prog = parse("let r = a && b || c\n");
         match &prog.statements[0] {
-            Stmt::Let { value, .. } => {
-        match value {
+            Stmt::Let { value, .. } => match value {
+                Expr::Binary {
+                    op: BinaryOp::Or,
+                    left,
+                    ..
+                } => match left.as_ref() {
                     Expr::Binary {
-                        op: BinaryOp::Or,
-                        left,
-                        ..
-                    } => match left.as_ref() {
-                        Expr::Binary {
-                            op: BinaryOp::And, ..
-                        } => {}
-                        _ => panic!("expected And left"),
-                    },
-                    _ => panic!("expected Or at top"),
-                }
-            }
+                        op: BinaryOp::And, ..
+                    } => {}
+                    _ => panic!("expected And left"),
+                },
+                _ => panic!("expected Or at top"),
+            },
             _ => panic!("expected Let"),
         }
     }
@@ -1440,6 +1638,96 @@ else:
                 _ => panic!("expected Unary"),
             },
             _ => panic!("expected Let"),
+        }
+    }
+
+    #[test]
+    fn lambda_expression() {
+        let src = "let f = fn(x: Int, y: Int) -> Int:\n    return x + y\n";
+        let prog = parse(src);
+        match &prog.statements[0] {
+            Stmt::Let { value, .. } => match value {
+                Expr::Lambda {
+                    params,
+                    return_type,
+                    body,
+                    ..
+                } => {
+                    assert_eq!(params.len(), 2);
+                    assert_eq!(params[0].name, "x");
+                    assert_eq!(params[1].name, "y");
+                    assert!(return_type.is_some());
+                    assert_eq!(body.len(), 1);
+                }
+                _ => panic!("expected Lambda"),
+            },
+            _ => panic!("expected Let"),
+        }
+    }
+
+    #[test]
+    fn lambda_no_return() {
+        let src = "let f = fn(x: Int):\n    let y = x\n";
+        let prog = parse(src);
+        match &prog.statements[0] {
+            Stmt::Let { value, .. } => match value {
+                Expr::Lambda {
+                    params,
+                    return_type,
+                    body,
+                    ..
+                } => {
+                    assert_eq!(params.len(), 1);
+                    assert_eq!(params[0].name, "x");
+                    assert!(return_type.is_none());
+                    assert_eq!(body.len(), 1);
+                }
+                _ => panic!("expected Lambda"),
+            },
+            _ => panic!("expected Let"),
+        }
+    }
+
+    #[test]
+    fn defer_statement() {
+        let src = "defer:\n    cleanup()\n";
+        let prog = parse(src);
+        match &prog.statements[0] {
+            Stmt::Defer { body, .. } => {
+                assert_eq!(body.len(), 1);
+            }
+            _ => panic!("expected Defer"),
+        }
+    }
+
+    #[test]
+    fn defer_single_stmt() {
+        let src = "defer cleanup()\n";
+        let prog = parse(src);
+        match &prog.statements[0] {
+            Stmt::Defer { body, .. } => {
+                assert_eq!(body.len(), 1);
+                assert!(matches!(&body[0], Stmt::Expr(Expr::Call { .. })));
+            }
+            _ => panic!("expected Defer"),
+        }
+    }
+
+    #[test]
+    fn macro_definition() {
+        let src = "macro my_macro(x, y):\n    let result = x + y\n    return result\n";
+        let prog = parse(src);
+        match &prog.statements[0] {
+            Stmt::MacroDef {
+                name, params, body, ..
+            } => {
+                assert_eq!(name, "my_macro");
+                assert_eq!(params.len(), 2);
+                assert_eq!(params[0], "x");
+                assert_eq!(params[1], "y");
+                assert_eq!(body.len(), 2);
+            }
+            _ => panic!("expected MacroDef"),
         }
     }
 

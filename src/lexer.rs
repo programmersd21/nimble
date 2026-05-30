@@ -70,13 +70,21 @@ pub enum TokenKind {
     Extern,
     Load,
     As,
+    Match,
+    Enum,
     True,
     False,
+    Defer,
+    Macro,
 
     Identifier(String),
     IntLiteral(i64),
     FloatLiteral(f64),
     StringLiteral(String),
+
+    Mut,
+    Async,
+    Await,
 
     Plus,
     Minus,
@@ -101,6 +109,7 @@ pub enum TokenKind {
     PercentEqual,
     AmpersandAmpersand,
     PipePipe,
+    Question,
 
     Eof,
 }
@@ -370,14 +379,13 @@ impl<'a> Lexer<'a> {
                 self.indent_stack.push(0);
             }
             // Validate that we landed on an exact match.
-            if *self.indent_stack.last().unwrap() != indent {
-                if indent != 0 || self.indent_stack.len() != 1 {
+            if *self.indent_stack.last().unwrap() != indent
+                && (indent != 0 || self.indent_stack.len() != 1) {
                     return Err(format!(
                         "Indentation error at line {}: indent level {} \
                          does not match any enclosing block",
                         self.line_num, indent,
                     ));
-                }
             }
         }
 
@@ -386,12 +394,14 @@ impl<'a> Lexer<'a> {
 
         Ok(())
     }
-
     fn skip_inline_whitespace(&mut self) {
         let bytes = self.current_line().as_bytes();
         while self.pos < bytes.len() {
             match bytes[self.pos] {
-                b' ' => { self.pos += 1; self.col += 1; }
+                b' ' => {
+                    self.pos += 1;
+                    self.col += 1;
+                }
                 b'\t' => return,
                 _ => break,
             }
@@ -430,6 +440,7 @@ impl<'a> Lexer<'a> {
             b'|' => (1, TokenKind::Pipe),
             b'>' => (1, TokenKind::Greater),
             b'<' => (1, TokenKind::Less),
+            b'?' => (1, TokenKind::Question),
 
             b'\t' => {
                 return Err(format!(
@@ -583,9 +594,8 @@ impl<'a> Lexer<'a> {
                     self.pos += 1;
                     self.col += 1;
                 }
-            }
-        }
-    }
+                }
+                }
 
     fn tokenize_identifier_or_keyword(&mut self) -> Result<Token, String> {
         let start_pos = self.pos;
@@ -624,6 +634,13 @@ impl<'a> Lexer<'a> {
             "extern" => TokenKind::Extern,
             "load" => TokenKind::Load,
             "as" => TokenKind::As,
+            "match" => TokenKind::Match,
+            "enum" => TokenKind::Enum,
+            "mut" => TokenKind::Mut,
+            "async" => TokenKind::Async,
+            "await" => TokenKind::Await,
+            "defer" => TokenKind::Defer,
+            "macro" => TokenKind::Macro,
             "true" => TokenKind::True,
             "false" => TokenKind::False,
             ident => TokenKind::Identifier(ident.to_string()),
@@ -636,8 +653,7 @@ impl<'a> Lexer<'a> {
         self.pos += width;
         self.col += width;
     }
-}
-
+    }
 impl<'a> Iterator for Lexer<'a> {
     type Item = Result<Token, String>;
 
@@ -760,7 +776,7 @@ mod tests {
     #[test]
     fn all_keywords() {
         let toks = kinds_no_eof(
-            "fn let var if elif else struct interface pub return in extern for while true false",
+            "fn let var if elif else struct interface pub mut return in extern for while match enum defer macro async await true false",
         );
         assert_eq!(
             toks,
@@ -774,11 +790,18 @@ mod tests {
                 TokenKind::Struct,
                 TokenKind::Interface,
                 TokenKind::Pub,
+                TokenKind::Mut,
                 TokenKind::Return,
                 TokenKind::In,
                 TokenKind::Extern,
                 TokenKind::For,
                 TokenKind::While,
+                TokenKind::Match,
+                TokenKind::Enum,
+                TokenKind::Defer,
+                TokenKind::Macro,
+                TokenKind::Async,
+                TokenKind::Await,
                 TokenKind::True,
                 TokenKind::False,
             ],

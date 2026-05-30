@@ -20,6 +20,20 @@ pub struct Codegen {
     current_fn: Option<String>,
     declared_externs: std::collections::HashSet<String>,
     loop_stack: Vec<(String, String)>,
+
+    debug_info_enabled: bool,
+    di_counter: u32,
+    current_di_scope: String,
+
+    defer_stack: Vec<Vec<Stmt>>,
+    lambda_counter: u32,
+    lambda_irs: Vec<String>,
+}
+
+impl Default for Codegen {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Codegen {
@@ -39,11 +53,37 @@ impl Codegen {
             current_fn: None,
             declared_externs: std::collections::HashSet::new(),
             loop_stack: Vec::new(),
+            debug_info_enabled: false,
+            di_counter: 5,
+            current_di_scope: String::new(),
+            defer_stack: Vec::new(),
+            lambda_counter: 0,
+            lambda_irs: Vec::new(),
         }
     }
 
-    pub fn into_ir(self) -> String {
+    pub fn into_ir(mut self) -> String {
+        for lambda_ir in &self.lambda_irs {
+            self.ir.push_str(lambda_ir);
+        }
         self.ir
+    }
+
+    pub fn enable_debug_info(&mut self) {
+        self.debug_info_enabled = true;
+    }
+
+    fn emit_di_location(&mut self, span: &crate::lexer::Span) -> String {
+        if !self.debug_info_enabled || self.current_di_scope.is_empty() {
+            return String::new();
+        }
+        let id = self.di_counter;
+        self.di_counter += 1;
+        self.push(&format!(
+            "!{} = !DILocation(line: {}, column: {}, scope: !{})\n",
+            id, span.line, span.column, self.current_di_scope
+        ));
+        format!(", !dbg !{}", id)
     }
 
     fn fresh_reg(&mut self) -> String {
@@ -197,7 +237,21 @@ impl Codegen {
             self.gen_stmt(stmt, env)?;
         }
 
+        if self.debug_info_enabled {
+            self.emit_debug_epilogue();
+        }
+
         Ok("ok")
+    }
+
+    fn emit_debug_epilogue(&mut self) {
+        self.push("!llvm.dbg.cu = !{!0}\n");
+        self.push("!llvm.module.flags = !{!1, !2}\n");
+        self.push("!0 = distinct DICompileUnit(language: DW_LANG_C, file: !3, producer: \"nimble\", isOptimized: true, runtimeVersion: 0, emissionKind: FullDebug)\n");
+        self.push("!1 = !{i32 2, !\"Dwarf Version\", i32 4}\n");
+        self.push("!2 = !{i32 2, !\"Debug Info Version\", i32 3}\n");
+        self.push("!3 = !DIFile(filename: \"program.nbl\", directory: \"/\")\n");
+        self.push("!4 = !{}\n");
     }
 
     /// Pre-pass for string literal global constants.
@@ -264,6 +318,16 @@ impl Codegen {
             Stmt::Expr(expr) => self.collect_expr_strings(expr),
             Stmt::ExternFn { .. } => {}
             Stmt::Load { .. } => {}
+            Stmt::Defer { body, .. } => {
+                for s in body {
+                    self.collect_stmt_strings(s);
+                }
+            }
+            Stmt::MacroDef { body, .. } => {
+                for s in body {
+                    self.collect_stmt_strings(s);
+                }
+            }
         }
     }
 
@@ -316,6 +380,12 @@ impl Codegen {
             | Expr::FloatLiteral(..)
             | Expr::BoolLiteral(..)
             | Expr::Identifier(..) => {}
+            Expr::Lambda { body, .. } => {
+                for s in body {
+                    self.collect_stmt_strings(s);
+                }
+            }
+            Expr::MacroInvocation { .. } => {}
         }
     }
 
@@ -388,7 +458,8 @@ impl Codegen {
                     self.symbol_struct_types.insert(name.clone(), struct_name);
                 } else if let Some(sym) = env.lookup(name) {
                     if let Type::Struct(struct_name) = &sym.type_ {
-                        self.symbol_struct_types.insert(name.clone(), struct_name.clone());
+                        self.symbol_struct_types
+                            .insert(name.clone(), struct_name.clone());
                     }
                 }
                 Ok(())
@@ -399,7 +470,7 @@ impl Codegen {
                 params,
                 return_type: _,
                 body,
-                ..
+                span,
             } => {
                 let sym = env
                     .lookup(name)
@@ -436,6 +507,16 @@ impl Codegen {
                 self.push_indent(&format!("define {} @{}({}) {{", ret_llvm, name, param_str));
                 self.indent += 1;
 
+                if self.debug_info_enabled {
+                    let di_id = self.di_counter;
+                    self.di_counter += 1;
+                    self.push(&format!(
+                        "!{} = distinct DISubprogram(name: \"{}\", scope: !3, file: !3, line: {}, type: !4, isLocal: false, isDefinition: true, scopeLine: {}, unit: !0)\n",
+                        di_id, name, span.line, span.line
+                    ));
+                    self.current_di_scope = format!("!{}", di_id);
+                }
+
                 self.current_fn = Some(name.clone());
 
                 // Create allocas for all parameters at the entry block.
@@ -453,13 +534,21 @@ impl Codegen {
                     self.symbols.insert(param.name.clone(), ptr_reg.clone());
                     self.symbol_types.insert(ptr_reg, param_ty.clone());
                     if let Type::Struct(struct_name) = crate::types::Type::from(&param.type_annot) {
-                        self.symbol_struct_types.insert(param.name.clone(), struct_name);
+                        self.symbol_struct_types
+                            .insert(param.name.clone(), struct_name);
                     }
                 }
 
                 // Generate body statements.
                 for s in body {
                     self.gen_stmt(s, env)?;
+                }
+
+                // Emit pending defers before function exit
+                while let Some(defer_body) = self.defer_stack.pop() {
+                    for d in &defer_body {
+                        self.gen_stmt(d, env)?;
+                    }
                 }
 
                 // If the function doesn't end with a return, emit a default.
@@ -631,6 +720,12 @@ impl Codegen {
             }
 
             Stmt::Return { value, .. } => {
+                // Emit pending defers before returning
+                while let Some(defer_body) = self.defer_stack.pop() {
+                    for d in &defer_body {
+                        self.gen_stmt(d, env)?;
+                    }
+                }
                 match value {
                     Some(val) => {
                         let reg = self.gen_expr(val, env)?;
@@ -651,6 +746,11 @@ impl Codegen {
                 self.gen_expr(expr, env)?;
                 Ok(())
             }
+            Stmt::Defer { body, .. } => {
+                self.defer_stack.push(body.clone());
+                Ok(())
+            }
+            Stmt::MacroDef { .. } => Ok(()),
         }
     }
 
@@ -703,31 +803,34 @@ impl Codegen {
 
     fn gen_expr(&mut self, expr: &Expr, env: &Environment) -> Result<String, String> {
         match expr {
-            Expr::IntLiteral(n, _) => {
+            Expr::IntLiteral(n, span) => {
+                let loc = self.emit_di_location(span);
                 let reg = self.fresh_reg();
-                self.push_indent(&format!("{} = add i64 0, {}", reg, n));
+                self.push_indent(&format!("{} = add i64 0, {}{}", reg, n, loc));
                 self.register_types.insert(reg.clone(), "i64".to_string());
                 Ok(reg)
             }
 
-            Expr::FloatLiteral(f, _) => {
+            Expr::FloatLiteral(f, span) => {
+                let loc = self.emit_di_location(span);
                 let reg = self.fresh_reg();
-                self.push_indent(&format!("{} = fadd double 0.0, {:.20}", reg, f));
+                self.push_indent(&format!("{} = fadd double 0.0, {:.20}{}", reg, f, loc));
                 self.register_types
                     .insert(reg.clone(), "double".to_string());
                 Ok(reg)
             }
 
-            Expr::BoolLiteral(b, _) => {
+            Expr::BoolLiteral(b, span) => {
+                let loc = self.emit_di_location(span);
                 let reg = self.fresh_reg();
                 let val = if *b { "true" } else { "false" };
-                self.push_indent(&format!("{} = add i1 0, {}", reg, val));
+                self.push_indent(&format!("{} = add i1 0, {}{}", reg, val, loc));
                 self.register_types.insert(reg.clone(), "i1".to_string());
                 Ok(reg)
             }
 
-            Expr::StringLiteral(s, _) => {
-                // Look up pre-assigned global name from the pre-pass.
+            Expr::StringLiteral(s, span) => {
+                let loc = self.emit_di_location(span);
                 let global_name = self
                     .string_global_names
                     .get(s)
@@ -736,16 +839,18 @@ impl Codegen {
 
                 let reg = self.fresh_reg();
                 self.push_indent(&format!(
-                    "{} = getelementptr inbounds [{} x i8], ptr @{}, i64 0, i64 0",
+                    "{} = getelementptr inbounds [{} x i8], ptr @{}, i64 0, i64 0{}",
                     reg,
                     s.len() + 1,
-                    global_name
+                    global_name,
+                    loc
                 ));
                 self.register_types.insert(reg.clone(), "ptr".to_string());
                 Ok(reg)
             }
 
-            Expr::Identifier(name, _) => {
+            Expr::Identifier(name, span) => {
+                let loc = self.emit_di_location(span);
                 let ptr_reg = self.symbols.get(name).cloned();
                 match ptr_reg {
                     Some(ptr) => {
@@ -756,8 +861,8 @@ impl Codegen {
                             .unwrap_or_else(|| "i64".to_string());
                         let val_reg = self.fresh_reg();
                         self.push_indent(&format!(
-                            "{} = load {}, ptr {}, align 8",
-                            val_reg, ty, ptr
+                            "{} = load {}, ptr {}, align 8{}",
+                            val_reg, ty, ptr, loc
                         ));
                         self.register_types.insert(val_reg.clone(), ty.clone());
                         if let Some(struct_name) = self.symbol_struct_types.get(name) {
@@ -835,10 +940,15 @@ impl Codegen {
                     ));
                     let fval = self.gen_expr(fexpr, env)?;
                     let fty = self.llvm_type(&field_defs[idx].1);
-                    self.push_indent(&format!("store {} {}, ptr {}, align 8", fty, fval, field_ptr));
+                    self.push_indent(&format!(
+                        "store {} {}, ptr {}, align 8",
+                        fty, fval, field_ptr
+                    ));
                 }
-                self.register_types.insert(ptr_reg.clone(), "ptr".to_string());
-                self.register_struct_types.insert(ptr_reg.clone(), name.clone());
+                self.register_types
+                    .insert(ptr_reg.clone(), "ptr".to_string());
+                self.register_struct_types
+                    .insert(ptr_reg.clone(), name.clone());
                 Ok(ptr_reg)
             }
 
@@ -911,6 +1021,19 @@ impl Codegen {
                     }
                 }
                 self.register_types.insert(result.clone(), to_ty);
+                Ok(result)
+            }
+            Expr::Lambda {
+                params,
+                return_type,
+                body,
+                ..
+            } => self.gen_lambda(params, return_type, body, env),
+            Expr::MacroInvocation { .. } => {
+                let result = self.fresh_reg();
+                self.push_indent(&format!("{} = add i64 0, 0", result));
+                self.register_types
+                    .insert(result.clone(), "i64".to_string());
                 Ok(result)
             }
         }
@@ -1192,21 +1315,130 @@ impl Codegen {
             ));
             self.register_types.insert(result.clone(), ret_llvm.clone());
             if let Type::Struct(struct_name) = &ret_type {
-                self.register_struct_types.insert(result.clone(), struct_name.clone());
+                self.register_struct_types
+                    .insert(result.clone(), struct_name.clone());
             }
             Ok(result)
         }
+    }
+
+    fn gen_lambda(
+        &mut self,
+        params: &[crate::ast::Param],
+        return_type: &Option<crate::ast::Type>,
+        body: &[Stmt],
+        env: &Environment,
+    ) -> Result<String, String> {
+        let lambda_id = self.lambda_counter;
+        self.lambda_counter += 1;
+        let fn_name = format!("__lambda_{}", lambda_id);
+
+        let param_types: Vec<Type> = params.iter().map(|p| Type::from(&p.type_annot)).collect();
+        let ret = match return_type {
+            Some(t) => Type::from(t),
+            None => Type::Void,
+        };
+
+        let ret_llvm = self.llvm_type(&ret);
+        let param_llvm: Vec<String> = param_types.iter().map(|p| self.llvm_type(p)).collect();
+
+        let named_params: Vec<String> = params
+            .iter()
+            .zip(param_llvm.iter())
+            .map(|(p, ty)| format!("{} %{}", ty, p.name))
+            .collect();
+        let param_str = if named_params.is_empty() {
+            String::new()
+        } else {
+            named_params.join(", ")
+        };
+
+        let mut lambda_ir = String::new();
+        lambda_ir.push_str(&format!(
+            "define {} @{}({}) {{\n",
+            ret_llvm, fn_name, param_str
+        ));
+        lambda_ir.push_str("  entry:\n");
+
+        for (param, param_ty) in params.iter().zip(param_llvm.iter()) {
+            let ptr_reg = format!("%{}", self.reg_counter);
+            self.reg_counter += 1;
+            lambda_ir.push_str(&format!("  {} = alloca {}, align 8\n", ptr_reg, param_ty));
+            lambda_ir.push_str(&format!(
+                "  store {} %{}, ptr {}, align 8\n",
+                param_ty, param.name, ptr_reg
+            ));
+        }
+
+        // Generate body into a temp string
+        let saved_ir = std::mem::take(&mut self.ir);
+        let saved_indent = self.indent;
+        let saved_reg_counter = self.reg_counter;
+        let saved_label_counter = self.label_counter;
+        let saved_register_types = std::mem::take(&mut self.register_types);
+        let saved_symbols = std::mem::take(&mut self.symbols);
+        let saved_symbol_types = std::mem::take(&mut self.symbol_types);
+        let saved_defer_stack = std::mem::take(&mut self.defer_stack);
+
+        self.indent = 1;
+        self.reg_counter = 0;
+        self.label_counter = 0;
+
+        for param in params {
+            let ptr_reg = format!("%{}", self.reg_counter);
+            self.symbols.insert(param.name.clone(), ptr_reg.clone());
+        }
+
+        for s in body {
+            self.gen_stmt(s, env)?;
+        }
+
+        while let Some(defer_body) = self.defer_stack.pop() {
+            for d in &defer_body {
+                self.gen_stmt(d, env)?;
+            }
+        }
+
+        let term = self.ir.lines().last().map(|l| l.trim()).unwrap_or("");
+        if !term.starts_with("ret ") {
+            if ret_llvm == "void" {
+                lambda_ir.push_str("  ret void\n");
+            } else {
+                lambda_ir.push_str(&format!("  ret {} {}\n", ret_llvm, self.llvm_zero(&ret)));
+            }
+        }
+
+        lambda_ir.push_str(&self.ir);
+        lambda_ir.push_str("}\n\n");
+
+        // Restore state
+        self.ir = saved_ir;
+        self.indent = saved_indent;
+        self.reg_counter = saved_reg_counter;
+        self.label_counter = saved_label_counter;
+        self.register_types = saved_register_types;
+        self.symbols = saved_symbols;
+        self.symbol_types = saved_symbol_types;
+        self.defer_stack = saved_defer_stack;
+
+        self.lambda_irs.push(lambda_ir);
+
+        // Return a function pointer (as i64 for simplicity)
+        let result = self.fresh_reg();
+        self.push_indent(&format!("{} = ptrtoint ptr @{} to i64", result, fn_name));
+        self.register_types
+            .insert(result.clone(), "i64".to_string());
+        Ok(result)
     }
 
     fn resolve_ir_type(&self, reg: &str) -> String {
         if let Some(ty) = self.register_types.get(reg) {
             return ty.clone();
         }
-        for (_name, ptr_reg) in &self.symbols {
-            if let Some(ty) = self.symbol_types.get(ptr_reg) {
-                if !ty.is_empty() {
+        for ptr_reg in self.symbols.values() {
+            if let Some(ty) = self.symbol_types.get(ptr_reg)
+                && !ty.is_empty() {
                     return ty.clone();
-                }
             }
         }
         "i64".to_string()
@@ -1252,17 +1484,16 @@ impl Codegen {
                 // Fallback: extract type from the instruction.
                 let first_word = rhs.split_whitespace().next().unwrap_or("i64");
                 // If it starts with a known keyword, return i64 as default.
-                if first_word == "call" {
-                    if let Some(ret) = rhs.split_whitespace().nth(1) {
-                        if ret != "void" {
-                            return ret.to_string();
-                        }
-                    }
+                if first_word == "call"
+                    && let Some(ret) = rhs.split_whitespace().nth(1)
+                    && ret != "void"
+                {
+                    return ret.to_string();
                 }
-                if rhs.starts_with("alloca") {
-                    if let Some(_after) = rhs.split_whitespace().nth(1) {
-                        return format!("ptr"); // alloca returns ptr
-                    }
+                if rhs.starts_with("alloca")
+                    && let Some(_after) = rhs.split_whitespace().nth(1)
+                {
+                    return "ptr".to_string();
                 }
             }
         }
@@ -1598,7 +1829,11 @@ mod tests {
             "struct Point:\n    let x: Int = 0\n    let y: Int = 0\n\nlet p = Point{x: 1, y: 2}\nlet n = p.x\n",
         )
         .unwrap();
-        assert!(ir.contains("getelementptr inbounds { i64, i64 }"), "no struct GEP: {}", ir);
+        assert!(
+            ir.contains("getelementptr inbounds { i64, i64 }"),
+            "no struct GEP: {}",
+            ir
+        );
         assert!(ir.contains("load i64"), "no field load: {}", ir);
     }
 }

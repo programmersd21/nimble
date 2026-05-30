@@ -182,6 +182,121 @@ pub extern "C" fn nimble_flush() {
     let _ = io::stdout().flush();
 }
 
+// ── Async runtime & concurrency primitives ──────────────────────────
+
+use std::sync::mpsc;
+use std::thread;
+
+/// Internal channel handle that holds both sender and receiver.
+struct Channel {
+    sender: mpsc::Sender<i64>,
+    receiver: mpsc::Receiver<i64>,
+}
+
+/// Sleep for `ms` milliseconds.
+#[unsafe(no_mangle)]
+pub extern "C" fn nimble_sleep_ms(ms: i64) {
+    thread::sleep(std::time::Duration::from_millis(ms as u64));
+}
+
+/// Wrapper to make a thread closure `Send` across the FFI boundary.
+struct ThreadClosure {
+    f: extern "C" fn(*mut u8),
+    arg: *mut u8,
+}
+unsafe impl Send for ThreadClosure {}
+
+/// Spawn a new thread that calls `fn_ptr(arg)`.
+/// Returns a handle ID (0 for now since join is a no-op).
+#[unsafe(no_mangle)]
+pub extern "C" fn nimble_thread_spawn(fn_ptr: extern "C" fn(*mut u8), arg: *mut u8) -> i64 {
+    let tc = ThreadClosure { f: fn_ptr, arg };
+    thread::spawn(move || {
+        (tc.f)(tc.arg);
+    });
+    // JoinHandle tracking left for future implementation
+    0
+}
+
+/// Join a thread by ID (simplified — waits on a channel).
+#[unsafe(no_mangle)]
+pub extern "C" fn nimble_thread_join(_thread_id: i64) {
+    // In a full implementation we would track handles.
+    // For now this is a no-op placeholder.
+}
+
+/// Create a mutex.
+#[unsafe(no_mangle)]
+pub extern "C" fn nimble_mutex_create() -> *mut std::sync::Mutex<()> {
+    Box::into_raw(Box::new(std::sync::Mutex::new(())))
+}
+
+/// Lock a mutex.
+#[unsafe(no_mangle)]
+pub extern "C" fn nimble_mutex_lock(mtx: *mut std::sync::Mutex<()>) {
+    if let Some(m) = unsafe { mtx.as_ref() } {
+        let _ = m.lock();
+    }
+}
+
+/// Unlock a mutex.
+#[unsafe(no_mangle)]
+pub extern "C" fn nimble_mutex_unlock(mtx: *mut std::sync::Mutex<()>) {
+    if let Some(m) = unsafe { mtx.as_ref() } {
+        // Drop the lock guard by letting it fall out of scope.
+        if let Ok(guard) = m.lock() {
+            drop(guard);
+        }
+    }
+}
+
+/// Create a channel (returns an opaque pointer to a channel handle).
+#[unsafe(no_mangle)]
+pub extern "C" fn nimble_channel_create() -> i64 {
+    let (tx, rx) = mpsc::channel::<i64>();
+    let chan = Box::into_raw(Box::new(Channel { sender: tx, receiver: rx }));
+    chan as i64
+}
+
+/// Send a value on a channel.
+#[unsafe(no_mangle)]
+pub extern "C" fn nimble_channel_send(chan_ptr: i64, value: i64) {
+    let chan = unsafe { &*(chan_ptr as *const Channel) };
+    let _ = chan.sender.send(value);
+}
+
+/// Receive a value from a channel (blocking).
+#[unsafe(no_mangle)]
+pub extern "C" fn nimble_channel_recv(chan_ptr: i64) -> i64 {
+    let chan = unsafe { &*(chan_ptr as *const Channel) };
+    chan.receiver.recv().unwrap_or(0)
+}
+
+/// Atomic load.
+#[unsafe(no_mangle)]
+pub extern "C" fn nimble_atomic_load(ptr: *mut i64) -> i64 {
+    unsafe {
+        std::sync::atomic::AtomicI64::from_ptr(ptr).load(std::sync::atomic::Ordering::SeqCst)
+    }
+}
+
+/// Atomic store.
+#[unsafe(no_mangle)]
+pub extern "C" fn nimble_atomic_store(ptr: *mut i64, val: i64) {
+    unsafe {
+        std::sync::atomic::AtomicI64::from_ptr(ptr).store(val, std::sync::atomic::Ordering::SeqCst)
+    }
+}
+
+/// Atomic fetch-and-add. Returns the previous value.
+#[unsafe(no_mangle)]
+pub extern "C" fn nimble_atomic_add(ptr: *mut i64, val: i64) -> i64 {
+    unsafe {
+        std::sync::atomic::AtomicI64::from_ptr(ptr)
+            .fetch_add(val, std::sync::atomic::Ordering::SeqCst)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

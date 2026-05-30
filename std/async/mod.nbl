@@ -1,14 +1,52 @@
-# Nimble Standard Library - Async
+# Nimble Standard Library — Async runtime and concurrency primitives
 
-extern fn nimble_sleep(ms: Int) -> Void
-extern fn nimble_thread_spawn(entry: String) -> Int
+extern fn nimble_thread_spawn(fn_ptr: String, arg: String) -> Int
 extern fn nimble_thread_join(thread: Int) -> Void
+extern fn nimble_sleep_ms(ms: Int) -> Void
+extern fn nimble_channel_create() -> Int
+extern fn nimble_channel_send(chan: Int, value: Int) -> Void
+extern fn nimble_channel_recv(chan: Int) -> Int
+extern fn nimble_mutex_create() -> Int
+extern fn nimble_mutex_lock(mtx: Int) -> Void
+extern fn nimble_mutex_unlock(mtx: Int) -> Void
+
+# Simple thread spawn
+fn spawn[T](f: fn() -> T) -> Int:
+    return nimble_thread_spawn(f as String, "")
+
+fn join(thread_id: Int) -> Void:
+    nimble_thread_join(thread_id)
 
 fn sleep(ms: Int) -> Void:
-    nimble_sleep(ms)
+    nimble_sleep_ms(ms)
 
-fn spawn(entry: String) -> Int:
-    return nimble_thread_spawn(entry)
+# Future type for async
+enum Future[T]:
+    Pending
+    Ready(T)
 
-fn join(thread: Int) -> Void:
-    nimble_thread_join(thread)
+# Channel
+struct Channel:
+    let handle: Int = 0
+
+fn channel() -> Channel:
+    return Channel{handle: nimble_channel_create()}
+
+fn send[T](self: Channel, value: T) -> Void:
+    nimble_channel_send(self.handle, value as Int)
+
+fn recv[T](self: Channel) -> T:
+    return nimble_channel_recv(self.handle) as T
+
+# Mutex
+struct Mutex:
+    let handle: Int = 0
+
+fn mutex() -> Mutex:
+    return Mutex{handle: nimble_mutex_create()}
+
+fn lock[T](self: Mutex) -> Void:
+    nimble_mutex_lock(self.handle)
+
+fn unlock[T](self: Mutex) -> Void:
+    nimble_mutex_unlock(self.handle)
