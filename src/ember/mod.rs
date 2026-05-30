@@ -1,6 +1,8 @@
 use std::alloc::{self, Layout};
 use std::io::{self, Write};
 use std::process;
+use std::sync::mpsc;
+use std::thread;
 
 /// Allocate `size` bytes of zero-initialised memory.
 ///
@@ -39,7 +41,7 @@ pub unsafe extern "C" fn nimble_free(ptr: *mut u8, size: usize) {
 /// Reallocate a block to a new size, preserving the original contents up to
 /// `min(old_size, new_size)` bytes.
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_realloc(ptr: *mut u8, old_size: usize, new_size: usize) -> *mut u8 {
+pub unsafe extern "C" fn nimble_realloc(ptr: *mut u8, old_size: usize, new_size: usize) -> *mut u8 {
     if new_size == 0 {
         if !ptr.is_null() {
             unsafe {
@@ -123,7 +125,7 @@ pub extern "C" fn nimble_panic(_msg: *const u8, _len: i64) -> ! {
 
 /// Print a string (pointer + length) to stdout.
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_print_string(msg: *const u8, len: i64) {
+pub unsafe extern "C" fn nimble_print_string(msg: *const u8, len: i64) {
     if msg.is_null() || len <= 0 {
         return;
     }
@@ -134,7 +136,7 @@ pub extern "C" fn nimble_print_string(msg: *const u8, len: i64) {
 
 /// Print a null-terminated string to stdout followed by a newline.
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_print(ptr: *const u8) {
+pub unsafe extern "C" fn nimble_print(ptr: *const u8) {
     if ptr.is_null() {
         return;
     }
@@ -146,7 +148,7 @@ pub extern "C" fn nimble_print(ptr: *const u8) {
 /// Print a null-terminated string to stdout **without** a trailing newline.
 /// Used by the `print_str` built-in.
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_print_str(ptr: *const u8) {
+pub unsafe extern "C" fn nimble_print_str(ptr: *const u8) {
     if ptr.is_null() {
         return;
     }
@@ -184,9 +186,6 @@ pub extern "C" fn nimble_flush() {
 
 // ── Async runtime & concurrency primitives ──────────────────────────
 
-use std::sync::mpsc;
-use std::thread;
-
 /// Internal channel handle that holds both sender and receiver.
 struct Channel {
     sender: mpsc::Sender<i64>,
@@ -199,20 +198,13 @@ pub extern "C" fn nimble_sleep_ms(ms: i64) {
     thread::sleep(std::time::Duration::from_millis(ms as u64));
 }
 
-/// Wrapper to make a thread closure `Send` across the FFI boundary.
-struct ThreadClosure {
-    f: extern "C" fn(*mut u8),
-    arg: *mut u8,
-}
-unsafe impl Send for ThreadClosure {}
-
 /// Spawn a new thread that calls `fn_ptr(arg)`.
 /// Returns a handle ID (0 for now since join is a no-op).
 #[unsafe(no_mangle)]
 pub extern "C" fn nimble_thread_spawn(fn_ptr: extern "C" fn(*mut u8), arg: *mut u8) -> i64 {
-    let tc = ThreadClosure { f: fn_ptr, arg };
+    let arg_val = arg as usize;
     thread::spawn(move || {
-        (tc.f)(tc.arg);
+        fn_ptr(arg_val as *mut u8);
     });
     // JoinHandle tracking left for future implementation
     0
@@ -233,15 +225,16 @@ pub extern "C" fn nimble_mutex_create() -> *mut std::sync::Mutex<()> {
 
 /// Lock a mutex.
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_mutex_lock(mtx: *mut std::sync::Mutex<()>) {
+pub unsafe extern "C" fn nimble_mutex_lock(mtx: *mut std::sync::Mutex<()>) {
     if let Some(m) = unsafe { mtx.as_ref() } {
-        let _ = m.lock();
+        let guard = m.lock();
+        drop(guard);
     }
 }
 
 /// Unlock a mutex.
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_mutex_unlock(mtx: *mut std::sync::Mutex<()>) {
+pub unsafe extern "C" fn nimble_mutex_unlock(mtx: *mut std::sync::Mutex<()>) {
     if let Some(m) = unsafe { mtx.as_ref() } {
         // Drop the lock guard by letting it fall out of scope.
         if let Ok(guard) = m.lock() {
@@ -254,7 +247,10 @@ pub extern "C" fn nimble_mutex_unlock(mtx: *mut std::sync::Mutex<()>) {
 #[unsafe(no_mangle)]
 pub extern "C" fn nimble_channel_create() -> i64 {
     let (tx, rx) = mpsc::channel::<i64>();
-    let chan = Box::into_raw(Box::new(Channel { sender: tx, receiver: rx }));
+    let chan = Box::into_raw(Box::new(Channel {
+        sender: tx,
+        receiver: rx,
+    }));
     chan as i64
 }
 
@@ -274,15 +270,13 @@ pub extern "C" fn nimble_channel_recv(chan_ptr: i64) -> i64 {
 
 /// Atomic load.
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_atomic_load(ptr: *mut i64) -> i64 {
-    unsafe {
-        std::sync::atomic::AtomicI64::from_ptr(ptr).load(std::sync::atomic::Ordering::SeqCst)
-    }
+pub unsafe extern "C" fn nimble_atomic_load(ptr: *mut i64) -> i64 {
+    unsafe { std::sync::atomic::AtomicI64::from_ptr(ptr).load(std::sync::atomic::Ordering::SeqCst) }
 }
 
 /// Atomic store.
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_atomic_store(ptr: *mut i64, val: i64) {
+pub unsafe extern "C" fn nimble_atomic_store(ptr: *mut i64, val: i64) {
     unsafe {
         std::sync::atomic::AtomicI64::from_ptr(ptr).store(val, std::sync::atomic::Ordering::SeqCst)
     }
@@ -290,7 +284,7 @@ pub extern "C" fn nimble_atomic_store(ptr: *mut i64, val: i64) {
 
 /// Atomic fetch-and-add. Returns the previous value.
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_atomic_add(ptr: *mut i64, val: i64) -> i64 {
+pub unsafe extern "C" fn nimble_atomic_add(ptr: *mut i64, val: i64) -> i64 {
     unsafe {
         std::sync::atomic::AtomicI64::from_ptr(ptr)
             .fetch_add(val, std::sync::atomic::Ordering::SeqCst)

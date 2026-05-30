@@ -127,7 +127,7 @@ pub fn compile(source: &str, options: &CompileOptions) -> Result<(), String> {
 
     let output = Command::new(&options.clang_path)
         .arg("-c")
-        .arg(&format!("-O{}", options.opt_level))
+        .arg(format!("-O{}", options.opt_level))
         .arg("-o")
         .arg(&options.output_path)
         .arg(ir_path.to_str().unwrap())

@@ -90,6 +90,38 @@ enum Commands {
         #[arg(default_value = ".")]
         path: PathBuf,
     },
+
+    /// Generate documentation for a Nimble project
+    Doc {
+        #[arg(default_value = ".")]
+        path: PathBuf,
+        #[arg(long, default_value = "docs")]
+        output_dir: String,
+    },
+
+    /// Profile a Nimble program
+    Profile {
+        file: String,
+        #[arg(short = 'o', long)]
+        output: Option<String>,
+    },
+
+    /// Fuzz the compiler to find crashes
+    Fuzz {
+        #[arg(long, default_value = "1000")]
+        iterations: u64,
+        #[arg(long, default_value = "42")]
+        seed: u64,
+    },
+
+    /// Generate the runtime C header for self-hosting
+    GenerateHeader {
+        #[arg(default_value = "nimble_runtime.h")]
+        output: String,
+    },
+
+    /// Lint a Nimble source file
+    Lint { file: String },
 }
 
 #[derive(Subcommand)]
@@ -255,6 +287,93 @@ async fn main() -> Result<()> {
                     "    \x1b[1mFinished\x1b[0m {} package(s) ready",
                     cached.len()
                 );
+            }
+        }
+        Commands::Doc { path, output_dir } => {
+            let mut docgen = nimble::docgen::DocGenerator::new();
+            for entry in std::fs::read_dir(&path).map_err(|e| miette::miette!(e))? {
+                let entry = entry.map_err(|e| miette::miette!(e))?;
+                let entry_path = entry.path();
+                if entry_path.extension().is_some_and(|ext| ext == "nbl") {
+                    let source =
+                        std::fs::read_to_string(&entry_path).map_err(|e| miette::miette!(e))?;
+                    match nimble::Parser::new(&source) {
+                        Ok(mut p) => {
+                            if let Ok(prog) = p.parse() {
+                                let module_name = entry_path
+                                    .file_stem()
+                                    .map(|s| s.to_string_lossy().to_string())
+                                    .unwrap_or_else(|| "unknown".to_string());
+                                docgen.extract_from_program(&prog, &module_name);
+                            }
+                        }
+                        Err(_) => {}
+                    }
+                }
+            }
+            std::fs::create_dir_all(&output_dir).map_err(|e| miette::miette!(e))?;
+            let html = docgen.to_html();
+            let index_path = Path::new(&output_dir).join("index.html");
+            std::fs::write(&index_path, html)
+                .map_err(|e| miette::miette!("failed to write {}: {}", index_path.display(), e))?;
+            eprintln!("docs generated in {}", output_dir);
+        }
+        Commands::Profile { file, output } => {
+            let source = std::fs::read_to_string(&file)
+                .map_err(|e| miette::miette!("cannot read `{}`: {}", file, e))?;
+            let out_path = output.unwrap_or_else(|| {
+                Path::new(&file)
+                    .with_extension("exe")
+                    .to_string_lossy()
+                    .to_string()
+            });
+            let mut profiler = nimble::profiler::Profiler::new();
+            profiler.start("compile");
+            let opts = nimble::smelt::driver::CompileOptions {
+                output_path: out_path.clone(),
+                source_path: Some(file.clone()),
+                run_after: true,
+                ..Default::default()
+            };
+            nimble::smelt::driver::compile(&source, &opts).map_err(|e| miette::miette!(e))?;
+            profiler.end("compile");
+            profiler.write_report();
+        }
+        Commands::Fuzz { iterations, seed } => {
+            let fuzzer = nimble::fuzzer::Fuzzer::new(seed, iterations);
+            let crashes = fuzzer.run().map_err(|e| miette::miette!(e))?;
+            if crashes.is_empty() {
+                eprintln!("fuzzing completed: {} iterations, no crashes", iterations);
+            } else {
+                for crash in &crashes {
+                    eprintln!("{}", crash);
+                }
+                eprintln!("fuzzing completed: {} crashes found", crashes.len());
+            }
+        }
+        Commands::GenerateHeader { output } => {
+            let header = nimble::selfhost::generate_runtime_header();
+            std::fs::write(&output, header)
+                .map_err(|e| miette::miette!("failed to write {}: {}", output, e))?;
+            eprintln!("generated runtime header: {}", output);
+        }
+        Commands::Lint { file } => {
+            let source = std::fs::read_to_string(&file)
+                .map_err(|e| miette::miette!("cannot read `{}`: {}", file, e))?;
+            let prog = match nimble::Parser::new(&source) {
+                Ok(mut p) => p
+                    .parse()
+                    .map_err(|e| miette::miette!("parse error: {}", e))?,
+                Err(e) => return Err(miette::miette!("lex error: {}", e)),
+            };
+            let mut linter = nimble::lint::Linter::new();
+            let warnings = linter.lint_program(&prog);
+            if warnings.is_empty() {
+                eprintln!("no warnings");
+            } else {
+                for w in &warnings {
+                    eprintln!("warning:{}:{}: {}", w.line, w.column, w.message);
+                }
             }
         }
     }

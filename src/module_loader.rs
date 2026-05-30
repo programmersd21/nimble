@@ -208,7 +208,7 @@ impl ModuleLoader {
                 .map(|s| (s.clone(), loaded.env.clone()))
                 .collect();
             collected_module_stmts.borrow_mut().extend(pairs);
-            Self::import_from_env(&loaded.env, target_env, symbols, alias, &module_path, span)?;
+            Self::import_from_env(&loaded.env, target_env, symbols, alias, module_path, span)?;
             return Ok(loaded
                 .stmts
                 .iter()
@@ -267,7 +267,7 @@ impl ModuleLoader {
         collected_module_stmts.borrow_mut().extend(pairs);
 
         // Import symbols into the target environment.
-        Self::import_from_env(&env, target_env, symbols, alias, &module_path, span)?;
+        Self::import_from_env(&env, target_env, symbols, alias, module_path, span)?;
 
         // Return extern fn statements for codegen.
         Ok(externs)

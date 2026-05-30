@@ -12,6 +12,23 @@
 
 Type names are case-insensitive. All of `Int`, `int`, and `INT` resolve to the `Int` type.
 
+## Reference Types
+
+| Type | LLVM Repr | Description |
+|------|-----------|-------------|
+| `&T` | `ptr` | Immutable reference to T |
+| `&mut T` | `ptr` | Mutable reference to T |
+
+References are created with the `&` prefix operator and auto-dereferenced on access.
+
+## Function and Closure Types
+
+| Type | Description |
+|------|-------------|
+| `fn(A, B) -> C` | Function pointer or closure signature |
+
+Non-capturing closures compile down to plain function pointers. Capturing closures compile to trampoline structs `{ fn_ptr, capture_data }`.
+
 ## Explicit Type Annotations
 
 Variable declarations and function parameters accept optional type annotations.
@@ -24,7 +41,7 @@ fn add(a: Int, b: Int) -> Int:
 
 ## Type Casting
 
-Nimble supports explicit type casting using the `as` keyword. This allows converting between primitive types when the conversion is safe or explicitly desired.
+Nimble supports explicit type casting using the `as` keyword.
 
 ```
 let x: Int = 42
@@ -43,7 +60,7 @@ Supported casts:
 
 ## Type Inference
 
-The type checker infers local variable types from literal values and usage. Function parameters and most public boundaries remain explicit.
+The type checker uses Hindley-Milner inference with unification. Local variable types are inferred from literal values and usage. Function parameters and most public boundaries remain explicit.
 
 ```
 let x = 42          # x : Int
@@ -54,7 +71,7 @@ let s = "hello"     # s : String
 
 ## Function Types
 
-Functions have the type `fn(ParamTypes...) -> ReturnType`. Function types are inferred by the checker and used for call-site validation.
+Functions have the type `fn(ParamTypes...) -> ReturnType`.
 
 ```
 fn identity(x: Int) -> Int:
@@ -76,6 +93,26 @@ struct Point:
 let p = Point{x: 1, y: 2}
 let x = p.x
 ```
+
+### Enums (Sum Types)
+
+Enums are tagged unions with named variants, each optionally carrying payload data.
+
+```nimble
+enum Option[T]:
+    Some(T), None
+
+enum Result[T, E]:
+    Ok(T), Err(E)
+
+enum Color:
+    Red, Green, Blue(Int)
+
+let c = Color.Red
+let rgb = Color.Blue(255)
+```
+
+Enums are lowered to `{ i64 tag, i64 payload }` in LLVM. Pattern matching switches on the tag and extracts the payload.
 
 ### Interfaces
 
@@ -99,7 +136,9 @@ let d: Drawable = Circle{radius: 5}
 Parameterized type syntax is supported in annotations and unification.
 
 ```nimble
-let box: Box[Int] = Box{value: 1}
+let b: Box[Int] = Box{value: 1}
+let vec: Vec[Int] = new_vec()
+let map: HashMap[String, Int] = new_map()
 ```
 
 ## Type Variables
@@ -114,7 +153,10 @@ During inference, fresh type variables are generated. The checker resolves them 
 4. **Function**: `fn(A1..An) -> R` unifies with `fn(B1..Bn) -> R'` by unifying each `Ai` with `Bi` and `R` with `R'`. Arity must match.
 5. **Generic**: `T[A1..An]` unifies with `T[B1..Bn]` by unifying each argument. A generic instance may also unify with its nominal base struct.
 6. **Interface**: `Interface(I)` unifies with `Struct(S)` when `S` provides the required interface methods.
-7. **Mismatch**: Any other pair produces a `TypeError::Mismatch`.
+7. **Enum variant**: Enum types unify by matching the enum name and variant.
+8. **Reference**: `&T` unifies with `&U` when `T` unifies with `U`. `&mut T` follows the same rule.
+9. **Closure**: Closure types unify by matching parameter and return types.
+10. **Mismatch**: Any other pair produces a `TypeError::Mismatch`.
 
 ## Type Errors
 
@@ -132,6 +174,5 @@ During inference, fresh type variables are generated. The checker resolves them 
 
 ## Current Gaps
 
-- No borrow checking or ownership model
-- No generic function monomorphization yet
-- No method dispatch syntax yet
+- No full borrow checker (reference types are parsed and tracked, but no borrow-checker passes enforce lifetimes yet)
+- No variance annotations on generics

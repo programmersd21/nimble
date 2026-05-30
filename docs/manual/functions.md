@@ -19,6 +19,39 @@ fn fib(n: Int) -> Int:
     return fib(n - 1) + fib(n - 2)
 ```
 
+## Generic Functions
+
+Functions can declare type parameters in square brackets before the parameter list:
+
+```
+fn identity[T](x: T) -> T:
+    return x
+
+fn swap[T](a: T, b: T) -> T:
+    return b
+
+fn first[T, U](a: T, b: U) -> T:
+    return a
+```
+
+Generic functions are monomorphized: a separate copy is generated for each unique combination of type arguments at each call site.
+
+## Closures / Lambdas
+
+Anonymous functions are written with `fn`:
+
+```
+let double = fn(x: Int): x * 2
+let apply = fn(f: fn(Int) -> Int, x: Int): f(x)
+```
+
+Lambdas can capture variables from the enclosing scope. Capturing closures compile to a trampoline struct `{fn_ptr, capture_data}`. Non-capturing closures compile to plain function pointers.
+
+```
+let scale = 2
+let doubler = fn(x: Int): x * scale   # captures `scale`
+```
+
 ## Parameter Passing
 
 Parameters are passed by value (copied into the callee's stack frame). Parameters are immutable bindings inside the function body.
@@ -43,6 +76,19 @@ fn greet(name: String):
     return
 ```
 
+## Method Call Syntax
+
+Functions whose first parameter is named `self` can be called with method syntax:
+
+```
+fn describe(self: String) -> Void:
+    print(self)
+
+"hello".describe()     # same as describe("hello")
+```
+
+This is desugared at the type-checker level, so no special codegen support is needed.
+
 ## Foreign Function Interface
 
 `extern fn` declares a function with C calling convention. No body is provided. The codegen emits an LLVM `declare`, making the symbol available to the linker.
@@ -65,13 +111,6 @@ The compiler driver (`smelt`) links the resulting object file against the `ember
 - Inner scopes can shadow outer bindings.
 - Variables declared in inner scopes are not visible outside that scope.
 
-## Current Limitations
-
-- No keyword-only, default, or variadic parameters
-- No multiple return values
-- No closures or nested function definitions
-- No async functions or generators
-
 ```
 fn example(x: Int):
     let a = 1          # visible in entire function
@@ -80,3 +119,9 @@ fn example(x: Int):
         a = 3          # error: a is immutable
     # b is not visible here
 ```
+
+## Current Limitations
+
+- No keyword-only, default, or variadic parameters
+- No multiple return values
+- No async functions (use the async/await primitives from std.async instead)

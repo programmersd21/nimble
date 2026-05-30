@@ -7,7 +7,7 @@ use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer};
 
-use crate::{ParseError, Parser, TypeChecker, TypeError};
+use crate::{ParseError, Parser, SymbolKind, TypeChecker, TypeError};
 
 /// Convert a `nimble::Span` into an LSP `Range`.
 fn span_to_range(span: &crate::Span, line_index: &[usize]) -> Range {
@@ -16,7 +16,7 @@ fn span_to_range(span: &crate::Span, line_index: &[usize]) -> Range {
 
     let line_start = *line_index.get(span.line.saturating_sub(1)).unwrap_or(&0);
     let start_col = span.byte_index.saturating_sub(line_start) as u32;
-    let end_col = start_col + span.length.saturating_sub(1).max(0) as u32;
+    let end_col = start_col + span.length.saturating_sub(1) as u32;
 
     Range {
         start: Position {
@@ -133,13 +133,19 @@ impl LanguageServer for Backend {
         Ok(InitializeResult {
             server_info: Some(ServerInfo {
                 name: "lantern".to_string(),
-                version: Some("0.1.0".to_string()),
+                version: Some("0.1.1".to_string()),
             }),
             capabilities: ServerCapabilities {
                 text_document_sync: Some(TextDocumentSyncCapability::Kind(
                     TextDocumentSyncKind::INCREMENTAL,
                 )),
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
+                definition_provider: Some(OneOf::Left(true)),
+                completion_provider: Some(CompletionOptions {
+                    resolve_provider: None,
+                    trigger_characters: Some(vec![".".to_string()]),
+                    ..Default::default()
+                }),
                 ..Default::default()
             },
         })
@@ -225,9 +231,9 @@ impl LanguageServer for Backend {
             candidate
         };
 
-        if let Some(tok) = token_at_cursor {
-            if let crate::TokenKind::Identifier(name) = &tok.kind {
-                if let Some(sym) = env.lookup(name) {
+        if let Some(tok) = token_at_cursor
+            && let crate::TokenKind::Identifier(name) = &tok.kind
+            && let Some(sym) = env.lookup(name) {
                     let hover_text = format!(
                         "**{}** `{}`  \n---\nkind: {:?}  \nmutable: {}",
                         name, sym.type_, sym.kind, sym.mutable
@@ -246,4 +252,105 @@ impl LanguageServer for Backend {
 
         Ok(None)
     }
+
+    async fn goto_definition(
+        &self,
+        params: GotoDefinitionParams,
+    ) -> Result<Option<GotoDefinitionResponse>> {
+        let uri = params.text_document_position_params.text_document.uri;
+        let pos = params.text_document_position_params.position;
+        if let Some(source) = self.documents.get(&uri) {
+            let line = pos.line as usize;
+            let col = pos.character as usize;
+            let lines: Vec<&str> = source.lines().collect();
+            if line < lines.len() && col < lines[line].len() {
+                let word = extract_word_at(lines[line], col);
+                if let Ok(prog) = Parser::new(&source).and_then(|mut p| p.parse())
+                    && let Ok(env) = TypeChecker::new(&source).check_program(&prog)
+                    && let Some(sym) = env.lookup(&word) {
+                            let def_pos = Position::new(
+                                (sym.defined_at.line - 1) as u32,
+                                (sym.defined_at.column - 1) as u32,
+                            );
+                            return Ok(Some(GotoDefinitionResponse::Scalar(Location::new(
+                                uri.clone(),
+                                Range::new(def_pos, def_pos),
+                            ))));
+                        }
+                    }
+                }
+            }
+        }
+        Ok(None)
+    }
+
+    async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>> {
+        let mut items = Vec::new();
+        for kw in &[
+            "fn",
+            "let",
+            "var",
+            "if",
+            "elif",
+            "else",
+            "match",
+            "return",
+            "while",
+            "for",
+            "break",
+            "continue",
+            "struct",
+            "enum",
+            "interface",
+            "extern",
+            "load",
+            "pub",
+            "as",
+            "true",
+            "false",
+            "defer",
+            "mut",
+        ] {
+            items.push(CompletionItem {
+                label: kw.to_string(),
+                kind: Some(CompletionItemKind::KEYWORD),
+                ..Default::default()
+            });
+        }
+        let uri = &params.text_document_position.text_document.uri;
+        if let Some(source) = self.documents.get(uri)
+            && let Ok(prog) = Parser::new(&source).and_then(|mut p| p.parse())
+            && let Ok(env) = TypeChecker::new(&source).check_program(&prog) {
+                    for (name, sym) in env.get_globals() {
+                        let kind = match sym.kind {
+                            SymbolKind::Function => CompletionItemKind::FUNCTION,
+                            SymbolKind::Variable => CompletionItemKind::VARIABLE,
+                            SymbolKind::Struct => CompletionItemKind::STRUCT,
+                            SymbolKind::Interface => CompletionItemKind::INTERFACE,
+                        };
+                        items.push(CompletionItem {
+                            label: name.clone(),
+                            kind: Some(kind),
+                            detail: Some(sym.type_.to_string()),
+                            ..Default::default()
+                        });
+                    }
+                }
+            }
+        }
+        Ok(Some(CompletionResponse::Array(items)))
+    }
+}
+
+fn extract_word_at(line: &str, col: usize) -> String {
+    let bytes = line.as_bytes();
+    let mut start = col;
+    let mut end = col;
+    while start > 0 && (bytes[start - 1] as char).is_alphanumeric() {
+        start -= 1;
+    }
+    while end < bytes.len() && (bytes[end] as char).is_alphanumeric() {
+        end += 1;
+    }
+    line[start..end].to_string()
 }

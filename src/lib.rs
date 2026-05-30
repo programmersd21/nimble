@@ -12,10 +12,15 @@ pub mod types;
 
 pub mod anvil;
 pub mod chisel;
+pub mod docgen;
 pub mod ember;
 pub mod forge;
+pub mod fuzzer;
 pub mod lantern;
+pub mod lint;
 pub mod nim;
+pub mod profiler;
+pub mod selfhost;
 pub mod smelt;
 
 pub use ast::*;

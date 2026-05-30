@@ -5,6 +5,9 @@ extern fn print(s: String) -> Void
 extern fn print_str(s: String) -> Void
 extern fn print_int(i: Int) -> Void
 extern fn print_float(f: Float) -> Void
+extern fn nimble_read_file(path: String) -> String
+extern fn nimble_write_file(path: String, content: String) -> Int
+extern fn nimble_read_line() -> String
 
 fn println(s: String) -> Void:
     print(s)
@@ -14,3 +17,21 @@ fn print_no_newline(s: String) -> Void:
 
 fn print_int_val(i: Int) -> Void:
     print_int(i)
+
+fn read_file(path: String) -> Result[String, String]:
+    let content = nimble_read_file(path)
+    if content == "":
+        return Err("file not found or empty")
+    return Ok(content)
+
+fn write_file(path: String, content: String) -> Result[Int, String]:
+    let result = nimble_write_file(path, content)
+    if result != 0:
+        return Err("failed to write file")
+    return Ok(result)
+
+fn read_line() -> Result[String, String]:
+    let line = nimble_read_line()
+    if line == "":
+        return Err("no input")
+    return Ok(line)

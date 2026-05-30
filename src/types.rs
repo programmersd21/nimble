@@ -23,6 +23,13 @@ pub enum Type {
 
     /// Function type: `Fn(params...) -> return_type`.
     Function(Vec<Type>, Box<Type>),
+
+    /// Closure type: `Closure(params..., captures...) -> return_type`.
+    Closure {
+        params: Vec<Type>,
+        ret: Box<Type>,
+        captures: Vec<(String, Type)>,
+    },
 }
 
 pub type Substitution = HashMap<usize, Type>;
@@ -43,6 +50,23 @@ impl Type {
                 let new_ret = ret.apply(subst);
                 Type::Function(new_params, Box::new(new_ret))
             }
+            Type::Closure {
+                params,
+                ret,
+                captures,
+            } => {
+                let new_params: Vec<Type> = params.iter().map(|p| p.apply(subst)).collect();
+                let new_ret = ret.apply(subst);
+                let new_captures: Vec<(String, Type)> = captures
+                    .iter()
+                    .map(|(n, t)| (n.clone(), t.apply(subst)))
+                    .collect();
+                Type::Closure {
+                    params: new_params,
+                    ret: Box::new(new_ret),
+                    captures: new_captures,
+                }
+            }
             Type::GenericInstance(name, args) => {
                 let new_args: Vec<Type> = args.iter().map(|a| a.apply(subst)).collect();
                 Type::GenericInstance(name.clone(), new_args)
@@ -59,6 +83,21 @@ impl Type {
                 let mut vars = ret.free_vars();
                 for p in params {
                     vars.extend(p.free_vars());
+                }
+                vars
+            }
+            Type::Closure {
+                params,
+                ret,
+                captures,
+                ..
+            } => {
+                let mut vars = ret.free_vars();
+                for p in params {
+                    vars.extend(p.free_vars());
+                }
+                for (_, t) in captures {
+                    vars.extend(t.free_vars());
                 }
                 vars
             }
@@ -105,6 +144,27 @@ impl std::fmt::Display for Type {
                 }
                 write!(f, ") -> {}", ret)
             }
+            Type::Closure {
+                params,
+                ret,
+                captures,
+            } => {
+                write!(f, "closure(")?;
+                for (i, p) in params.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}", p)?;
+                }
+                write!(f, ") -> {} [", ret)?;
+                for (i, (n, t)) in captures.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}: {}", n, t)?;
+                }
+                write!(f, "]")
+            }
         }
     }
 }
@@ -112,10 +172,7 @@ impl std::fmt::Display for Type {
 impl From<&crate::ast::Type> for Type {
     fn from(t: &crate::ast::Type) -> Self {
         if !t.args.is_empty() {
-            return Type::GenericInstance(
-                t.name.clone(),
-                t.args.iter().map(Type::from).collect(),
-            );
+            return Type::GenericInstance(t.name.clone(), t.args.iter().map(Type::from).collect());
         }
         match t.name.to_lowercase().as_str() {
             "int" => Type::Int,

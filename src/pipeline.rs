@@ -79,9 +79,7 @@ impl PipelineConfig {
 
     /// Detect host CPU and pass `-mcpu=native` to target the current machine.
     pub fn native_host_args() -> Vec<String> {
-        let mut args = vec![];
-        args.push("-mcpu".into());
-        args.push("native".into());
+        let args = vec!["-mcpu".into(), "native".into()];
         args
     }
 }

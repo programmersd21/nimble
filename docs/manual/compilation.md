@@ -24,6 +24,16 @@ Token stream -> Parser -> AST (Program)
 - **Pass 1**: Register all top-level function signatures.
 - **Pass 2**: Type-check all function bodies against registered signatures.
 
+The checker handles:
+- Hindley-Milner type inference with unification
+- Generic function monomorphization (fresh type variables per instantiation)
+- Enum variant resolution and pattern matching type checking
+- Method call desugaring (`obj.method(args)` -> `method(obj, args)`)
+- Closure capture analysis
+- Macro expansion
+- Interface conformance checking
+- Ownership tracking scaffold
+
 Returns an `Environment` mapping every name to its resolved `Symbol`.
 
 ```
@@ -41,6 +51,17 @@ AST -> TypeChecker -> Environment + Subst
 | `Bool` | `i1` |
 | `String` | `ptr` |
 | `Void` | `void` |
+| `&T` / `&mut T` | `ptr` |
+| `struct` | LLVM named `%T` |
+| `enum` | `{i64, i64}` tagged union |
+
+The codegen also handles:
+- Enum tagged unions with tag check and payload extraction
+- Lambda trampolines for captured closures
+- Function pointer codegen for non-capturing closures
+- `defer` scope-exit emission via a defer stack
+- `?` operator tag-check + early-return IR
+- Optional LLVM debug info (`!DILocation`, `DISubprogram`, `DICompileUnit`)
 
 ```
 AST + Environment -> Codegen -> LLVM IR (.ll)

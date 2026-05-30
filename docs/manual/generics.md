@@ -1,20 +1,31 @@
 # Generics
 
-Nimble supports generic type syntax in annotations and unification. Type parameters are written in square brackets.
+Nimble supports generics for both structs and functions. Type parameters are written in square brackets.
 
-## Generic Type Annotations
+## Generic Functions
 
-Use `Type[Arg]` syntax in variable annotations:
+Functions can declare type parameters before the parameter list:
 
 ```nimble
-let b: Box[Int] = Box{value: 42}
+fn identity[T](x: T) -> T:
+    return x
+
+fn pair[T, U](a: T, b: U) -> T:
+    return a
 ```
 
-The type checker unifies `Box[Int]` with the concrete struct `Box` by matching the base name and checking that the argument is compatible with the field types.
+### Monomorphization
+
+Each call to a generic function with distinct type arguments generates a fresh monomorphized copy. The type arguments are substituted into the function body, and the resulting concrete function is compiled independently.
+
+```nimble
+let a = identity[Int](42)     # monomorphizes identity with T=Int
+let b = identity[Float](3.14) # monomorphizes identity with T=Float
+```
 
 ## Generic Structs
 
-Declare a struct normally. The generic parameter appears only in the annotation at the use site:
+Structs can be declared with generic parameters in their type annotation at the use site:
 
 ```nimble
 struct Box:
@@ -33,20 +44,40 @@ struct Pair:
 let p: Pair[Int, Int] = Pair{first: 1, second: 2}
 ```
 
+## Generic Enums
+
+Enums also support type parameters:
+
+```nimble
+enum Option[T]:
+    Some(T), None
+
+enum Result[T, E]:
+    Ok(T), Err(E)
+
+let x: Option[Int] = Option.Some(42)
+let y: Result[String, String] = Ok("ok")
+```
+
+## Generic Collections
+
+The standard library uses generics for collections:
+
+```nimble
+let vec: Vec[Int] = new_vec()
+let map: HashMap[String, Int] = new_map()
+```
+
 ## Unification Rules
 
 When the type checker encounters `T[A1..An]`:
 
-1. It looks up the base struct `T`.
+1. It looks up the base type `T`.
 2. It unifies each type argument `Ai` with the corresponding field type.
-3. A generic instance also unifies with the bare struct name `T` (the annotation is advisory).
+3. A generic instance also unifies with the bare type name `T` (the annotation is advisory).
 
 ## Current Limitations
 
-- **No generic function monomorphization.** Functions cannot declare type parameters (`fn identity[T](x: T) -> T` is not yet supported). Generic parameters only appear in type annotations on variables.
-- No variance annotations.
-- No bounds / constraints on type parameters.
-
-## Example
-
-See [`examples/generics.nbl`](../../examples/generics.nbl).
+- No variance annotations
+- No bounds / constraints on type parameters
+- No trait bounds on generic parameters

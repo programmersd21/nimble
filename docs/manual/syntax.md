@@ -33,8 +33,9 @@ String escape sequences: `\n` (newline), `\t` (tab), `\r` (carriage return), `\0
 ### Keywords
 
 ```
-fn  let  var  if  elif  else  struct  interface  pub
+fn  let  var  if  elif  else  struct  interface  enum  match  pub
 return  while  break  continue  for  in  extern  load  as  true  false
+defer  macro  mut  async  await  ref
 ```
 
 ## Indentation
@@ -59,7 +60,7 @@ fn main() -> Int:
 | `:` | Block start, type annotation separator |
 | `->` | Return type arrow |
 | `,` | Separator in parameter/argument lists |
-| `.` | Member access |
+| `.` | Member access, method call |
 | `(` `)` | Grouping, function call, parameter list |
 | `[` `]` | Generic type argument list |
 | `{` `}` | Struct literal fields |
@@ -106,37 +107,50 @@ fn main() -> Int:
 | `/=` | Divide and assign |
 | `%=` | Modulo and assign |
 
+### Other
+
+| Operator | Meaning |
+|----------|---------|
+| `?` | Error propagation (postfix on Result/Option) |
+| `&` | Reference operator (prefix) |
+
 ## Precedence (lowest to highest)
 
 | Level | Operators | Assoc |
 |-------|-----------|-------|
-| 1 | `=` `+=` `-=` `*=` `/=` `%=` | right |
-| 2 | `||` | left |
-| 3 | `&&` | left |
-| 4 | `==` `!=` | left |
-| 5 | `<` `>` `<=` `>=` | left |
-| 6 | `+` `-` | left |
-| 7 | `*` `/` `%` | left |
-| 8 | unary `-` `!` | right (prefix) |
-| 9 | `()` call | left |
+| 1 | `?` | left |
+| 2 | `=` `+=` `-=` `*=` `/=` `%=` | right |
+| 3 | `||` | left |
+| 4 | `&&` | left |
+| 5 | `==` `!=` | left |
+| 6 | `<` `>` `<=` `>=` | left |
+| 7 | `+` `-` | left |
+| 8 | `*` `/` `%` | left |
+| 9 | unary `-` `!` `&` | right (prefix) |
+| 10 | `()` call `.` method | left |
 
 ## Expressions
 
-Supported expression forms today include:
+Supported expression forms include:
 
 - Literals: integers, floats, strings, booleans
 - Identifiers
 - Binary and unary operators
 - Function calls
 - Assignment expressions
+- Method call expressions (`obj.method(args)`)
 - Parenthesized grouping
 - Member access chains
 - Struct literals
 - Explicit casts using `as`
+- Postfix `?` for error propagation
+- Lambda expressions (`fn(params): body`)
+- Match expressions
+- Macro invocations
+- Enum variant construction (`Enum.Variant(args)`)
 
 Not yet implemented as first-class syntax:
 
-- Lists, maps, tuples, and comprehensions
-- Pattern matching
-- Lambdas / anonymous functions
-- Lists, maps, tuples, and comprehensions
+- List, map, and tuple literals
+- Comprehensions
+- Range literals

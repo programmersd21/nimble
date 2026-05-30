@@ -78,6 +78,16 @@ pub enum Stmt {
         is_pub: bool,
         span: Span,
     },
+    Defer {
+        body: Vec<Stmt>,
+        span: Span,
+    },
+    MacroDef {
+        name: String,
+        params: Vec<String>,
+        body: Vec<Stmt>,
+        span: Span,
+    },
     Expr(Expr),
 }
 
@@ -126,6 +136,17 @@ pub enum Expr {
     Cast {
         expr: Box<Expr>,
         target_type: Type,
+        span: Span,
+    },
+    Lambda {
+        params: Vec<Param>,
+        return_type: Option<Type>,
+        body: Vec<Stmt>,
+        span: Span,
+    },
+    MacroInvocation {
+        name: String,
+        args: Vec<Expr>,
         span: Span,
     },
 }

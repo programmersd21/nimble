@@ -61,8 +61,8 @@ fn find_linker() -> Result<String, String> {
 fn find_workspace_root(start: &Path) -> Option<PathBuf> {
     let mut dir = Some(start.to_path_buf());
     for _ in 0..8 {
-        if let Some(ref d) = dir {
-            if d.join("src").join("ember").join("mod.rs").exists() {
+        if let Some(ref d) = dir
+            && d.join("src").join("ember").join("mod.rs").exists() {
                 return Some(d.clone());
             }
         }
@@ -130,7 +130,7 @@ fn build_runtime_lib(runtime_dir: Option<&PathBuf>) -> Result<PathBuf, String> {
         } else {
             "libember.a"
         };
-        let lib_path = d.join(&lib_name);
+        let lib_path = d.join(lib_name);
         if lib_path.exists() {
             return Ok(lib_path);
         }
@@ -142,7 +142,7 @@ fn build_runtime_lib(runtime_dir: Option<&PathBuf>) -> Result<PathBuf, String> {
             } else {
                 "release"
             };
-            let target_lib = workspace_root.join("target").join(profile).join(&lib_name);
+            let target_lib = workspace_root.join("target").join(profile).join(lib_name);
             if target_lib.exists() {
                 return Ok(target_lib);
             }
@@ -151,15 +151,15 @@ fn build_runtime_lib(runtime_dir: Option<&PathBuf>) -> Result<PathBuf, String> {
     }
 
     // Priority 3: relative to the smelt executable.
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(exe_dir) = exe.parent() {
+    if let Ok(exe) = std::env::current_exe()
+        && let Some(exe_dir) = exe.parent() {
             let lib_name = if cfg!(windows) {
                 "ember.lib"
             } else {
                 "libember.a"
             };
             // Check for a pre-built lib next to the binary.
-            let bundled = exe_dir.join(&lib_name);
+            let bundled = exe_dir.join(lib_name);
             if bundled.exists() {
                 return Ok(bundled);
             }
@@ -179,8 +179,8 @@ fn build_runtime_lib(runtime_dir: Option<&PathBuf>) -> Result<PathBuf, String> {
     }
 
     // Priority 5: search from the current working directory.
-    if let Ok(cwd) = std::env::current_dir() {
-        if let Some(root) = find_workspace_root(&cwd) {
+    if let Ok(cwd) = std::env::current_dir()
+        && let Some(root) = find_workspace_root(&cwd) {
             return build_ember(&root);
         }
     }
@@ -200,7 +200,7 @@ fn build_ember(workspace_root: &Path) -> Result<PathBuf, String> {
         "libember.a"
     };
     let target_dir = workspace_root.join("target").join(profile);
-    let lib_path = target_dir.join(&lib_name);
+    let lib_path = target_dir.join(lib_name);
 
     // If already built, return immediately.
     if lib_path.exists() {
@@ -286,7 +286,7 @@ pub fn compile(source: &str, options: &CompileOptions) -> Result<(), String> {
 
     if options.emit_llvm {
         let out_path = Path::new(&options.output_path);
-        let ll_path = if out_path.extension().map_or(false, |e| e == "ll") {
+        let ll_path = if out_path.extension().is_some_and(|e| e == "ll") {
             out_path.to_path_buf()
         } else {
             out_path.with_extension("ll")
@@ -391,8 +391,8 @@ pub fn compile(source: &str, options: &CompileOptions) -> Result<(), String> {
         let status = Command::new(&run_path)
             .status()
             .map_err(|e| format!("failed to run executable: {}", e))?;
-        if !status.success() {
-            if let Some(code) = status.code() {
+        if !status.success()
+            && let Some(code) = status.code() {
                 std::process::exit(code);
             }
         }

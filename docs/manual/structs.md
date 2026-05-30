@@ -47,6 +47,18 @@ fn area(r: Rectangle) -> Int:
     return r.width * r.height
 ```
 
+## Method Syntax
+
+Functions whose first parameter is the struct type can be called with method syntax (`obj.method(args)`). This is desugared at the type-checker level.
+
+```nimble
+fn describe(self: Point) -> Void:
+    print("point")
+
+let p = Point{x: 1, y: 2}
+p.describe()     # same as describe(p)
+```
+
 ## Type Annotations
 
 Struct types can be used anywhere a type is expected:
@@ -55,16 +67,31 @@ Struct types can be used anywhere a type is expected:
 let rect: Rectangle = Rectangle{width: 10, height: 5}
 ```
 
+## Conformance to Interfaces
+
+A struct satisfies an interface when, for every method in the interface, a free function exists with the matching name and the struct as the first parameter type:
+
+```nimble
+interface Shape:
+    fn area(self: Shape) -> Int
+
+struct Square:
+    let side: Int = 0
+
+fn area(self: Square) -> Int:
+    return self.side * self.side
+
+let s: Shape = Square{side: 6}
+```
+
 ## Codegen
 
 Each struct is lowered to an LLVM named struct type. Fields are laid out in declaration order. Struct literals emit `insertvalue` sequences. Field access emits `extractvalue`.
 
 ## Current Limitations
 
-- No method syntax (`value.method()`). Use free functions with the struct as the first parameter.
-- No inheritance or embedding.
-- No visibility modifiers on fields.
-- Mutable field assignment via `var` binding is not yet fully supported in all codegen paths.
+- No inheritance or embedding
+- No visibility modifiers on fields
 
 ## Example
 

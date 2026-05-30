@@ -75,7 +75,7 @@ fn format_stmt(stmt: &Stmt, indent: usize, out: &mut String) {
             }
         }
         Stmt::StructDef { name, fields, .. } => {
-            let _ = write!(out, "{}struct {}:\n", indent_str, name);
+            let _ = writeln!(out, "{}struct {}:", indent_str, name);
             for f in fields {
                 let _ = write!(out, "{}    let {}: ", indent_str, f.name);
                 format_type(&f.type_annot, out);
@@ -83,9 +83,9 @@ fn format_stmt(stmt: &Stmt, indent: usize, out: &mut String) {
             }
         }
         Stmt::InterfaceDef { name, methods, .. } => {
-            let _ = write!(out, "{}interface {}:\n", indent_str, name);
+            let _ = writeln!(out, "{}interface {}:", indent_str, name);
             for m in methods {
-                let _ = write!(out, "{}    fn {}(...)\n", indent_str, m.name);
+                let _ = writeln!(out, "{}    fn {}(...)", indent_str, m.name);
             }
         }
         Stmt::If {
@@ -112,7 +112,7 @@ fn format_stmt(stmt: &Stmt, indent: usize, out: &mut String) {
                 }
             }
             if let Some(ebody) = else_body {
-                let _ = write!(out, "{}else:\n", indent_str);
+                let _ = writeln!(out, "{}else:", indent_str);
                 for b in ebody {
                     format_stmt(b, indent + 1, out);
                     out.push('\n');
@@ -200,6 +200,8 @@ fn format_stmt(stmt: &Stmt, indent: usize, out: &mut String) {
                 let _ = write!(out, "::{{{}}}", syms.join(", "));
             }
         }
+        Stmt::Defer { .. } => todo!(),
+        Stmt::MacroDef { .. } => todo!(),
     }
 }
 
@@ -299,6 +301,8 @@ fn format_expr(expr: &Expr, out: &mut String) {
             out.push_str(" as ");
             format_type(target_type, out);
         }
+        Expr::Lambda { .. } => todo!(),
+        Expr::MacroInvocation { .. } => todo!(),
     }
 }
 

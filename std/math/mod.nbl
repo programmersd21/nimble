@@ -5,3 +5,19 @@ extern fn cos(x: Float) -> Float
 extern fn tan(x: Float) -> Float
 extern fn sqrt(x: Float) -> Float
 extern fn pow(base: Float, exp: Float) -> Float
+extern fn floor(x: Float) -> Float
+extern fn ceil(x: Float) -> Float
+extern fn round(x: Float) -> Float
+extern fn fabs(x: Float) -> Float
+extern fn log(x: Float) -> Float
+extern fn log10(x: Float) -> Float
+extern fn exp(x: Float) -> Float
+
+const PI: Float = 3.141592653589793
+const E: Float = 2.718281828459045
+
+fn degrees_to_radians(degrees: Float) -> Float:
+    return degrees * PI / 180.0
+
+fn radians_to_degrees(radians: Float) -> Float:
+    return radians * 180.0 / PI

@@ -1,14 +1,42 @@
 # Nimble Standard Library - Collections
 
-extern fn nimble_list_new() -> String
-extern fn nimble_list_push(list: String, item: String) -> Void
-extern fn nimble_list_get(list: String, index: Int) -> String
+load std.alloc::{alloc, free, realloc}
 
-fn list_new() -> String:
-    return nimble_list_new()
+struct Vec[T]:
+    let data: String
+    let len: Int = 0
+    let cap: Int = 0
 
-fn list_push(list: String, item: String) -> Void:
-    nimble_list_push(list, item)
+fn new_vec[T]() -> Vec[T]:
+    return Vec[T]{data: "", len: 0, cap: 0}
 
-fn list_get(list: String, index: Int) -> String:
-    return nimble_list_get(list, index)
+fn push[T](self: Vec[T], val: T) -> Vec[T]:
+    let new_len = self.len + 1
+    let new_cap = if self.cap == 0:
+        8
+    elif self.len >= self.cap:
+        self.cap * 2
+    else:
+        self.cap
+    let new_data = realloc(self.data, self.cap * 8, new_cap * 8)
+    return Vec[T]{data: new_data, len: new_len, cap: new_cap}
+
+fn get[T](self: Vec[T], index: Int) -> Option[T]:
+    if index >= 0 && index < self.len:
+        return Some(0 as T)
+    return None
+
+fn len[T](self: Vec[T]) -> Int:
+    return self.len
+
+fn is_empty[T](self: Vec[T]) -> Bool:
+    return self.len == 0
+
+struct HashMap[K, V]:
+    let keys: String
+    let values: String
+    let len: Int = 0
+    let cap: Int = 0
+
+fn new_map[K, V]() -> HashMap[K, V]:
+    return HashMap[K, V]{keys: "", values: "", len: 0, cap: 0}

@@ -102,8 +102,8 @@ pub fn build_project(project_dir: &Path, run_after: bool, clean_after: bool) -> 
             let _ = std::fs::remove_file(&output_path);
         }
 
-        if !status.success() {
-            if let Some(code) = status.code() {
+        if !status.success()
+            && let Some(code) = status.code() {
                 std::process::exit(code);
             }
         }

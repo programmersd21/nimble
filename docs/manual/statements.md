@@ -45,6 +45,13 @@ fn add(a: Int, b: Int) -> Int:
     return a + b
 ```
 
+Generic functions use square brackets:
+
+```
+fn identity[T](x: T) -> T:
+    return x
+```
+
 ## `return`
 
 ```
@@ -125,11 +132,101 @@ for variable in iterable:
     body
 ```
 
-Iterates over an expression. Currently iterates once over the value (simple assignment semantics). Extended iteration is reserved.
+Iterates over an expression. Currently iterates once over the value (simple assignment semantics). Iterator interface-based iteration is reserved.
 
 ```
 for i in range:
     print(i)
+```
+
+## `match`
+
+```
+match expr:
+    pattern1:
+        body
+    pattern2:
+        body
+    _:
+        default
+```
+
+Pattern matching with exhaustive checking. Supported patterns:
+- **Wildcard** `_` - matches any value
+- **Literal** `42`, `"hello"` - matches exact value
+- **Variant** `Some(val)` - matches enum variant and binds payload
+- **Binding** `name` - matches any value and binds to name
+
+```
+match result:
+    Ok(val):
+        print("success: ")
+        print_int(val)
+    Err(e):
+        print("error: ")
+        print(e)
+```
+
+## `if let`
+
+```
+if let pattern = expr:
+    body
+else:
+    body
+```
+
+Pattern match with a single-arm match. Desugars to `match expr: pattern: body else: body`.
+
+```
+if let Some(val) = optional:
+    print(val)
+```
+
+## `while let`
+
+```
+while let pattern = expr:
+    body
+```
+
+Repeatedly match and execute while the pattern matches.
+
+```
+while let Ok(line) = read_line():
+    process(line)
+```
+
+## `defer`
+
+```
+defer:
+    body
+```
+
+Schedule one or more statements to execute when the current scope exits (on function return or end of block). Defers run in LIFO order.
+
+```
+fn work() -> Void:
+    let f = open(path)
+    defer close(f)
+    # f is automatically closed when work() returns
+```
+
+## Macro Definitions
+
+```
+macro name(params):
+    body
+```
+
+Define a compile-time macro that substitutes its body at the invocation site with arguments bound.
+
+```
+macro assert_eq(a, b):
+    if a != b:
+        print("assertion failed")
+        panic("")
 ```
 
 ## `load`
@@ -159,9 +256,3 @@ print("hello")
 x + y
 fizzbuzz(42)
 ```
-
-## Current Gaps
-
-- No `match` statement
-- No `try` / `except`-style error handling
-- No `defer` or `using` statement

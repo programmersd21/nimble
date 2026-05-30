@@ -2,13 +2,27 @@
 
 Nimble provides a standard library under the `std` namespace. Standard modules are loaded using the `load` keyword:
 
-- `load std.io` - basic I/O helpers
-- `load std.math` - math functions backed by the host math library
+- `load std.io` - basic I/O helpers (print, read_file, write_file, read_line)
+- `load std.math` - math functions backed by the host math library (sin, cos, sqrt, log, PI, E, ...)
+- `load std.collections` - generic Vec[T] and HashMap[K, V] data structures
 - `load std.alloc` - allocation and reallocation helpers
-- `load std.core` - core utilities like `max_i`, `min_i`, and `clamp`
-- `load std.log` - simple logging helpers
-- `load std.fmt` - formatting utilities
-- `load std.testing` - lightweight assertion helpers
+- `load std.core` - core utilities: Result, Option, max_i, min_i, clamp, panic, expect
+- `load std.testing` - assertion framework with assert_eq, assert_true, assert_ok, run_test
+- `load std.fmt` - formatting utilities (print_label, format_int)
+- `load std.async` - async primitives: Future, Channel, Mutex, spawn, join, sleep
+- `load std.sync` - synchronization: AtomicInt, Arc
+- `load std.thread` - threading: Thread, spawn, join
+- `load std.log` - simple logging helpers (info, warn, error)
+- `load std.fs` - file system operations (open, close)
+- `load std.net` - networking (connect, send, recv)
+- `load std.json` - JSON parsing (parse, stringify)
+- `load std.crypto` - random numbers (rand, srand)
+- `load std.os` - OS interaction (get_env, execute)
+- `load std.process` - process management (terminate)
+- `load std.time` - time utilities (now)
+- `load std.mem` - memory management (alloc_bytes, free_bytes)
+- `load std.ffi` - foreign function interface helpers (printf)
+- `load std.reflect` - reflection utilities (type_name, size_of)
 - `load std` - root `std` module aggregator that loads every available stdlib module
 
 ## Root `std` Module
@@ -17,7 +31,6 @@ The root `std` module is defined in `std/mod.nbl` and imports available standard
 
 ```nimble
 load std
-load std.math as m
 
 fn main() -> Int:
     std.io.println("Hello from std")
@@ -44,7 +57,6 @@ fn main() -> Int:
 
 ```nimble
 load std
-load std.fmt
 
 fn main() -> Int:
     std.io.println("Nimble standard library demo")
@@ -52,8 +64,23 @@ fn main() -> Int:
     std.testing.assert_eq(7, std.core.max_i(3, 7))
     std.testing.assert_eq(3, std.core.min_i(3, 7))
     std.fmt.print_label("clamp(10,0,5) = ", std.core.clamp(10, 0, 5))
-    let buffer = std.alloc.alloc(16)
-    std.mem.free_bytes(buffer, 16)
+
+    # File I/O with Result propagation
+    let content = std.io.read_file("test.txt")?
+    std.io.println(content)
+
+    # Math with constants
+    let half_pi = std.math.PI / 2.0
+    let s = std.math.sin(half_pi)
+
+    # Collections
+    let vec = std.collections.new_vec[Int]()
+    let vec = std.collections.push(vec, 42)
+
+    # Async
+    let future = std.async.spawn(fn(): 42)
+    let result = std.async.await(future)?
+
     return 0
 ```
 
@@ -61,17 +88,23 @@ fn main() -> Int:
 
 For detailed information on each module, see the [stdlib documentation](../sdocs/):
 
-- [std.io](../sdocs/io.md) - `println`, `print_no_newline`, `print_int_val`
-- [std.math](../sdocs/math.md) - `sin`, `cos`, `tan`, `sqrt`, `pow`
-- [std.fs](../sdocs/fs.md) - `read_file`, `write_file`
-- [std.testing](../sdocs/testing.md) - `assert_eq`
-- [std.fmt](../sdocs/fmt.md) - `format`
-- `std.alloc` - `alloc`, `free`, `realloc`
-... and others as they are added.
+- [std.io](../sdocs/io.md) - print, read_file, write_file, read_line
+- [std.math](../sdocs/math.md) - sin, cos, sqrt, log, PI, E, floor, ceil, round
+- [std.collections](../sdocs/collections.md) - Vec[T], HashMap[K,V]
+- [std.testing](../sdocs/testing.md) - assert_eq, assert_true, assert_ok, run_test
+- [std.fmt](../sdocs/fmt.md) - print_label, format_int
+- [std.async](../sdocs/async.md) - Future, Channel, Mutex
+- [std.sync](../sdocs/sync.md) - AtomicInt, Arc
+- [std.thread](../sdocs/thread.md) - Thread, spawn, join
+- [std.core](../sdocs/core.md) - Result, Option, panic, expect, unwrap
+- [std.alloc](../sdocs/alloc.md) - alloc, free, realloc
+- [std.log](../sdocs/log.md) - info, warn, error
+- [std.fs](../sdocs/fs.md) - open, close
+- [std.net](../sdocs/net.md) - connect, send, recv
+- [std.json](../sdocs/json.md) - parse, stringify
+- [std.ffi](../sdocs/ffi.md) - printf helpers
 
-The stdlib is still evolving. Several namespaces are thin wrappers over runtime or host-provided symbols, and some are reserved for future APIs.
-
-## Math module example
+## math module example
 
 The `std.math` module exposes floating-point math functions from the host platform.
 
