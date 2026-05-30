@@ -380,12 +380,13 @@ impl<'a> Lexer<'a> {
             }
             // Validate that we landed on an exact match.
             if *self.indent_stack.last().unwrap() != indent
-                && (indent != 0 || self.indent_stack.len() != 1) {
-                    return Err(format!(
-                        "Indentation error at line {}: indent level {} \
+                && (indent != 0 || self.indent_stack.len() != 1)
+            {
+                return Err(format!(
+                    "Indentation error at line {}: indent level {} \
                          does not match any enclosing block",
-                        self.line_num, indent,
-                    ));
+                    self.line_num, indent,
+                ));
             }
         }
 
@@ -594,8 +595,9 @@ impl<'a> Lexer<'a> {
                     self.pos += 1;
                     self.col += 1;
                 }
-                }
-                }
+            }
+        }
+    }
 
     fn tokenize_identifier_or_keyword(&mut self) -> Result<Token, String> {
         let start_pos = self.pos;
@@ -653,7 +655,8 @@ impl<'a> Lexer<'a> {
         self.pos += width;
         self.col += width;
     }
-    }
+}
+
 impl<'a> Iterator for Lexer<'a> {
     type Item = Result<Token, String>;
 
@@ -879,7 +882,7 @@ mod tests {
             toks,
             vec![
                 TokenKind::FloatLiteral(0.0),
-                TokenKind::FloatLiteral(3.14),
+                TokenKind::FloatLiteral(std::f64::consts::PI),
                 TokenKind::FloatLiteral(2.5),
             ],
         );

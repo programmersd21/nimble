@@ -227,8 +227,7 @@ async fn main() -> Result<()> {
             let stdin = tokio::io::stdin();
             let stdout = tokio::io::stdout();
             let (service, socket) =
-                tower_lsp::LspService::build(|client| nimble::lantern::lsp::Backend::new(client))
-                    .finish();
+                tower_lsp::LspService::build(nimble::lantern::lsp::Backend::new).finish();
             tower_lsp::Server::new(stdin, stdout, socket)
                 .serve(service)
                 .await;
@@ -297,17 +296,14 @@ async fn main() -> Result<()> {
                 if entry_path.extension().is_some_and(|ext| ext == "nbl") {
                     let source =
                         std::fs::read_to_string(&entry_path).map_err(|e| miette::miette!(e))?;
-                    match nimble::Parser::new(&source) {
-                        Ok(mut p) => {
-                            if let Ok(prog) = p.parse() {
-                                let module_name = entry_path
-                                    .file_stem()
-                                    .map(|s| s.to_string_lossy().to_string())
-                                    .unwrap_or_else(|| "unknown".to_string());
-                                docgen.extract_from_program(&prog, &module_name);
-                            }
-                        }
-                        Err(_) => {}
+                    if let Ok(mut p) = nimble::Parser::new(&source)
+                        && let Ok(prog) = p.parse()
+                    {
+                        let module_name = entry_path
+                            .file_stem()
+                            .map(|s| s.to_string_lossy().to_string())
+                            .unwrap_or_else(|| "unknown".to_string());
+                        docgen.extract_from_program(&prog, &module_name);
                     }
                 }
             }

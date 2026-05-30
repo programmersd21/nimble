@@ -326,16 +326,16 @@ impl TypeChecker {
                     ..
                 } = stmt
                 {
-                    match loader.load(
+                    match loader.load(crate::module_loader::LoadParams {
                         module_path,
-                        symbols.as_deref(),
-                        alias.as_deref(),
-                        &mut env,
-                        &self.collected_externs,
-                        &self.collected_module_stmts,
-                        &self.source,
-                        *span,
-                    ) {
+                        symbols: symbols.as_deref(),
+                        alias: alias.as_deref(),
+                        target_env: &mut env,
+                        collected_externs: &self.collected_externs,
+                        collected_module_stmts: &self.collected_module_stmts,
+                        source: &self.source,
+                        span: *span,
+                    }) {
                         Ok(_) => {}
                         Err(e) => {
                             return Err(TypeError::Internal {
@@ -556,9 +556,9 @@ impl TypeChecker {
                     Some(t) => {
                         let dt = self.type_from_ast(t, env);
                         if let Type::Struct(s) = &dt {
-                            let sym = env.lookup(s).ok_or_else(|| {
-                                TypeError::undefined_type(&self.source, s, *span)
-                            })?;
+                            let sym = env
+                                .lookup(s)
+                                .ok_or_else(|| TypeError::undefined_type(&self.source, s, *span))?;
                             if sym.kind != SymbolKind::Struct {
                                 return Err(TypeError::undefined_type(&self.source, s, *span));
                             }
@@ -842,10 +842,9 @@ impl TypeChecker {
                 let obj_ty = self.resolve(&obj_ty);
                 if let Type::Struct(name) = obj_ty
                     && let Some(fields) = env.get_struct_fields(&name)
-                    && let Some((_, ty)) = fields.iter().find(|(n, _)| n == member) {
-                            return Ok(ty.clone());
-                        }
-                    }
+                    && let Some((_, ty)) = fields.iter().find(|(n, _)| n == member)
+                {
+                    return Ok(ty.clone());
                 }
                 Err(TypeError::undefined_variable(&self.source, member, *span))
             }

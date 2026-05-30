@@ -32,11 +32,11 @@ impl Profiler {
 
     pub fn end(&mut self, name: &str) {
         if self.enabled
-            && let Some((start, count, total)) = self.timers.get_mut(name) {
-                let elapsed = start.elapsed().as_secs_f64();
-                *count += 1;
-                *total += elapsed;
-            }
+            && let Some((start, count, total)) = self.timers.get_mut(name)
+        {
+            let elapsed = start.elapsed().as_secs_f64();
+            *count += 1;
+            *total += elapsed;
         }
     }
 

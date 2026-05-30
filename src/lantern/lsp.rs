@@ -233,21 +233,20 @@ impl LanguageServer for Backend {
 
         if let Some(tok) = token_at_cursor
             && let crate::TokenKind::Identifier(name) = &tok.kind
-            && let Some(sym) = env.lookup(name) {
-                    let hover_text = format!(
-                        "**{}** `{}`  \n---\nkind: {:?}  \nmutable: {}",
-                        name, sym.type_, sym.kind, sym.mutable
-                    );
-                    let range = span_to_range(&tok.span, &line_index);
-                    return Ok(Some(Hover {
-                        contents: HoverContents::Markup(MarkupContent {
-                            kind: MarkupKind::Markdown,
-                            value: hover_text,
-                        }),
-                        range: Some(range),
-                    }));
-                }
-            }
+            && let Some(sym) = env.lookup(name)
+        {
+            let hover_text = format!(
+                "**{}** `{}`  \n---\nkind: {:?}  \nmutable: {}",
+                name, sym.type_, sym.kind, sym.mutable
+            );
+            let range = span_to_range(&tok.span, &line_index);
+            return Ok(Some(Hover {
+                contents: HoverContents::Markup(MarkupContent {
+                    kind: MarkupKind::Markdown,
+                    value: hover_text,
+                }),
+                range: Some(range),
+            }));
         }
 
         Ok(None)
@@ -267,17 +266,16 @@ impl LanguageServer for Backend {
                 let word = extract_word_at(lines[line], col);
                 if let Ok(prog) = Parser::new(&source).and_then(|mut p| p.parse())
                     && let Ok(env) = TypeChecker::new(&source).check_program(&prog)
-                    && let Some(sym) = env.lookup(&word) {
-                            let def_pos = Position::new(
-                                (sym.defined_at.line - 1) as u32,
-                                (sym.defined_at.column - 1) as u32,
-                            );
-                            return Ok(Some(GotoDefinitionResponse::Scalar(Location::new(
-                                uri.clone(),
-                                Range::new(def_pos, def_pos),
-                            ))));
-                        }
-                    }
+                    && let Some(sym) = env.lookup(&word)
+                {
+                    let def_pos = Position::new(
+                        (sym.defined_at.line - 1) as u32,
+                        (sym.defined_at.column - 1) as u32,
+                    );
+                    return Ok(Some(GotoDefinitionResponse::Scalar(Location::new(
+                        uri.clone(),
+                        Range::new(def_pos, def_pos),
+                    ))));
                 }
             }
         }
@@ -320,22 +318,21 @@ impl LanguageServer for Backend {
         let uri = &params.text_document_position.text_document.uri;
         if let Some(source) = self.documents.get(uri)
             && let Ok(prog) = Parser::new(&source).and_then(|mut p| p.parse())
-            && let Ok(env) = TypeChecker::new(&source).check_program(&prog) {
-                    for (name, sym) in env.get_globals() {
-                        let kind = match sym.kind {
-                            SymbolKind::Function => CompletionItemKind::FUNCTION,
-                            SymbolKind::Variable => CompletionItemKind::VARIABLE,
-                            SymbolKind::Struct => CompletionItemKind::STRUCT,
-                            SymbolKind::Interface => CompletionItemKind::INTERFACE,
-                        };
-                        items.push(CompletionItem {
-                            label: name.clone(),
-                            kind: Some(kind),
-                            detail: Some(sym.type_.to_string()),
-                            ..Default::default()
-                        });
-                    }
-                }
+            && let Ok(env) = TypeChecker::new(&source).check_program(&prog)
+        {
+            for (name, sym) in env.get_globals() {
+                let kind = match sym.kind {
+                    SymbolKind::Function => CompletionItemKind::FUNCTION,
+                    SymbolKind::Variable => CompletionItemKind::VARIABLE,
+                    SymbolKind::Struct => CompletionItemKind::STRUCT,
+                    SymbolKind::Interface => CompletionItemKind::INTERFACE,
+                };
+                items.push(CompletionItem {
+                    label: name.clone(),
+                    kind: Some(kind),
+                    detail: Some(sym.type_.to_string()),
+                    ..Default::default()
+                });
             }
         }
         Ok(Some(CompletionResponse::Array(items)))

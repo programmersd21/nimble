@@ -732,64 +732,66 @@ impl<'a> Parser<'a> {
             }
 
             if self.check(&TokenKind::LBrace)
-                && let Expr::Identifier(ref name, _) = left {
-                    left = self.parse_struct_literal(name.clone(), left.span())?;
-                    continue;
-                }
+                && let Expr::Identifier(ref name, _) = left
+            {
+                left = self.parse_struct_literal(name.clone(), left.span())?;
+                continue;
+            }
 
             // Check for binary operators.
             if let Some((prec, right_assoc)) = Self::get_infix_precedence(&self.current.kind)
-                && prec >= min_prec {
-                    let next_min = if right_assoc { prec } else { prec + 1 };
-                    let op_token = self.current.clone();
-                    self.advance();
-                    let right = self.parse_expr_prec(next_min)?;
-                    let span = self.merge_span(&left.span(), &right.span());
+                && prec >= min_prec
+            {
+                let next_min = if right_assoc { prec } else { prec + 1 };
+                let op_token = self.current.clone();
+                self.advance();
+                let right = self.parse_expr_prec(next_min)?;
+                let span = self.merge_span(&left.span(), &right.span());
 
-                    if matches!(&op_token.kind, TokenKind::Equal) {
-                        left = Expr::Assign {
-                            target: Box::new(left),
-                            value: Box::new(right),
-                            span,
-                        };
-                    } else if matches!(
-                        &op_token.kind,
-                        TokenKind::PlusEqual
-                            | TokenKind::MinusEqual
-                            | TokenKind::StarEqual
-                            | TokenKind::SlashEqual
-                            | TokenKind::PercentEqual
-                    ) {
-                        let compound_op = match &op_token.kind {
-                            TokenKind::PlusEqual => BinaryOp::Add,
-                            TokenKind::MinusEqual => BinaryOp::Sub,
-                            TokenKind::StarEqual => BinaryOp::Mul,
-                            TokenKind::SlashEqual => BinaryOp::Div,
-                            TokenKind::PercentEqual => BinaryOp::Mod,
-                            _ => unreachable!(),
-                        };
-                        let target = Box::new(left.clone());
-                        left = Expr::Assign {
-                            target,
-                            value: Box::new(Expr::Binary {
-                                left: Box::new(left),
-                                op: compound_op,
-                                right: Box::new(right),
-                                span,
-                            }),
-                            span,
-                        };
-                    } else {
-                        left = Expr::Binary {
+                if matches!(&op_token.kind, TokenKind::Equal) {
+                    left = Expr::Assign {
+                        target: Box::new(left),
+                        value: Box::new(right),
+                        span,
+                    };
+                } else if matches!(
+                    &op_token.kind,
+                    TokenKind::PlusEqual
+                        | TokenKind::MinusEqual
+                        | TokenKind::StarEqual
+                        | TokenKind::SlashEqual
+                        | TokenKind::PercentEqual
+                ) {
+                    let compound_op = match &op_token.kind {
+                        TokenKind::PlusEqual => BinaryOp::Add,
+                        TokenKind::MinusEqual => BinaryOp::Sub,
+                        TokenKind::StarEqual => BinaryOp::Mul,
+                        TokenKind::SlashEqual => BinaryOp::Div,
+                        TokenKind::PercentEqual => BinaryOp::Mod,
+                        _ => unreachable!(),
+                    };
+                    let target = Box::new(left.clone());
+                    left = Expr::Assign {
+                        target,
+                        value: Box::new(Expr::Binary {
                             left: Box::new(left),
-                            op: Self::token_to_binary_op(&op_token.kind),
+                            op: compound_op,
                             right: Box::new(right),
                             span,
-                        };
-                    }
-                    continue;
+                        }),
+                        span,
+                    };
+                } else {
+                    left = Expr::Binary {
+                        left: Box::new(left),
+                        op: Self::token_to_binary_op(&op_token.kind),
+                        right: Box::new(right),
+                        span,
+                    };
                 }
+                continue;
             }
+
             break;
         }
 

@@ -60,6 +60,17 @@ pub struct ModuleLoader {
     state: Rc<RefCell<ModuleLoaderState>>,
 }
 
+pub struct LoadParams<'a> {
+    pub module_path: &'a [String],
+    pub symbols: Option<&'a [String]>,
+    pub alias: Option<&'a str>,
+    pub target_env: &'a mut Environment,
+    pub collected_externs: &'a Rc<RefCell<Vec<Stmt>>>,
+    pub collected_module_stmts: &'a Rc<RefCell<Vec<(Stmt, Environment)>>>,
+    pub source: &'a str,
+    pub span: Span,
+}
+
 impl ModuleLoader {
     pub fn new(stdlib_dirs: Vec<PathBuf>, source_dir: Option<PathBuf>) -> Self {
         ModuleLoader {
@@ -72,27 +83,17 @@ impl ModuleLoader {
         }
     }
 
-    /// Load a module and import its symbols into `target_env`.
-    ///
-    /// * `module_path` - the dotted path, e.g. `["std", "io"]`
-    /// * `symbols` - `Some(&[...])` for selective import (`::{}`), `None` for namespace import
-    /// * `alias` - optional `as` alias
-    /// * `target_env` - the environment to import symbols into
-    /// * `source` - source text for error reporting
-    /// * `span` - span of the `load` statement for error reporting
-    ///
-    /// Returns the list of `extern fn` statements from the module (for codegen).
-    pub fn load(
-        &mut self,
-        module_path: &[String],
-        symbols: Option<&[String]>,
-        alias: Option<&str>,
-        target_env: &mut Environment,
-        collected_externs: &std::rc::Rc<std::cell::RefCell<Vec<Stmt>>>,
-        collected_module_stmts: &std::rc::Rc<std::cell::RefCell<Vec<(Stmt, Environment)>>>,
-        _source: &str,
-        span: Span,
-    ) -> Result<Vec<Stmt>, ModuleError> {
+    pub fn load(&mut self, params: LoadParams) -> Result<Vec<Stmt>, ModuleError> {
+        let LoadParams {
+            module_path,
+            symbols,
+            alias,
+            target_env,
+            collected_externs,
+            collected_module_stmts,
+            source: _source,
+            span,
+        } = params;
         let module_key = module_path.join(".");
 
         // C FFI import: `load c.printf`

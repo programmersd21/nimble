@@ -62,9 +62,9 @@ fn find_workspace_root(start: &Path) -> Option<PathBuf> {
     let mut dir = Some(start.to_path_buf());
     for _ in 0..8 {
         if let Some(ref d) = dir
-            && d.join("src").join("ember").join("mod.rs").exists() {
-                return Some(d.clone());
-            }
+            && d.join("src").join("ember").join("mod.rs").exists()
+        {
+            return Some(d.clone());
         }
         dir = dir?.parent().map(|p| p.to_path_buf());
     }
@@ -72,7 +72,6 @@ fn find_workspace_root(start: &Path) -> Option<PathBuf> {
 }
 
 /// Build the ember static library and return the path to the `.lib` / `.a`.
-
 fn user_home_dir() -> Option<PathBuf> {
     std::env::var_os("HOME")
         .map(PathBuf::from)
@@ -152,21 +151,21 @@ fn build_runtime_lib(runtime_dir: Option<&PathBuf>) -> Result<PathBuf, String> {
 
     // Priority 3: relative to the smelt executable.
     if let Ok(exe) = std::env::current_exe()
-        && let Some(exe_dir) = exe.parent() {
-            let lib_name = if cfg!(windows) {
-                "ember.lib"
-            } else {
-                "libember.a"
-            };
-            // Check for a pre-built lib next to the binary.
-            let bundled = exe_dir.join(lib_name);
-            if bundled.exists() {
-                return Ok(bundled);
-            }
-            // Walk up to find the workspace root.
-            if let Some(root) = find_workspace_root(exe_dir) {
-                return build_ember(&root);
-            }
+        && let Some(exe_dir) = exe.parent()
+    {
+        let lib_name = if cfg!(windows) {
+            "ember.lib"
+        } else {
+            "libember.a"
+        };
+        // Check for a pre-built lib next to the binary.
+        let bundled = exe_dir.join(lib_name);
+        if bundled.exists() {
+            return Ok(bundled);
+        }
+        // Walk up to find the workspace root.
+        if let Some(root) = find_workspace_root(exe_dir) {
+            return build_ember(&root);
         }
     }
 
@@ -180,9 +179,9 @@ fn build_runtime_lib(runtime_dir: Option<&PathBuf>) -> Result<PathBuf, String> {
 
     // Priority 5: search from the current working directory.
     if let Ok(cwd) = std::env::current_dir()
-        && let Some(root) = find_workspace_root(&cwd) {
-            return build_ember(&root);
-        }
+        && let Some(root) = find_workspace_root(&cwd)
+    {
+        return build_ember(&root);
     }
 
     Err("ember runtime not found. Set NIMBLE_RUNTIME to the path of ember.lib/libember.a, or run from the Nimble workspace.".to_string())
@@ -392,9 +391,9 @@ pub fn compile(source: &str, options: &CompileOptions) -> Result<(), String> {
             .status()
             .map_err(|e| format!("failed to run executable: {}", e))?;
         if !status.success()
-            && let Some(code) = status.code() {
-                std::process::exit(code);
-            }
+            && let Some(code) = status.code()
+        {
+            std::process::exit(code);
         }
     }
 

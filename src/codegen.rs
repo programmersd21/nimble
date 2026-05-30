@@ -456,11 +456,11 @@ impl Codegen {
                 // or from the env (for function-scope params visible at top level).
                 if let Some(struct_name) = self.register_struct_types.get(&value_reg).cloned() {
                     self.symbol_struct_types.insert(name.clone(), struct_name);
-                } else if let Some(sym) = env.lookup(name) {
-                    if let Type::Struct(struct_name) = &sym.type_ {
-                        self.symbol_struct_types
-                            .insert(name.clone(), struct_name.clone());
-                    }
+                } else if let Some(sym) = env.lookup(name)
+                    && let Type::Struct(struct_name) = &sym.type_
+                {
+                    self.symbol_struct_types
+                        .insert(name.clone(), struct_name.clone());
                 }
                 Ok(())
             }
@@ -1437,8 +1437,9 @@ impl Codegen {
         }
         for ptr_reg in self.symbols.values() {
             if let Some(ty) = self.symbol_types.get(ptr_reg)
-                && !ty.is_empty() {
-                    return ty.clone();
+                && !ty.is_empty()
+            {
+                return ty.clone();
             }
         }
         "i64".to_string()

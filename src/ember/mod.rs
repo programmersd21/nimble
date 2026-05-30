@@ -40,6 +40,11 @@ pub unsafe extern "C" fn nimble_free(ptr: *mut u8, size: usize) {
 
 /// Reallocate a block to a new size, preserving the original contents up to
 /// `min(old_size, new_size)` bytes.
+///
+/// # Safety
+///
+/// The `ptr` must be a valid pointer to a memory block previously allocated by `nimble_alloc`,
+/// with a size at least `old_size`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_realloc(ptr: *mut u8, old_size: usize, new_size: usize) -> *mut u8 {
     if new_size == 0 {
@@ -124,6 +129,10 @@ pub extern "C" fn nimble_panic(_msg: *const u8, _len: i64) -> ! {
 }
 
 /// Print a string (pointer + length) to stdout.
+///
+/// # Safety
+///
+/// The `msg` must be a valid pointer to a sequence of `len` bytes.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_print_string(msg: *const u8, len: i64) {
     if msg.is_null() || len <= 0 {
@@ -135,6 +144,10 @@ pub unsafe extern "C" fn nimble_print_string(msg: *const u8, len: i64) {
 }
 
 /// Print a null-terminated string to stdout followed by a newline.
+///
+/// # Safety
+///
+/// The `ptr` must be a valid null-terminated string pointer.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_print(ptr: *const u8) {
     if ptr.is_null() {
@@ -147,6 +160,10 @@ pub unsafe extern "C" fn nimble_print(ptr: *const u8) {
 
 /// Print a null-terminated string to stdout **without** a trailing newline.
 /// Used by the `print_str` built-in.
+///
+/// # Safety
+///
+/// The `ptr` must be a valid null-terminated string pointer.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_print_str(ptr: *const u8) {
     if ptr.is_null() {
@@ -224,6 +241,10 @@ pub extern "C" fn nimble_mutex_create() -> *mut std::sync::Mutex<()> {
 }
 
 /// Lock a mutex.
+///
+/// # Safety
+///
+/// The `mtx` must be a valid pointer to a `std::sync::Mutex<()>`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_mutex_lock(mtx: *mut std::sync::Mutex<()>) {
     if let Some(m) = unsafe { mtx.as_ref() } {
@@ -233,6 +254,10 @@ pub unsafe extern "C" fn nimble_mutex_lock(mtx: *mut std::sync::Mutex<()>) {
 }
 
 /// Unlock a mutex.
+///
+/// # Safety
+///
+/// The `mtx` must be a valid pointer to a `std::sync::Mutex<()>`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_mutex_unlock(mtx: *mut std::sync::Mutex<()>) {
     if let Some(m) = unsafe { mtx.as_ref() } {
@@ -269,12 +294,20 @@ pub extern "C" fn nimble_channel_recv(chan_ptr: i64) -> i64 {
 }
 
 /// Atomic load.
+///
+/// # Safety
+///
+/// The `ptr` must be a valid pointer to an `i64`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_atomic_load(ptr: *mut i64) -> i64 {
     unsafe { std::sync::atomic::AtomicI64::from_ptr(ptr).load(std::sync::atomic::Ordering::SeqCst) }
 }
 
 /// Atomic store.
+///
+/// # Safety
+///
+/// The `ptr` must be a valid pointer to an `i64`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_atomic_store(ptr: *mut i64, val: i64) {
     unsafe {
@@ -283,6 +316,10 @@ pub unsafe extern "C" fn nimble_atomic_store(ptr: *mut i64, val: i64) {
 }
 
 /// Atomic fetch-and-add. Returns the previous value.
+///
+/// # Safety
+///
+/// The `ptr` must be a valid pointer to an `i64`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_atomic_add(ptr: *mut i64, val: i64) -> i64 {
     unsafe {
@@ -318,7 +355,7 @@ mod tests {
         unsafe {
             std::ptr::write(ptr, 42u8);
         }
-        let new_ptr = nimble_realloc(ptr, 16, 32);
+        let new_ptr = unsafe { nimble_realloc(ptr, 16, 32) };
         assert!(!new_ptr.is_null());
         unsafe {
             assert_eq!(std::ptr::read(new_ptr), 42u8);
@@ -353,7 +390,7 @@ mod tests {
 
     #[test]
     fn print_f64_does_not_panic() {
-        nimble_print_f64(3.14);
+        nimble_print_f64(std::f64::consts::PI);
     }
 
     #[test]
