@@ -1,7 +1,8 @@
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// The internal representation of a Nimble type during semantic analysis.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Type {
     Int,
     Float,

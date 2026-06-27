@@ -5,10 +5,11 @@ Cargo.lock
 **/*.rs.bk
 
 .idea/
-.vscode/
+/.vscode/
 
 .DS_Store
 Thumbs.db
 
 *.ll
 *.exe
+node_modules/

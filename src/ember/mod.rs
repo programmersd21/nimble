@@ -1,8 +1,24 @@
 use std::alloc::{self, Layout};
 use std::io::{self, Write};
 use std::process;
+use std::sync::Once;
 use std::sync::mpsc;
 use std::thread;
+
+#[cfg(windows)]
+fn init_console_utf8() {
+    static INIT: Once = Once::new();
+    INIT.call_once(|| unsafe {
+        unsafe extern "system" {
+            fn SetConsoleOutputCP(wCodePageID: u32) -> i32;
+        }
+        const CP_UTF8: u32 = 65001;
+        SetConsoleOutputCP(CP_UTF8);
+    });
+}
+
+#[cfg(not(windows))]
+fn init_console_utf8() {}
 
 /// Allocate `size` bytes of zero-initialised memory.
 ///
@@ -135,6 +151,7 @@ pub extern "C" fn nimble_panic(_msg: *const u8, _len: i64) -> ! {
 /// The `msg` must be a valid pointer to a sequence of `len` bytes.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_print_string(msg: *const u8, len: i64) {
+    init_console_utf8();
     if msg.is_null() || len <= 0 {
         return;
     }
@@ -150,6 +167,7 @@ pub unsafe extern "C" fn nimble_print_string(msg: *const u8, len: i64) {
 /// The `ptr` must be a valid null-terminated string pointer.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_print(ptr: *const u8) {
+    init_console_utf8();
     if ptr.is_null() {
         return;
     }
@@ -166,6 +184,7 @@ pub unsafe extern "C" fn nimble_print(ptr: *const u8) {
 /// The `ptr` must be a valid null-terminated string pointer.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_print_str(ptr: *const u8) {
+    init_console_utf8();
     if ptr.is_null() {
         return;
     }

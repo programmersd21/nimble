@@ -1,10 +1,11 @@
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use crate::lexer::Span;
 use crate::types::Type;
 
 /// What kind of binding a symbol represents.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum SymbolKind {
     /// A plain variable (let or var).
     Variable,
@@ -17,7 +18,7 @@ pub enum SymbolKind {
 }
 
 /// A single entry in the symbol table.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Symbol {
     pub kind: SymbolKind,
     /// Whether this binding can be reassigned (`var` vs `let`).
@@ -29,7 +30,7 @@ pub struct Symbol {
 }
 
 /// Lexically-scoped symbol table with stack of frames.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Environment {
     pub scopes: Vec<HashMap<String, Symbol>>,
     pub struct_fields: HashMap<String, Vec<(String, Type)>>,
@@ -77,10 +78,10 @@ impl Environment {
         self.scopes.first()?.get(name)
     }
 
-    pub fn get_globals(&self) -> &HashMap<String, Symbol> {
+    pub fn get_globals(&self) -> Result<&HashMap<String, Symbol>, String> {
         self.scopes
             .first()
-            .expect("Environment must have at least one scope")
+            .ok_or_else(|| "internal error: environment has no scopes".to_string())
     }
 
     pub fn define_struct(&mut self, name: &str, fields: Vec<(String, Type)>) {

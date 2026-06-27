@@ -58,6 +58,7 @@ pub struct ModuleLoader {
     stdlib_dirs: Vec<PathBuf>,
     source_dir: Option<PathBuf>,
     state: Rc<RefCell<ModuleLoaderState>>,
+    pub db: Option<Rc<RefCell<crate::query::Database>>>,
 }
 
 pub struct LoadParams<'a> {
@@ -80,7 +81,13 @@ impl ModuleLoader {
                 loaded: HashMap::new(),
                 loading: Vec::new(),
             })),
+            db: None,
         }
+    }
+
+    pub fn with_db(mut self, db: Rc<RefCell<crate::query::Database>>) -> Self {
+        self.db = Some(db);
+        self
     }
 
     pub fn load(&mut self, params: LoadParams) -> Result<Vec<Stmt>, ModuleError> {
@@ -97,20 +104,16 @@ impl ModuleLoader {
         let module_key = module_path.join(".");
 
         // C FFI import: `load c.printf`
+        // The C function signature must be provided separately via `extern fn`.
+        // This registers the name so the function can be called from Nimble code.
         if module_path.len() >= 2 && module_path[0] == "c" {
             let fn_name = module_path[1..].join(".");
-            // Register as an external function in the environment.
-            // We use a dummy Type::Function for now.
-            // In a real implementation, we might want to lookup the signature.
             target_env.define(
                 &fn_name,
                 Symbol {
                     kind: SymbolKind::Function,
                     mutable: false,
-                    type_: Type::Function(
-                        vec![], // Variadic or unknown
-                        Box::new(Type::Int),
-                    ),
+                    type_: Type::Function(vec![], Box::new(Type::Int)),
                     defined_at: span,
                 },
             );
@@ -220,22 +223,34 @@ impl ModuleLoader {
 
         // Read and parse the file.
         self.state.borrow_mut().loading.push(module_key.clone());
-        let src = std::fs::read_to_string(&file_path).map_err(|_| ModuleError::NotFound {
-            name: module_key.clone(),
-        })?;
 
-        // ...
-        let prog = Parser::new(&src)
-            .map_err(|e| ModuleError::Parse(format!("{:?}", e)))?
-            .parse()
-            .map_err(|e| ModuleError::Parse(format!("{:?}", e)))?;
+        let (prog, externs) = if let Some(ref db_cell) = self.db {
+            let prog = crate::query::Database::query_parse(db_cell.clone(), &file_path)
+                .map_err(|e| ModuleError::Parse(e))?;
+            let externs: Vec<Stmt> = prog
+                .statements
+                .iter()
+                .filter(|s| matches!(s, Stmt::ExternFn { .. }))
+                .cloned()
+                .collect();
+            (prog, externs)
+        } else {
+            let src = std::fs::read_to_string(&file_path).map_err(|_| ModuleError::NotFound {
+                name: module_key.clone(),
+            })?;
+            let prog = Parser::new(&src)
+                .map_err(|e| ModuleError::Parse(format!("{:?}", e)))?
+                .parse()
+                .map_err(|e| ModuleError::Parse(format!("{:?}", e)))?;
+            let externs: Vec<Stmt> = prog
+                .statements
+                .iter()
+                .filter(|s| matches!(s, Stmt::ExternFn { .. }))
+                .cloned()
+                .collect();
+            (prog, externs)
+        };
 
-        let externs: Vec<Stmt> = prog
-            .statements
-            .iter()
-            .filter(|s| matches!(s, Stmt::ExternFn { .. }))
-            .cloned()
-            .collect();
         let fn_defs: Vec<Stmt> = prog
             .statements
             .iter()
@@ -243,13 +258,24 @@ impl ModuleLoader {
             .cloned()
             .collect();
 
-        let mut nested_loader = self.clone();
-        nested_loader.source_dir = module_dir.clone();
-
-        let env = TypeChecker::with_externs(&src, collected_externs.clone())
-            .with_loader(nested_loader)
-            .check_program(&prog)
-            .map_err(|e| ModuleError::TypeError(format!("{:?}", e)))?;
+        let (env, externs_loaded, fn_defs_with_envs) = if let Some(ref db_cell) = self.db {
+            let tc_res = crate::query::Database::query_typecheck(db_cell.clone(), &file_path)
+                .map_err(|e| ModuleError::TypeError(e))?;
+            (tc_res.env, tc_res.externs, tc_res.module_stmts)
+        } else {
+            let mut nested_loader = self.clone();
+            nested_loader.source_dir = module_dir.clone();
+            let src = std::fs::read_to_string(&file_path).map_err(|_| ModuleError::NotFound {
+                name: module_key.clone(),
+            })?;
+            let env = TypeChecker::with_externs(&src, collected_externs.clone())
+                .with_loader(nested_loader)
+                .check_program(&prog)
+                .map_err(|e| ModuleError::TypeError(format!("{:?}", e)))?;
+            let pairs: Vec<(Stmt, Environment)> =
+                fn_defs.into_iter().map(|s| (s, env.clone())).collect();
+            (env, externs.clone(), pairs)
+        };
 
         let mut state = self.state.borrow_mut();
         state.loading.retain(|n| n != &module_key);
@@ -262,10 +288,10 @@ impl ModuleLoader {
         );
 
         // Store the loaded module statements for later code generation.
-        collected_externs.borrow_mut().extend(externs.clone());
-        let pairs: Vec<(Stmt, Environment)> =
-            fn_defs.into_iter().map(|s| (s, env.clone())).collect();
-        collected_module_stmts.borrow_mut().extend(pairs);
+        collected_externs.borrow_mut().extend(externs_loaded);
+        collected_module_stmts
+            .borrow_mut()
+            .extend(fn_defs_with_envs);
 
         // Import symbols into the target environment.
         Self::import_from_env(&env, target_env, symbols, alias, module_path, span)?;

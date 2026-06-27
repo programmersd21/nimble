@@ -1,12 +1,13 @@
 use crate::lexer::Span;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Program {
     pub statements: Vec<Stmt>,
     pub span: Span,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Stmt {
     Var {
         name: String,
@@ -91,7 +92,7 @@ pub enum Stmt {
     Expr(Expr),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Expr {
     IntLiteral(i64, Span),
     FloatLiteral(f64, Span),
@@ -151,7 +152,7 @@ pub enum Expr {
     },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum BinaryOp {
     Add,
     Sub,
@@ -168,20 +169,20 @@ pub enum BinaryOp {
     Mod,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum UnaryOp {
     Negate,
     Not,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Param {
     pub name: String,
     pub type_annot: Type,
     pub span: Span,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Type {
     pub name: String,
     pub args: Vec<Type>,

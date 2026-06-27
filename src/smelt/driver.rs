@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::{
-    codegen::Codegen, module_loader::ModuleLoader, parser::Parser, typechecker::TypeChecker,
+    codegen::Codegen, driver, module_loader::ModuleLoader, parser::Parser, typechecker::TypeChecker,
 };
 use miette::Report;
 
@@ -71,34 +71,8 @@ fn find_workspace_root(start: &Path) -> Option<PathBuf> {
     None
 }
 
-/// Build the ember static library and return the path to the `.lib` / `.a`.
-fn user_home_dir() -> Option<PathBuf> {
-    std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .or_else(|| std::env::var_os("USERPROFILE").map(PathBuf::from))
-}
-
 fn find_stdlib_dirs() -> Vec<PathBuf> {
-    let mut candidates = Vec::new();
-
-    if let Ok(dir) = std::env::var("NIMBLE_STDLIB") {
-        candidates.push(PathBuf::from(dir));
-    }
-    if let Some(home) = user_home_dir() {
-        candidates.push(home.join("nimble").join("std"));
-    }
-    candidates.push(PathBuf::from("src/std"));
-    if let Ok(dir) = std::env::var("CARGO_MANIFEST_DIR") {
-        candidates.push(PathBuf::from(dir).join("src").join("std"));
-    }
-
-    let mut dirs: Vec<PathBuf> = candidates.into_iter().filter(|d| d.exists()).collect();
-    dirs.sort();
-    dirs.dedup();
-    if dirs.is_empty() {
-        dirs.push(PathBuf::from("src/std"));
-    }
-    dirs
+    driver::find_stdlib_dirs()
 }
 
 fn build_runtime_lib(runtime_dir: Option<&PathBuf>) -> Result<PathBuf, String> {
@@ -251,32 +225,35 @@ fn build_ember(workspace_root: &Path) -> Result<PathBuf, String> {
 }
 
 pub fn compile(source: &str, options: &CompileOptions) -> Result<(), String> {
-    let prog = Parser::new(source)
-        .map_err(|e| format!("{:?}", Report::new(e)))?
-        .parse()
-        .map_err(|e| format!("{:?}", Report::new(e)))?;
+    let ir = if let Some(ref src_path) = options.source_path {
+        let db = std::rc::Rc::new(std::cell::RefCell::new(crate::query::Database::new(
+            Path::new("."),
+        )));
+        let res = crate::query::Database::query_codegen(db.clone(), Path::new(src_path))?;
+        let _ = db.borrow().save_manifest();
+        res
+    } else {
+        let prog = Parser::new(source)
+            .map_err(|e| format!("{:?}", Report::new(e)))?
+            .parse()
+            .map_err(|e| format!("{:?}", Report::new(e)))?;
 
-    let stdlib_dirs = find_stdlib_dirs();
-    let source_path = options.source_path.as_deref();
-    let source_dir = source_path.and_then(|p| Path::new(p).parent().map(|p| p.to_path_buf()));
-    let loader = ModuleLoader::new(stdlib_dirs, source_dir);
+        let stdlib_dirs = find_stdlib_dirs();
+        let loader = ModuleLoader::new(stdlib_dirs, None);
 
-    let externs_rc = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
-    let module_fns_rc: std::rc::Rc<
-        std::cell::RefCell<Vec<(crate::ast::Stmt, crate::env::Environment)>>,
-    > = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
-    let mut checker = TypeChecker::with_externs_and_module_stmts(
-        source,
-        externs_rc.clone(),
-        module_fns_rc.clone(),
-    )
-    .with_loader(loader);
+        let externs_rc = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+        let module_fns_rc = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+        let mut checker = TypeChecker::with_externs_and_module_stmts(
+            source,
+            externs_rc.clone(),
+            module_fns_rc.clone(),
+        )
+        .with_loader(loader);
 
-    let env = checker
-        .check_program(&prog)
-        .map_err(|e| format!("{:?}", Report::new(e)))?;
+        let env = checker
+            .check_program(&prog)
+            .map_err(|e| format!("{:?}", Report::new(e)))?;
 
-    let ir = {
         let mut cg = Codegen::new();
         cg.generate_with_externs_and_module_fns(&prog, &env, &externs_rc, &module_fns_rc)
             .map_err(|e| format!("codegen error: {}", e))?;

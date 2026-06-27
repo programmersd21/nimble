@@ -1302,13 +1302,8 @@ impl TypeChecker {
                 }
             }
 
-            (Type::Interface(iface_name), Type::Struct(_))
-            | (Type::Struct(_), Type::Interface(iface_name)) => {
-                let struct_name = match (&a, &b) {
-                    (Type::Interface(_), Type::Struct(s)) => s,
-                    (Type::Struct(s), Type::Interface(_)) => s,
-                    _ => unreachable!(),
-                };
+            (Type::Interface(iface_name), Type::Struct(struct_name))
+            | (Type::Struct(struct_name), Type::Interface(iface_name)) => {
                 self.check_interface_conformance(iface_name, struct_name, span)
             }
 

@@ -5,6 +5,23 @@ use rand::SeedableRng;
 use rand::rngs::StdRng;
 use std::path::PathBuf;
 
+/// Configuration for lexer-targeted fuzzing.
+pub struct LexerFuzzConfig {
+    pub max_length: usize,
+    pub include_null: bool,
+    pub include_high_bytes: bool,
+}
+
+impl Default for LexerFuzzConfig {
+    fn default() -> Self {
+        LexerFuzzConfig {
+            max_length: 64,
+            include_null: true,
+            include_high_bytes: true,
+        }
+    }
+}
+
 pub struct Fuzzer {
     seed: u64,
     iterations: u64,
@@ -128,6 +145,58 @@ impl Fuzzer {
 
         program.push_str("    return 0\n");
         program
+    }
+
+    /// Generate a random byte sequence for lexer fuzzing.
+    pub fn generate_lexer_input(&self, config: &LexerFuzzConfig) -> Vec<u8> {
+        let mut rng = StdRng::seed_from_u64(self.seed ^ 0xABCD);
+        let len = rng.random_range(0..=config.max_length);
+        let mut input = Vec::with_capacity(len);
+        for _ in 0..len {
+            let byte = if config.include_high_bytes && rng.random_bool(0.3) {
+                // Include multi-byte UTF-8 leading bytes
+                rng.random_range(0xC0u8..=0xF7u8)
+            } else if config.include_null && rng.random_bool(0.05) {
+                0x00
+            } else if rng.random_bool(0.2) {
+                rng.random_range(b'\x01'..=b'\x7f')
+            } else {
+                rng.random_range(b'\x80'..=b'\xBF')
+            };
+            input.push(byte);
+        }
+        input
+    }
+
+    /// Fuzz the lexer with random byte sequences, returning crashes or panics.
+    pub fn fuzz_lexer(&self, iterations: u64) -> Vec<String> {
+        let mut crashes = Vec::new();
+        let config = LexerFuzzConfig::default();
+        for i in 0..iterations {
+            let bytes = self.generate_lexer_input(&config);
+            // Only test valid UTF-8 (the lexer requires &str)
+            if let Ok(s) = String::from_utf8(bytes) {
+                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    let mut lex = crate::lexer::Lexer::new(&s);
+                    loop {
+                        match lex.next_token() {
+                            Ok(tok) if matches!(tok.kind, crate::lexer::TokenKind::Eof) => break,
+                            Ok(_) => continue,
+                            Err(_) => break,
+                        }
+                    }
+                }));
+                if result.is_err() {
+                    crashes.push(format!(
+                        "Fuzz lexer {}: PANIC/CRASH\nInput (len={}): {:?}",
+                        i,
+                        s.len(),
+                        s
+                    ));
+                }
+            }
+        }
+        crashes
     }
 
     /// Run the fuzzer

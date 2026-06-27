@@ -1,0 +1,45 @@
+{
+  "name": "nimble-lsp",
+  "displayName": "Nimble Language Support",
+  "description": "LSP-based language support for the Nimble programming language",
+  "version": "0.1.0",
+  "publisher": "nimble-toolchain",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "categories": ["Programming Languages"],
+  "keywords": ["nimble", "language-server", "lsp"],
+  "activationEvents": ["onLanguage:nimble", "onStartupFinished"],
+  "main": "./extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "nimble",
+        "aliases": ["Nimble", "nimble"],
+        "extensions": [".nbl"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "nimble",
+        "scopeName": "source.nimble",
+        "path": "./syntaxes/nimble.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "title": "Nimble",
+      "properties": {
+        "nimble.lsp.command": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the nimble compiler binary. Can use ${workspaceFolder}."
+        }
+      }
+    }
+  }
+}

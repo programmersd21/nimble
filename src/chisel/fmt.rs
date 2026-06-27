@@ -32,7 +32,6 @@ fn format_stmt(stmt: &Stmt, indent: usize, out: &mut String) {
             }
             let _ = write!(out, " = ");
             format_expr(value, out);
-            // TODO: add test for type-annotated var
         }
         Stmt::Let {
             name,
@@ -200,8 +199,29 @@ fn format_stmt(stmt: &Stmt, indent: usize, out: &mut String) {
                 let _ = write!(out, "::{{{}}}", syms.join(", "));
             }
         }
-        Stmt::Defer { .. } => todo!(),
-        Stmt::MacroDef { .. } => todo!(),
+        Stmt::Defer { body, .. } => {
+            let _ = writeln!(out, "{}defer:", indent_str);
+            for s in body {
+                format_stmt(s, indent + 1, out);
+                out.push('\n');
+            }
+        }
+        Stmt::MacroDef {
+            name, params, body, ..
+        } => {
+            let _ = write!(out, "{}macro {}(", indent_str, name);
+            for (i, p) in params.iter().enumerate() {
+                if i > 0 {
+                    out.push_str(", ");
+                }
+                out.push_str(p);
+            }
+            out.push_str("):\n");
+            for s in body {
+                format_stmt(s, indent + 1, out);
+                out.push('\n');
+            }
+        }
     }
 }
 
@@ -301,8 +321,41 @@ fn format_expr(expr: &Expr, out: &mut String) {
             out.push_str(" as ");
             format_type(target_type, out);
         }
-        Expr::Lambda { .. } => todo!(),
-        Expr::MacroInvocation { .. } => todo!(),
+        Expr::Lambda {
+            params,
+            return_type,
+            body,
+            ..
+        } => {
+            let _ = write!(out, "fn(");
+            for (i, p) in params.iter().enumerate() {
+                if i > 0 {
+                    out.push_str(", ");
+                }
+                let _ = write!(out, "{}: ", p.name);
+                format_type(&p.type_annot, out);
+            }
+            out.push(')');
+            if let Some(ret) = return_type {
+                out.push_str(" -> ");
+                format_type(ret, out);
+            }
+            out.push_str(":\n");
+            for s in body {
+                format_stmt(s, 1, out);
+                out.push('\n');
+            }
+        }
+        Expr::MacroInvocation { name, args, .. } => {
+            let _ = write!(out, "{}!(", name);
+            for (i, arg) in args.iter().enumerate() {
+                if i > 0 {
+                    out.push_str(", ");
+                }
+                format_expr(arg, out);
+            }
+            out.push(')');
+        }
     }
 }
 

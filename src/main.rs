@@ -122,6 +122,9 @@ enum Commands {
 
     /// Lint a Nimble source file
     Lint { file: String },
+
+    /// Explain a Nimble compiler error code
+    Explain { code: String },
 }
 
 #[derive(Subcommand)]
@@ -370,6 +373,14 @@ async fn main() -> Result<()> {
                 for w in &warnings {
                     eprintln!("warning:{}:{}: {}", w.line, w.column, w.message);
                 }
+            }
+        }
+        Commands::Explain { code } => {
+            if let Some(err_code) = nimble::diagnostics::codes::ErrorCode::from_str(&code) {
+                println!("{}", err_code.explanation());
+            } else {
+                eprintln!("error: unknown error code `{}`", code);
+                std::process::exit(1);
             }
         }
     }

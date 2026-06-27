@@ -338,12 +338,18 @@ impl Codegen {
                 if !self.string_global_names.contains_key(s) {
                     let global_name = format!(".str.{}", self.reg_counter);
                     self.reg_counter += 1;
-                    let escaped = s
-                        .replace("\\", "\\5C")
-                        .replace("\"", "\\22")
-                        .replace("\n", "\\0A")
-                        .replace("\r", "\\0D")
-                        .replace("\t", "\\09");
+                    let escaped: String = s
+                        .bytes()
+                        .flat_map(|b| match b {
+                            b'\\' => "\\5C".chars().collect::<Vec<_>>(),
+                            b'"' => "\\22".chars().collect::<Vec<_>>(),
+                            b'\n' => "\\0A".chars().collect::<Vec<_>>(),
+                            b'\r' => "\\0D".chars().collect::<Vec<_>>(),
+                            b'\t' => "\\09".chars().collect::<Vec<_>>(),
+                            0x20..=0x7E => vec![b as char],
+                            _ => format!("\\{:02X}", b).chars().collect::<Vec<_>>(),
+                        })
+                        .collect();
                     self.string_globals.push(format!(
                         "@{} = private unnamed_addr constant [{} x i8] c\"{}\\00\"",
                         global_name,
@@ -834,7 +840,7 @@ impl Codegen {
                 let global_name = self
                     .string_global_names
                     .get(s)
-                    .expect("string literal not found in pre-pass; this is a bug")
+                    .ok_or_else(|| format!("string literal `{}` not collected in pre-pass", s))?
                     .clone();
 
                 let reg = self.fresh_reg();
@@ -1061,7 +1067,16 @@ impl Codegen {
                     BinaryOp::Mul => ("mul", "mul", "fmul"),
                     BinaryOp::Div => ("div", "sdiv", "fdiv"),
                     BinaryOp::Mod => ("mod", "srem", "frem"),
-                    _ => unreachable!(),
+                    BinaryOp::Equal
+                    | BinaryOp::NotEqual
+                    | BinaryOp::Less
+                    | BinaryOp::Greater
+                    | BinaryOp::LessEqual
+                    | BinaryOp::GreaterEqual
+                    | BinaryOp::And
+                    | BinaryOp::Or => {
+                        return Err("arithmetic op on comparison/logical operator".to_string());
+                    }
                 };
 
                 let result_type = if left_ir_type == "double" {
@@ -1134,7 +1149,15 @@ impl Codegen {
                             "sge"
                         }
                     }
-                    _ => unreachable!(),
+                    BinaryOp::Add
+                    | BinaryOp::Sub
+                    | BinaryOp::Mul
+                    | BinaryOp::Div
+                    | BinaryOp::Mod
+                    | BinaryOp::And
+                    | BinaryOp::Or => {
+                        return Err("comparison op on arithmetic/logical operator".to_string());
+                    }
                 };
 
                 let result = self.fresh_reg();
@@ -1234,7 +1257,11 @@ impl Codegen {
 
                 let clean_name = qualified_name.trim_end_matches('.');
 
-                let target_name = clean_name.rsplit('.').next().unwrap().to_string();
+                let target_name = clean_name
+                    .rsplit('.')
+                    .next()
+                    .map(|s| s.to_string())
+                    .ok_or_else(|| "invalid qualified name: empty after split".to_string())?;
 
                 (target_name, clean_name.to_string())
             }
@@ -1301,10 +1328,10 @@ impl Codegen {
                 llvm_fn_name.trim_start_matches('@'),
                 call_args.join(", ")
             ));
-            let dummy = self.fresh_reg();
-            self.push_indent(&format!("{} = add i64 0, 0", dummy));
-            self.register_types.insert(dummy.clone(), "i64".to_string());
-            Ok(dummy)
+            let void_reg = self.fresh_reg();
+            self.register_types
+                .insert(void_reg.clone(), "void".to_string());
+            Ok(void_reg)
         } else {
             self.push_indent(&format!(
                 "{} = call {} @{}({})",
@@ -1562,6 +1589,16 @@ mod tests {
         assert!(
             ir.contains("private unnamed_addr constant"),
             "no global: {}",
+            ir
+        );
+    }
+
+    #[test]
+    fn ir_string_with_emoji() {
+        let ir = generate_ir("let x = \"😀\"\n").unwrap();
+        assert!(
+            ir.contains("\\F0\\9F\\98\\80"),
+            "emoji not correctly escaped in IR: {}",
             ir
         );
     }

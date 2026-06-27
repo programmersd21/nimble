@@ -36,14 +36,14 @@ impl Default for CompileOptions {
 }
 
 /// Locate the user's home directory.
-fn user_home_dir() -> Option<PathBuf> {
+pub(crate) fn user_home_dir() -> Option<PathBuf> {
     std::env::var_os("HOME")
         .map(PathBuf::from)
         .or_else(|| std::env::var_os("USERPROFILE").map(PathBuf::from))
 }
 
 /// Find the stdlib directory by searching near the workspace root and user home.
-fn find_stdlib_dirs() -> Vec<PathBuf> {
+pub(crate) fn find_stdlib_dirs() -> Vec<PathBuf> {
     let mut candidates = Vec::new();
 
     // Explicit override via NIMBLE_STDLIB
@@ -130,7 +130,11 @@ pub fn compile(source: &str, options: &CompileOptions) -> Result<(), String> {
         .arg(format!("-O{}", options.opt_level))
         .arg("-o")
         .arg(&options.output_path)
-        .arg(ir_path.to_str().unwrap())
+        .arg(
+            ir_path
+                .to_str()
+                .ok_or_else(|| format!("non-UTF-8 path: {}", ir_path.display()))?,
+        )
         .output()
         .map_err(|e| {
             format!(

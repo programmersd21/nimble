@@ -1,9 +1,172 @@
 use miette::{Diagnostic, SourceSpan};
 use thiserror::Error;
 
-use crate::lexer::TokenKind;
+use crate::lexer::{Span, TokenKind};
+
+// ── Lexer Errors ──────────────────────────────────────────────────────────
 
 #[derive(Debug, Error, Diagnostic)]
+pub enum LexError {
+    #[error("Illegal tab character")]
+    #[diagnostic(code("nimble::lex::illegal_tab"))]
+    IllegalTab {
+        line: usize,
+        column: usize,
+        #[source_code]
+        src: String,
+        #[label("tabs are not allowed")]
+        span: SourceSpan,
+        #[help("replace this tab with spaces")]
+        help: &'static str,
+    },
+
+    #[error("Unexpected character `{ch}`")]
+    #[diagnostic(code("nimble::lex::unexpected_character"))]
+    UnexpectedCharacter {
+        ch: char,
+        line: usize,
+        column: usize,
+        #[source_code]
+        src: String,
+        #[label("unexpected character `{ch}`")]
+        span: SourceSpan,
+    },
+
+    #[error("Unmatched closing delimiter")]
+    #[diagnostic(code("nimble::lex::unmatched_delimiter"))]
+    UnmatchedDelimiter {
+        delimiter: char,
+        line: usize,
+        column: usize,
+        #[source_code]
+        src: String,
+        #[label("no matching opening delimiter")]
+        span: SourceSpan,
+        #[help("remove this extra closing delimiter, or add an opening one")]
+        help: &'static str,
+    },
+
+    #[error("Invalid float literal `{literal}`")]
+    #[diagnostic(code("nimble::lex::invalid_float"))]
+    InvalidFloat {
+        literal: String,
+        line: usize,
+        column: usize,
+        #[source_code]
+        src: String,
+        #[label("invalid float")]
+        span: SourceSpan,
+    },
+
+    #[error("Integer literal `{literal}` out of range")]
+    #[diagnostic(code("nimble::lex::int_overflow"))]
+    IntOverflow {
+        literal: String,
+        line: usize,
+        column: usize,
+        #[source_code]
+        src: String,
+        #[label("integer value too large")]
+        span: SourceSpan,
+        #[help("use a smaller integer literal, or switch to `Float`")]
+        help: &'static str,
+    },
+
+    #[error("Unterminated string literal")]
+    #[diagnostic(code("nimble::lex::unterminated_string"))]
+    UnterminatedString {
+        line: usize,
+        column: usize,
+        #[source_code]
+        src: String,
+        #[label("missing closing `\"`")]
+        span: SourceSpan,
+        #[help("add a closing double-quote to terminate this string")]
+        help: &'static str,
+    },
+
+    #[error("Invalid escape sequence `\\{escape}`")]
+    #[diagnostic(code("nimble::lex::invalid_escape"))]
+    InvalidEscape {
+        escape: char,
+        line: usize,
+        column: usize,
+        #[source_code]
+        src: String,
+        #[label("invalid escape")]
+        span: SourceSpan,
+        #[help(r#"valid escapes: \n, \t, \r, \0, \\, \", \'"#)]
+        help: &'static str,
+    },
+
+    #[error("Newline inside string literal")]
+    #[diagnostic(code("nimble::lex::newline_in_string"))]
+    NewlineInString {
+        line: usize,
+        column: usize,
+        #[source_code]
+        src: String,
+        #[label("newline inside string")]
+        span: SourceSpan,
+        #[help("use a multi-line string or escape the newline with \\n")]
+        help: &'static str,
+    },
+
+    #[error(
+        "Indentation error at line {line}: indent level {indent} does not match any enclosing block"
+    )]
+    #[diagnostic(code("nimble::lex::indentation_error"))]
+    IndentationError {
+        indent: usize,
+        line: usize,
+        column: usize,
+        #[source_code]
+        src: String,
+        #[label("indent level {indent} is inconsistent")]
+        span: SourceSpan,
+        #[help("all indentation must align with an enclosing block's indent level")]
+        help: &'static str,
+    },
+}
+
+impl LexError {
+    pub fn span(&self) -> Span {
+        let (src_span, line, column): (SourceSpan, usize, usize) = match self {
+            Self::IllegalTab {
+                span, line, column, ..
+            } => (*span, *line, *column),
+            Self::UnexpectedCharacter {
+                span, line, column, ..
+            } => (*span, *line, *column),
+            Self::UnmatchedDelimiter {
+                span, line, column, ..
+            } => (*span, *line, *column),
+            Self::InvalidFloat {
+                span, line, column, ..
+            } => (*span, *line, *column),
+            Self::IntOverflow {
+                span, line, column, ..
+            } => (*span, *line, *column),
+            Self::UnterminatedString {
+                span, line, column, ..
+            } => (*span, *line, *column),
+            Self::InvalidEscape {
+                span, line, column, ..
+            } => (*span, *line, *column),
+            Self::NewlineInString {
+                span, line, column, ..
+            } => (*span, *line, *column),
+            Self::IndentationError {
+                span, line, column, ..
+            } => (*span, *line, *column),
+        };
+        Span::new_with_len(line, column, src_span.offset(), src_span.len())
+    }
+}
+
+// ── Parser Errors ─────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Error, Diagnostic)]
 pub enum ParseError {
     // Token-level errors
     #[error("Expected `{expected}` but found `{found}` at line {line}:{column}")]
@@ -262,6 +425,46 @@ pub fn format_token_kind(kind: &TokenKind) -> String {
         TokenKind::Await => "'await'".into(),
         TokenKind::Question => "'?'".into(),
         TokenKind::Eof => "end of file".into(),
+    }
+}
+
+// ── Name Resolution Errors ────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Error, Diagnostic)]
+pub enum ResolveError {
+    #[error("Undefined variable `{name}`")]
+    #[diagnostic(code("nimble::resolve::undefined_variable"))]
+    UndefinedVariable {
+        name: String,
+        line: usize,
+        column: usize,
+        #[source_code]
+        src: String,
+        #[label("`{name}` is not defined in this scope")]
+        span: SourceSpan,
+    },
+
+    #[error("Duplicate definition of `{name}`")]
+    #[diagnostic(code("nimble::resolve::duplicate_definition"))]
+    DuplicateDefinition {
+        name: String,
+        existing_span: Span,
+        new_span: Span,
+        #[source_code]
+        src: String,
+        #[label("`{name}` is already defined")]
+        span: SourceSpan,
+    },
+}
+
+impl ResolveError {
+    pub fn span(&self) -> Span {
+        match self {
+            Self::UndefinedVariable {
+                span, line, column, ..
+            } => Span::new_with_len(*line, *column, span.offset(), span.len()),
+            Self::DuplicateDefinition { span, .. } => Span::new(0, 0, span.offset()),
+        }
     }
 }
 

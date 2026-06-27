@@ -1,0 +1,76 @@
+{
+  "scopeName": "source.nimble",
+  "name": "Nimble",
+  "fileTypes": [".nbl"],
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#keywords" },
+    { "include": "#types" },
+    { "include": "#builtins" },
+    { "include": "#function-def" },
+    { "include": "#function-call" },
+    { "include": "#operators" }
+  ],
+  "repository": {
+    "comments": {
+      "name": "comment.line.number-sign.nimble",
+      "match": "#.*"
+    },
+    "strings": {
+      "name": "string.quoted.double.nimble",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        { "include": "#string-escapes" }
+      ]
+    },
+    "string-escapes": {
+      "name": "constant.character.escape.nimble",
+      "match": "\\\\[nrt0\"\\\\]"
+    },
+    "numbers": {
+      "patterns": [
+        { "match": "\\b[0-9]+\\.[0-9]+\\b", "name": "constant.numeric.float.nimble" },
+        { "match": "\\b[0-9]+\\b", "name": "constant.numeric.integer.nimble" }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        { "match": "\\b(fn|let|var|if|elif|else|struct|interface|enum|match|pub|return|while|for|in|break|continue|extern|load|as|mut|async|await|defer|macro)\\b", "name": "keyword.control.nimble" },
+        { "match": "\\b(true|false)\\b", "name": "constant.language.nimble" }
+      ]
+    },
+    "types": {
+      "match": "\\b(Int|Float|Bool|String|Void|Char)\\b",
+      "name": "storage.type.nimble"
+    },
+    "builtins": {
+      "match": "\\b(print|println|assert|len|panic|int|float|str|bool)\\b",
+      "name": "support.function.builtin.nimble"
+    },
+    "function-def": {
+      "match": "\\b(fn)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\([^)]*\\)\\s*->",
+      "captures": {
+        "1": { "name": "keyword.control.nimble" },
+        "2": { "name": "entity.name.function.nimble" }
+      }
+    },
+    "function-call": {
+      "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(",
+      "captures": {
+        "1": { "name": "support.function.nimble" }
+      }
+    },
+    "parameters": {
+      "patterns": [
+        { "match": "([a-zA-Z_][a-zA-Z0-9_]*)\\s*:", "name": "variable.parameter.nimble" }
+      ]
+    },
+    "operators": {
+      "match": "[+\\-*/%=!<>:&|@^~]+",
+      "name": "keyword.operator.nimble"
+    }
+  }
+}

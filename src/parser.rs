@@ -1,35 +1,92 @@
 use crate::ast::*;
-use crate::errors::ParseError;
+use crate::errors::{LexError, ParseError};
 use crate::lexer::{Lexer, Span, Token, TokenKind};
 
-/// Recursive-descent parser with Pratt precedence climbing.
+/// Recursive-descent parser with Pratt precedence climbing and panic-mode
+/// error recovery: when a parse error is encountered, the parser records it,
+/// skips to the next synchronisation token, and continues producing a partial AST.
 pub struct Parser<'a> {
     lexer: Lexer<'a>,
     current: Token,
     next: Token,
     /// Used for diagnostic messages.
     source: &'a str,
+    /// Lex errors collected during parsing.
+    lex_errors: Vec<LexError>,
+    /// Parse errors collected during recovery. The first error is also returned
+    /// by [`parse`] so that existing callers continue to see `Err`.
+    parse_errors: Vec<ParseError>,
 }
 
 impl<'a> Parser<'a> {
     pub fn new(source: &'a str) -> Result<Self, ParseError> {
         let mut lexer = Lexer::new(source);
-        let current = lexer.next_token().map_err(|msg| ParseError::Internal {
-            src: source.to_string(),
-            span: (0usize, 0usize).into(),
-            msg,
+        let current = lexer.next_token().map_err(|e| {
+            let span = (0usize, 0usize).into();
+            ParseError::Internal {
+                msg: format!("{}", e),
+                src: source.to_string(),
+                span,
+            }
         })?;
-        let next = lexer.next_token().map_err(|msg| ParseError::Internal {
-            src: source.to_string(),
-            span: (0usize, 0usize).into(),
-            msg,
+        let next = lexer.next_token().map_err(|e| {
+            let span = (0usize, 0usize).into();
+            ParseError::Internal {
+                msg: format!("{}", e),
+                src: source.to_string(),
+                span,
+            }
         })?;
         Ok(Parser {
             lexer,
             current,
             next,
             source,
+            lex_errors: Vec::new(),
+            parse_errors: Vec::new(),
         })
+    }
+
+    /// Drain lex errors accumulated during parsing.
+    pub fn drain_lex_errors(&mut self) -> Vec<LexError> {
+        let mut errors = self.lexer.drain_errors();
+        errors.append(&mut self.lex_errors);
+        errors
+    }
+
+    /// Drain parse errors accumulated during error recovery.
+    pub fn drain_parse_errors(&mut self) -> Vec<ParseError> {
+        std::mem::take(&mut self.parse_errors)
+    }
+
+    /// Panic-mode recovery: skip tokens until one of the synchronisation
+    /// tokens is found, then consume it (unless it is Eof).
+    fn recover(&mut self, sync: &[TokenKind]) {
+        loop {
+            if self.check(&TokenKind::Eof) {
+                return;
+            }
+            if sync.contains(&self.current.kind) {
+                return;
+            }
+            self.advance_ignoring_errors();
+        }
+    }
+
+    /// Advance past the current token even when the lexer returns an error.
+    fn advance_ignoring_errors(&mut self) {
+        self.current = std::mem::replace(
+            &mut self.next,
+            Token::new(TokenKind::Eof, Span::new(0, 0, 0)),
+        );
+        let next = match self.lexer.next_token() {
+            Ok(tok) => tok,
+            Err(e) => {
+                self.lex_errors.push(e);
+                Token::new(TokenKind::Eof, Span::new(1, 1, 0))
+            }
+        };
+        self.next = next;
     }
 
     pub fn parse(&mut self) -> Result<Program, ParseError> {
@@ -42,24 +99,40 @@ impl<'a> Parser<'a> {
             }
             if self.check(&TokenKind::Dedent) {
                 let tok = self.current.clone();
-                return Err(ParseError::unexpected_token(self.source, &tok));
+                self.parse_errors
+                    .push(ParseError::unexpected_token(self.source, &tok));
+                self.advance();
+                continue;
             }
-            statements.push(self.parse_statement()?);
+            match self.parse_statement() {
+                Ok(stmt) => statements.push(stmt),
+                Err(e) => {
+                    self.parse_errors.push(e);
+                    self.recover(&[TokenKind::Newline, TokenKind::Dedent, TokenKind::Eof]);
+                }
+            }
             if self.check(&TokenKind::Newline) {
                 self.advance();
             }
         }
 
         let end_span = self.current.span;
-        Ok(Program {
-            statements,
-            span: Span::new_with_len(
-                start_span.line,
-                start_span.column,
-                start_span.byte_index,
-                end_span.byte_index + end_span.length - start_span.byte_index,
-            ),
-        })
+
+        if self.parse_errors.is_empty() {
+            Ok(Program {
+                statements,
+                span: Span::new_with_len(
+                    start_span.line,
+                    start_span.column,
+                    start_span.byte_index,
+                    end_span.byte_index + end_span.length - start_span.byte_index,
+                ),
+            })
+        } else {
+            // Return the first error (backward compat) without draining,
+            // so drain_parse_errors() still has all accumulated errors.
+            Err(self.parse_errors[0].clone())
+        }
     }
 
     fn parse_statement(&mut self) -> Result<Stmt, ParseError> {
@@ -118,7 +191,13 @@ impl<'a> Parser<'a> {
 
         let mut stmts = Vec::new();
         while !self.check(&TokenKind::Dedent) && !self.check(&TokenKind::Eof) {
-            stmts.push(self.parse_statement()?);
+            match self.parse_statement() {
+                Ok(stmt) => stmts.push(stmt),
+                Err(e) => {
+                    self.parse_errors.push(e);
+                    self.recover(&[TokenKind::Newline, TokenKind::Dedent, TokenKind::Eof]);
+                }
+            }
             if self.check(&TokenKind::Newline) {
                 self.advance();
             }
@@ -768,7 +847,17 @@ impl<'a> Parser<'a> {
                         TokenKind::StarEqual => BinaryOp::Mul,
                         TokenKind::SlashEqual => BinaryOp::Div,
                         TokenKind::PercentEqual => BinaryOp::Mod,
-                        _ => unreachable!(),
+                        _ => {
+                            return Err(ParseError::Internal {
+                                msg: format!(
+                                    "unexpected compound assignment token {:?}",
+                                    op_token.kind
+                                ),
+                                src: self.source.to_string(),
+                                span: (op_token.span.byte_index, op_token.span.length.max(1))
+                                    .into(),
+                            });
+                        }
                     };
                     let target = Box::new(left.clone());
                     left = Expr::Assign {
@@ -956,10 +1045,16 @@ impl<'a> Parser<'a> {
             });
         }
         let token = self.current.clone();
-        let name = if let TokenKind::Identifier(s) = &token.kind {
-            s.clone()
-        } else {
-            unreachable!()
+        let name = match &token.kind {
+            TokenKind::Identifier(s) => s.clone(),
+            _ => {
+                return Err(ParseError::ExpectedType {
+                    line: token.span.line,
+                    column: token.span.column,
+                    src: self.source.to_string(),
+                    span: (token.span.byte_index, token.span.length.max(1)).into(),
+                });
+            }
         };
         self.advance();
         let mut args = Vec::new();
@@ -997,15 +1092,14 @@ impl<'a> Parser<'a> {
     }
 
     fn advance(&mut self) -> Token {
-        std::mem::replace(
-            &mut self.current,
-            std::mem::replace(
-                &mut self.next,
-                self.lexer
-                    .next_token()
-                    .unwrap_or_else(|_| Token::new(TokenKind::Eof, Span::new(1, 1, 0))),
-            ),
-        )
+        let next = match self.lexer.next_token() {
+            Ok(tok) => tok,
+            Err(e) => {
+                self.lex_errors.push(e);
+                Token::new(TokenKind::Eof, Span::new(1, 1, 0))
+            }
+        };
+        std::mem::replace(&mut self.current, std::mem::replace(&mut self.next, next))
     }
 
     fn expect_identifier(&mut self) -> Result<String, ParseError> {
@@ -1772,5 +1866,80 @@ else:
         let mut parser = Parser::new(src).expect("parser creation failed");
         let result = parser.parse();
         assert!(result.is_err(), "expected parse error");
+    }
+
+    // ── Error recovery tests ────────────────────────────────────────────────
+
+    #[test]
+    fn parse_error_recovery_collects_multiple_errors() {
+        // Two malformed statements: the parser should recover after the first
+        // and report both via drain_parse_errors().
+        let src = "let x = \nlet y = \n";
+        let mut parser = Parser::new(src).expect("parser creation failed");
+        let result = parser.parse();
+        assert!(result.is_err(), "expected parse error");
+        assert!(
+            parser.parse_errors.len() >= 1,
+            "should have collected errors"
+        );
+    }
+
+    #[test]
+    fn parse_error_recovery_continues_after_bad_stmt() {
+        // A bad statement followed by a good one.
+        let src = "let x = \nlet y = 1\n";
+        let mut parser = Parser::new(src).expect("parser creation failed");
+        let _result = parser.parse();
+        let errors = parser.drain_parse_errors();
+        assert!(!errors.is_empty(), "expected errors");
+        // Should have recovered and produced partial AST
+    }
+
+    #[test]
+    fn parse_error_recovery_bad_if_body() {
+        // Malformed inside if body: parser should recover per-statement
+        // and continue parsing the rest of the block.
+        let src = "if true:\n    let x = \n    let y = 42\n";
+        let mut parser = Parser::new(src).expect("parser creation failed");
+        let _result = parser.parse();
+        let errors = parser.drain_parse_errors();
+        assert!(!errors.is_empty(), "expected parse errors for bad let");
+    }
+
+    #[test]
+    fn parse_error_recovery_unclosed_paren_in_expr() {
+        // Unclosed paren inside an expression should be caught, recovered,
+        // and subsequent statements still parsed.
+        let src = "let x = (1 + 2\nlet y = 3\n";
+        let mut parser = Parser::new(src).expect("parser creation failed");
+        let result = parser.parse();
+        assert!(result.is_err(), "expected parse error on unclosed paren");
+        let errors = parser.drain_parse_errors();
+        assert!(!errors.is_empty(), "expected errors");
+    }
+
+    #[test]
+    fn parse_error_recovery_top_level_stray_dedent() {
+        // A stray Dedent at the top level should be recovered, letting the
+        // parser continue to the next statement.
+        let src = "let x = 1\n\ndedent\nlet y = 2\n";
+        // The blank line in the middle might produce a Dedent.
+        let mut parser = Parser::new(src).expect("parser creation failed");
+        let _result = parser.parse();
+        // Should have produced some AST even if there were errors.
+    }
+
+    #[test]
+    fn drain_parse_errors_clears_buffer() {
+        let src = "let x = \nlet y = \n";
+        let mut parser = Parser::new(src).expect("parser creation failed");
+        let _ = parser.parse();
+        let errors1 = parser.drain_parse_errors();
+        assert!(!errors1.is_empty());
+        let errors2 = parser.drain_parse_errors();
+        assert!(
+            errors2.is_empty(),
+            "drain_parse_errors should clear the buffer"
+        );
     }
 }

@@ -27,6 +27,7 @@ A statically typed language with Python-style indentation, LLVM-based code gener
 - **Formatter** - `nimble fmt` canonical source formatting
 - **Profiler** - `nimble profile` measures compilation and execution timing
 - **Self-hosting support** - `nimble generate-header` produces C runtime API headers
+- **Query-based compilation & caching** - central compiler database with dynamic dependency tracking and persistent disk cache
 - **Unified Toolchain** - everything integrated into a single `nimble` crate
 
 ## Quick Start
@@ -164,23 +165,82 @@ The entire Nimble toolchain is integrated into a single `nimble` binary.
 | `nimble pkg` | Package Manager | Manage library dependencies |
 | `nimble fetch` | Dependencies | Fetch manifest dependencies |
 
-## Pipeline
+## Pipeline & Query System
+
+The Nimble compiler adopts a **query-based, demand-driven compiler architecture** with an expanded multi-phase pipeline:
+```
+                      ┌─────────────────────────┐
+                      │    Compiler Database    │
+                      └────────────┼────────────┘
+                                   │ (queries)
+                                   ▼
+[Source] ──► [Lex] ──► [Parse] ──► [HIR Lower] ──► [Resolve] ──► [Typecheck] ──► [Codegen] ──► [Link]
+                                       │             │
+                                       ▼             ▼
+                                  [HirProgram]  [ResolvedProgram]
+                                       │             │
+                                       └─── [DefId map, scope chain]
+                                   ▲
+                                   │ (fingerprints, memoization, deps)
+                      ┌────────────┴────────────┐
+                      │    Persistent Cache     │
+                      └─────────────────────────┘
+```
+
+Every compilation unit (file read, lexing, parsing, HIR lowering, name resolution, type-checking, and code generation) is represented as a memoized query managed by the compiler `Database` ([query.rs](src/query.rs)).
+- **Dynamic Dependency Tracking**: Queries automatically register dependencies on other queries they invoke (e.g. `typecheck` of a file depends on `resolve`, `parse`, and `typecheck` of its imported modules).
+- **Stable Hashing**: Computes stable content-hash fingerprints. If a source file or its dependency graph is unchanged, Nimble avoids re-lexing, re-parsing, re-typechecking, and re-codegen.
+- **Persistent Cache**: Serializes query nodes to `target/.nimble_cache` to survive compiler restarts for near-instant rebuilds.
+
+### Compiler Phases
+
+| # | Phase | Module | Description |
+|:-:|-------|--------|-------------|
+| 1 | **Lexer** | `src/lexer.rs` | Tokenizes source with full UTF-8 Unicode support (XID_Start/XID_Continue identifiers). Structured `LexError` recovery via `drain_errors()`. Dedicated fuzz testing. |
+| 2 | **Parser** | `src/parser.rs` | Pratt-style precedence climbing. Panic-mode error recovery with sync tokens (`Newline`, `Dedent`, `Eof`). `drain_parse_errors()` collects all errors without aborting. |
+| 3 | **HIR Lowering** | `src/hir.rs` | Desugars AST into HIR by stripping transparent wrappers (e.g. `Grouping`). Preserves all `Span` info for diagnostics. |
+| 4 | **Name Resolution** | `src/resolver.rs` | Two-pass resolver: Pass 1 collects definitions with lexical scoping; Pass 2 resolves identifier references to `DefId`s. Detects undefined variables and duplicate definitions. |
+| 5 | **Type Checking** | `src/typechecker.rs` | Hindley-Milner inference with unification, generics, closures, method desugaring, interface conformance, ownership scaffold. |
+| 6 | **Code Generation** | `src/codegen.rs` | Emits textual LLVM IR with debug info, defer stacks, lambda trampolines, enum tagged unions. |
+| 7 | **Linking** | `smelt` driver | Auto-discovers system linker (`cc`, `clang`, `gcc`, `link.exe`) and links with `ember` runtime. |
+
+### Diagnostics System
+
+The diagnostics subsystem (`src/diagnostics/`) provides **Rust-quality error reporting**:
+
+- **~300 stable error codes** (N0001–N9025) across all subsystems — lexer, parser, resolver, typechecker, module system, lint, codegen, runtime, config, and ICE
+- **Structured diagnostics**: primary/secondary spans, multi-line spans, labels, notes, help messages
+- **Typo suggestions**: Levenshtein/Damerau distance for misspelled identifiers with ranked candidates
+- **Suggestions with applicability**: `MachineApplicable`, `MaybeIncorrect`, `HasPlaceholders`, `Unspecified`
+- **Cascading error suppression**: `RecoveryState` tracks known-broken variables to avoid avalanche errors
+- **Pretty printing**: Unicode box rendering with color theme, ANSI/ASCII fallback, source context with carets
+- **Machine-readable output**: JSON emitter and LSP diagnostic conversion for IDE integration
+- **Diagnostic deduplication**: `DiagnosticCache` prevents identical error reports
+- **Error explanations**: `nimble explain N2001` shows long-form documentation with examples and root-cause analysis
 
 ```
-source.nbl  →  lexer  →  parser  →  typechecker  →  codegen  →  .ll  →  clang -c  →  .obj
-                                                                                         │
-                                                                                   linker (clang -o)
-                                                                                         │
-                                                                                     a.exe  ←  ember.lib
+error[N2001]: Undefined variable `my_val`
+  --> src/main.nbl:3:15
+   |
+ 3 |     println(my_val)
+   |             ^^^^^^ `my_val` is not defined in this scope
+   |
+help: did you mean `my_var`?
+  |
+ 3 |     println(my_var)
+   |             ~~~~~~
+   |
+note: variables must be declared with `let` or `var` before use
 ```
 
 The codegen optionally emits LLVM debug info metadata (`DILocation`, `DISubprogram`, `DICompileUnit`) for source-level debugging.
 
 ## Current Status
 
-Implemented:
+### Implemented
 
-- Lexer, parser, AST, type checker, code generator
+**Core Compiler:**
+- Lexer, parser, AST, HIR lowering, name resolver, type checker, code generator
 - `if` / `elif` / `else`, `while`, `for`, `break`, `continue`, `return`, `load`, `extern fn`
 - Immutable `let` and mutable `var`
 - Struct declarations, struct literals, and field access
@@ -192,21 +252,67 @@ Implemented:
 - **Method call syntax** (`obj.method(args)`)
 - **`if let` / `while let`** pattern matching
 - **`?` operator** for error propagation
-- **`defer`** statements for resource cleanup
+- **`defer` statements** for resource cleanup
 - **Compile-time macros**
 - **Async/await** with channel, mutex, atomic primitives
 - **Reference types** (`&T`, `&mut T`)
-- **Standard library** with 23 modules
+- Standard library with 23 modules
+
+**HIR Lowering** ([src/hir.rs](src/hir.rs)):
+- Desugars AST into `HirProgram` with `HirStmt` and `HirExpr`
+- Strips semantically transparent wrappers (Grouping) while preserving all `Span` info
+- 5 unit tests covering lowering correctness
+
+**Name Resolution** ([src/resolver.rs](src/resolver.rs)):
+- Two-pass resolver: Pass 1 collects all definitions with lexical scoping; Pass 2 resolves identifier references to unique `DefId`s
+- Block-level scoping for `if`/`while`/`for`/`defer`/function bodies
+- `ResolvedProgram` with `lookup()`, `lookup_by_span()`, `get_def()` APIs
+- Detects `UndefinedVariable` and `DuplicateDefinition` errors
+- 12 unit tests
+
+**Diagnostics System** ([src/diagnostics/](src/diagnostics/)):
+- **~300 stable error codes** (N0001–N9025) covering every possible compiler error
+- Structured diagnostics with primary/secondary spans, labels, notes, suggestions
+- Pretty printer with Unicode box rendering, color themes, ASCII fallback
+- JSON emitter and LSP diagnostic conversion for IDE integration
+- Typo suggestions using Damerau-Levenshtein distance with ranked candidates
+- Cascading error suppression via `RecoveryState`
+- Diagnostic deduplication via `DiagnosticCache`
+- Error explanations via `nimble explain <code>`
+- Macro expansion awareness in span reporting
+
+**Parser Error Recovery:**
+- Panic-mode recovery with sync tokens (`Newline`, `Dedent`, `Eof`)
+- Collects multiple parse errors in a single pass via `drain_parse_errors()`
+- 6 dedicated recovery tests
+
+**Lexer Improvements:**
+- Full UTF-8 Unicode identifiers (XID_Start/XID_Continue) — CJK, Greek, Cyrillic, mixed scripts
+- Structured `LexError` enum with miette diagnostics
+- Dedicated fuzz testing for random byte sequences
+
+**Tooling:**
 - REPL, formatter, LSP (hover, goto-def, autocomplete), docgen, linter
 - Project tooling (`init`, `build`, `run`, `pkg`, `install`, `fetch`)
 - Profiling, fuzzing, and self-hosting header generation
 - LLVM debug info emission
 
-Still early:
+### Still Early
 
 - Full ownership / borrow checker (scaffolding present)
 - Package registry protocol
-- Incremental compilation (in-memory caching present)
+
+## Test Suite
+
+The compiler has **223+ unit tests** across all subsystems:
+- 47 lexer tests — including Unicode identifiers, error recovery, fuzz safety
+- 41 parser tests — including error recovery, full AST coverage
+- 6 HIR tests — lowering correctness
+- 12 resolver tests — name resolution, scoping, error detection
+- 32 typechecker tests — type inference, errors, generics, interfaces
+- 5 codegen tests — full compilation examples (fibonacci, fizzbuzz, etc.)
+- 5 lint tests — dead code detection, unused variable detection
+- 5 diagnostics tests — pretty printing, span rendering, JSON output
 
 ## Build Options
 

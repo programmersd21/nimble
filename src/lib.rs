@@ -1,14 +1,20 @@
 pub mod ast;
 pub mod codegen;
+pub mod diagnostics;
 pub mod driver;
 pub mod env;
 pub mod errors;
+pub mod hir;
 pub mod lexer;
 pub mod module_loader;
 pub mod parser;
 pub mod pipeline;
+pub mod query;
+pub mod resolver;
 pub mod typechecker;
 pub mod types;
+
+pub use query::{Database, TypecheckResult};
 
 pub mod anvil;
 pub mod chisel;
@@ -23,12 +29,8 @@ pub mod profiler;
 pub mod selfhost;
 pub mod smelt;
 
-pub use ast::*;
 pub use codegen::Codegen;
-pub use driver::{CompileOptions, compile, compile_to_ir};
-pub use env::{Environment, Symbol, SymbolKind};
-pub use errors::ParseError;
-pub use lexer::{Lexer, Span, Token, TokenKind};
+pub use lexer::Lexer;
 pub use parser::Parser;
-pub use typechecker::{TypeChecker, TypeError};
-pub use types::{Substitution, Type};
+pub use pipeline::PipelineConfig;
+pub use typechecker::TypeChecker;

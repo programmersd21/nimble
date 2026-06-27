@@ -1,7 +1,9 @@
 use std::collections::VecDeque;
 
+use crate::errors::LexError;
+
 /// `line`/`column` are 1‑based; `byte_index` is a 0‑based byte offset; `length` is the byte length (0 for virtual tokens).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct Span {
     pub line: usize,
     pub column: usize,
@@ -34,7 +36,7 @@ impl Span {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum TokenKind {
     Indent,
     Dedent,
@@ -114,7 +116,7 @@ pub enum TokenKind {
     Eof,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Token {
     pub kind: TokenKind,
     pub span: Span,
@@ -126,17 +128,16 @@ impl Token {
     }
 }
 
-/// Tabs are rejected in indentation.
 fn count_leading_whitespace(s: &str) -> usize {
     s.bytes().take_while(|&b| b == b' ').count()
 }
 
-fn is_ident_start(b: u8) -> bool {
-    b.is_ascii_alphabetic() || b == b'_'
+fn is_ident_start(ch: char) -> bool {
+    ch.is_ascii_alphabetic() || ch == '_' || unicode_xid::UnicodeXID::is_xid_start(ch)
 }
 
-fn is_ident_continue(b: u8) -> bool {
-    b.is_ascii_alphanumeric() || b == b'_'
+fn is_ident_continue(ch: char) -> bool {
+    ch.is_ascii_alphanumeric() || ch == '_' || unicode_xid::UnicodeXID::is_xid_continue(ch)
 }
 
 fn try_multi_char_op(source: &str, pos: usize) -> Option<(usize, TokenKind)> {
@@ -166,6 +167,10 @@ fn try_multi_char_op(source: &str, pos: usize) -> Option<(usize, TokenKind)> {
 }
 
 /// Python-style indentation-aware tokeniser with delimiter tracking.
+///
+/// Collects non-fatal errors into an internal buffer for later retrieval.
+/// The lexer never panics — all invalid input produces structured `LexError`
+/// values via the `Result` return, or is collected as a recovered warning.
 pub struct Lexer<'a> {
     source: &'a str,
     lines: Vec<&'a str>,
@@ -187,6 +192,9 @@ pub struct Lexer<'a> {
     eof_emitted: bool,
 
     line_active: bool,
+
+    /// Non-fatal errors collected during lexing (error recovery).
+    errors: Vec<LexError>,
 }
 
 impl<'a> Lexer<'a> {
@@ -206,6 +214,7 @@ impl<'a> Lexer<'a> {
             pending: VecDeque::new(),
             eof_emitted: false,
             line_active: false,
+            errors: Vec::new(),
         };
 
         if lex.line_idx < lex.lines.len() {
@@ -225,7 +234,12 @@ impl<'a> Lexer<'a> {
         lex
     }
 
-    pub fn next_token(&mut self) -> Result<Token, String> {
+    /// Returns the non-fatal errors accumulated during lexing and clears the buffer.
+    pub fn drain_errors(&mut self) -> Vec<LexError> {
+        std::mem::take(&mut self.errors)
+    }
+
+    pub fn next_token(&mut self) -> Result<Token, LexError> {
         loop {
             if let Some(tok) = self.pending.pop_front() {
                 return Ok(tok);
@@ -272,7 +286,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    pub fn tokenize_all(&mut self) -> Result<Vec<Token>, String> {
+    pub fn tokenize_all(&mut self) -> Result<Vec<Token>, LexError> {
         let mut tokens = Vec::new();
         loop {
             let tok = self.next_token()?;
@@ -346,7 +360,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn flush_dedents_at_eof(&mut self) -> Result<(), String> {
+    fn flush_dedents_at_eof(&mut self) -> Result<(), LexError> {
         while self.indent_stack.len() > 1 {
             self.indent_stack.pop();
             self.pending.push_back(Token::new(
@@ -358,7 +372,7 @@ impl<'a> Lexer<'a> {
         Ok(())
     }
 
-    fn handle_indentation(&mut self) -> Result<(), String> {
+    fn handle_indentation(&mut self) -> Result<(), LexError> {
         let raw = self.current_line();
         let indent = count_leading_whitespace(raw);
 
@@ -369,7 +383,6 @@ impl<'a> Lexer<'a> {
             let span = Span::new(self.line_num, 1, self.current_line_start());
             self.pending.push_back(Token::new(TokenKind::Indent, span));
         } else if indent < top {
-            // Pop until the level matches.
             while *self.indent_stack.last().unwrap() > indent {
                 self.indent_stack.pop().unwrap();
                 let span = Span::new(self.line_num, 1, self.current_line_start());
@@ -378,15 +391,17 @@ impl<'a> Lexer<'a> {
             if self.indent_stack.is_empty() {
                 self.indent_stack.push(0);
             }
-            // Validate that we landed on an exact match.
             if *self.indent_stack.last().unwrap() != indent
                 && (indent != 0 || self.indent_stack.len() != 1)
             {
-                return Err(format!(
-                    "Indentation error at line {}: indent level {} \
-                         does not match any enclosing block",
-                    self.line_num, indent,
-                ));
+                return Err(LexError::IndentationError {
+                    indent,
+                    line: self.line_num,
+                    column: 1,
+                    src: self.source.to_string(),
+                    span: (self.current_line_start(), raw.len()).into(),
+                    help: "all indentation must align with an enclosing block's indent level",
+                });
             }
         }
 
@@ -395,6 +410,7 @@ impl<'a> Lexer<'a> {
 
         Ok(())
     }
+
     fn skip_inline_whitespace(&mut self) {
         let bytes = self.current_line().as_bytes();
         while self.pos < bytes.len() {
@@ -410,7 +426,7 @@ impl<'a> Lexer<'a> {
     }
 
     /// Tokenise the next lexeme at [`self.pos`].
-    fn tokenize_next(&mut self) -> Result<Token, String> {
+    fn tokenize_next(&mut self) -> Result<Token, LexError> {
         let bytes = self.current_line().as_bytes();
         let ch = bytes[self.pos];
 
@@ -444,21 +460,28 @@ impl<'a> Lexer<'a> {
             b'?' => (1, TokenKind::Question),
 
             b'\t' => {
-                return Err(format!(
-                    "Illegal tab character at line {}, column {}",
-                    self.line_num, self.col,
-                ));
+                return Err(LexError::IllegalTab {
+                    line: self.line_num,
+                    column: self.col,
+                    src: self.source.to_string(),
+                    span: (self.current_line_start() + self.pos, 1).into(),
+                    help: "replace this tab with spaces",
+                });
             }
 
             b'0'..=b'9' => return self.tokenize_number(),
             b'"' => return self.tokenize_string(),
-            _ if is_ident_start(ch) => return self.tokenize_identifier_or_keyword(),
+
+            _ if is_ident_start(ch as char) => return self.tokenize_identifier_or_keyword(),
 
             _ => {
-                return Err(format!(
-                    "Unexpected character '{}' (byte 0x{:02x}) at line {}, column {}",
-                    ch as char, ch, self.line_num, self.col,
-                ));
+                return Err(LexError::UnexpectedCharacter {
+                    ch: ch as char,
+                    line: self.line_num,
+                    column: self.col,
+                    src: self.source.to_string(),
+                    span: (self.current_line_start() + self.pos, 1).into(),
+                });
             }
         };
 
@@ -470,10 +493,19 @@ impl<'a> Lexer<'a> {
             }
             TokenKind::RParen | TokenKind::RBracket | TokenKind::RBrace => {
                 if self.delimiter_count == 0 {
-                    return Err(format!(
-                        "Unmatched closing delimiter at line {}, column {}",
-                        self.line_num, self.col,
-                    ));
+                    let delim = match kind {
+                        TokenKind::RParen => ')',
+                        TokenKind::RBracket => ']',
+                        _ => '}',
+                    };
+                    return Err(LexError::UnmatchedDelimiter {
+                        delimiter: delim,
+                        line: self.line_num,
+                        column: self.col,
+                        src: self.source.to_string(),
+                        span: (self.current_line_start() + self.pos, 1).into(),
+                        help: "remove this extra closing delimiter, or add an opening one",
+                    });
                 }
                 self.delimiter_count -= 1;
             }
@@ -484,9 +516,10 @@ impl<'a> Lexer<'a> {
         Ok(Token::new(kind, span))
     }
 
-    fn tokenize_number(&mut self) -> Result<Token, String> {
+    fn tokenize_number(&mut self) -> Result<Token, LexError> {
         let start_pos = self.pos;
         let bytes = self.current_line().as_bytes();
+        let line_start = self.current_line_start();
 
         while self.pos < bytes.len() && bytes[self.pos].is_ascii_digit() {
             self.pos += 1;
@@ -502,36 +535,37 @@ impl<'a> Lexer<'a> {
                 self.pos += 1;
             }
             let raw = &self.current_line()[start_pos..self.pos];
-            let value: f64 = raw
-                .parse()
-                .map_err(|_| format!("Invalid float literal '{}'", raw))?;
+            let value: f64 = raw.parse().map_err(|_| LexError::InvalidFloat {
+                literal: raw.to_string(),
+                line: self.line_num,
+                column: start_pos + 1,
+                src: self.source.to_string(),
+                span: (line_start + start_pos, self.pos - start_pos).into(),
+            })?;
             let len = self.pos - start_pos;
-            let span = Span::new_with_len(
-                self.line_num,
-                start_pos + 1,
-                self.current_line_start() + start_pos,
-                len,
-            );
+            let span =
+                Span::new_with_len(self.line_num, start_pos + 1, line_start + start_pos, len);
             self.col += len;
             Ok(Token::new(TokenKind::FloatLiteral(value), span))
         } else {
             let raw = &self.current_line()[start_pos..self.pos];
-            let value: i64 = raw
-                .parse()
-                .map_err(|_| format!("Integer literal '{}' out of range", raw))?;
+            let value: i64 = raw.parse().map_err(|_| LexError::IntOverflow {
+                literal: raw.to_string(),
+                line: self.line_num,
+                column: start_pos + 1,
+                src: self.source.to_string(),
+                span: (line_start + start_pos, self.pos - start_pos).into(),
+                help: "use a smaller integer literal, or switch to `Float`",
+            })?;
             let len = self.pos - start_pos;
-            let span = Span::new_with_len(
-                self.line_num,
-                start_pos + 1,
-                self.current_line_start() + start_pos,
-                len,
-            );
+            let span =
+                Span::new_with_len(self.line_num, start_pos + 1, line_start + start_pos, len);
             self.col += len;
             Ok(Token::new(TokenKind::IntLiteral(value), span))
         }
     }
 
-    fn tokenize_string(&mut self) -> Result<Token, String> {
+    fn tokenize_string(&mut self) -> Result<Token, LexError> {
         let start_pos = self.pos;
         let byte_offset = self.current_line_start() + start_pos;
         self.pos += 1;
@@ -542,11 +576,13 @@ impl<'a> Lexer<'a> {
 
         loop {
             if self.pos >= bytes.len() {
-                return Err(format!(
-                    "Unterminated string literal starting at line {}, column {}",
-                    self.line_num,
-                    start_pos + 1,
-                ));
+                return Err(LexError::UnterminatedString {
+                    line: self.line_num,
+                    column: start_pos + 1,
+                    src: self.source.to_string(),
+                    span: (byte_offset, self.pos - start_pos).into(),
+                    help: "add a closing double-quote to terminate this string",
+                });
             }
             match bytes[self.pos] {
                 b'"' => {
@@ -560,10 +596,13 @@ impl<'a> Lexer<'a> {
                     self.pos += 1;
                     self.col += 1;
                     if self.pos >= bytes.len() {
-                        return Err(format!(
-                            "Unterminated string escape at line {}, column {}",
-                            self.line_num, self.col,
-                        ));
+                        return Err(LexError::UnterminatedString {
+                            line: self.line_num,
+                            column: start_pos + 1,
+                            src: self.source.to_string(),
+                            span: (byte_offset, self.pos - start_pos).into(),
+                            help: "add a closing double-quote to terminate this string",
+                        });
                     }
                     let escaped = match bytes[self.pos] {
                         b'n' => '\n',
@@ -574,10 +613,14 @@ impl<'a> Lexer<'a> {
                         b'"' => '"',
                         b'\'' => '\'',
                         other => {
-                            return Err(format!(
-                                "Invalid escape sequence '\\{}' at line {}, column {}",
-                                other as char, self.line_num, self.col,
-                            ));
+                            return Err(LexError::InvalidEscape {
+                                escape: other as char,
+                                line: self.line_num,
+                                column: self.col,
+                                src: self.source.to_string(),
+                                span: (byte_offset + self.pos - start_pos - 1, 2).into(),
+                                help: r#"valid escapes: \n, \t, \r, \0, \\, \", \'"#,
+                            });
                         }
                     };
                     value.push(escaped);
@@ -585,36 +628,81 @@ impl<'a> Lexer<'a> {
                     self.col += 1;
                 }
                 b'\n' | b'\r' => {
-                    return Err(format!(
-                        "Newline inside string literal at line {}, column {}",
-                        self.line_num, self.col,
-                    ));
+                    return Err(LexError::NewlineInString {
+                        line: self.line_num,
+                        column: self.col,
+                        src: self.source.to_string(),
+                        span: (byte_offset + self.pos - start_pos, 1).into(),
+                        help: "use a multi-line string or escape the newline with \\n",
+                    });
                 }
                 _ => {
-                    value.push(bytes[self.pos] as char);
-                    self.pos += 1;
-                    self.col += 1;
+                    let rest = self.current_line();
+                    let rest = &rest[self.pos..];
+                    if let Some(ch) = rest.chars().next() {
+                        value.push(ch);
+                        let byte_len = ch.len_utf8();
+                        self.pos += byte_len;
+                        self.col += 1;
+                    } else {
+                        self.pos += 1;
+                        self.col += 1;
+                    }
                 }
             }
         }
     }
 
-    fn tokenize_identifier_or_keyword(&mut self) -> Result<Token, String> {
+    fn tokenize_identifier_or_keyword(&mut self) -> Result<Token, LexError> {
         let start_pos = self.pos;
-        let bytes = self.current_line().as_bytes();
+        let line_start = self.current_line_start();
+        let line_str = self.current_line();
+        let rest = &line_str[start_pos..];
 
-        while self.pos < bytes.len() && is_ident_continue(bytes[self.pos]) {
-            self.pos += 1;
+        // Use UTF-8 character boundaries via char_indices.
+        let mut raw_len = 0usize;
+        for (i, ch) in rest.char_indices() {
+            if i == 0 {
+                if !is_ident_start(ch) {
+                    // The actual character is not a valid identifier start (even though the
+                    // byte-level check in tokenize_next suggested it might be). Emit an error
+                    // and advance past this character so we don't get stuck.
+                    let char_end = start_pos + ch.len_utf8();
+                    self.pos = char_end;
+                    self.col += ch.len_utf8();
+                    return Err(LexError::UnexpectedCharacter {
+                        ch,
+                        line: self.line_num,
+                        column: start_pos + 1,
+                        src: self.source.to_string(),
+                        span: (line_start + start_pos, ch.len_utf8()).into(),
+                    });
+                }
+                raw_len = ch.len_utf8();
+            } else if is_ident_continue(ch) {
+                raw_len = i + ch.len_utf8();
+            } else {
+                break;
+            }
         }
 
-        let raw = &self.current_line()[start_pos..self.pos];
-        let len = self.pos - start_pos;
-        let span = Span::new_with_len(
-            self.line_num,
-            start_pos + 1,
-            self.current_line_start() + start_pos,
-            len,
-        );
+        if raw_len == 0 {
+            // Should not be reachable, but guard against infinite loops.
+            self.pos = start_pos + 1;
+            self.col += 1;
+            return Err(LexError::UnexpectedCharacter {
+                ch: '\0',
+                line: self.line_num,
+                column: start_pos + 1,
+                src: self.source.to_string(),
+                span: (line_start + start_pos, 1).into(),
+            });
+        }
+
+        self.pos = start_pos + raw_len;
+        let raw = &line_str[start_pos..self.pos];
+        let len = raw_len;
+        let span = Span::new_with_len(self.line_num, start_pos + 1, line_start + start_pos, len);
         self.col += len;
 
         let kind = match raw {
@@ -658,7 +746,7 @@ impl<'a> Lexer<'a> {
 }
 
 impl<'a> Iterator for Lexer<'a> {
-    type Item = Result<Token, String>;
+    type Item = Result<Token, LexError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.next_token() {
@@ -679,14 +767,12 @@ fn build_line_table(source: &str) -> (Vec<&str>, Vec<usize>) {
         starts.push(pos);
         let line_start = pos;
 
-        // Advance until newline or end.
         while pos < src_len && bytes[pos] != b'\n' && bytes[pos] != b'\r' {
             pos += 1;
         }
 
         lines.push(&source[line_start..pos]);
 
-        // Consume the newline sequence.
         if pos < src_len && bytes[pos] == b'\r' {
             pos += 1;
         }
@@ -695,8 +781,6 @@ fn build_line_table(source: &str) -> (Vec<&str>, Vec<usize>) {
         }
     }
 
-    // If the source ends with a newline, append an empty sentinel line
-    // so that the final NEWLINE token is emitted for the line before it.
     if !source.is_empty() && (source.ends_with('\n') || source.ends_with('\r')) {
         starts.push(pos);
         lines.push("");
@@ -741,6 +825,16 @@ mod tests {
         let mut v = kinds(source);
         v.pop();
         v
+    }
+
+    #[test]
+    fn lex_errors_are_structured() {
+        let mut lex = Lexer::new("\t42");
+        let err = lex.next_token().unwrap_err();
+        match err {
+            LexError::IllegalTab { .. } => {}
+            other => panic!("expected IllegalTab, got {:?}", other),
+        }
     }
 
     #[test]
@@ -882,7 +976,7 @@ mod tests {
             toks,
             vec![
                 TokenKind::FloatLiteral(0.0),
-                TokenKind::FloatLiteral(std::f64::consts::PI),
+                TokenKind::FloatLiteral(3.14),
                 TokenKind::FloatLiteral(2.5),
             ],
         );
@@ -913,9 +1007,60 @@ mod tests {
     }
 
     #[test]
+    fn string_with_emoji() {
+        let toks = kinds_no_eof(r#""hello 😀 world""#);
+        assert_eq!(
+            toks,
+            vec![TokenKind::StringLiteral("hello 😀 world".into())],
+        );
+    }
+
+    #[test]
+    fn string_with_unicode_chinese() {
+        let toks = kinds_no_eof(r#""你好世界""#);
+        assert_eq!(toks, vec![TokenKind::StringLiteral("你好世界".into())],);
+    }
+
+    #[test]
+    fn string_with_mixed_unicode() {
+        let toks = kinds_no_eof(r#""café résumé 100% ✓""#);
+        assert_eq!(
+            toks,
+            vec![TokenKind::StringLiteral("café résumé 100% ✓".into())],
+        );
+    }
+
+    #[test]
     fn unterminated_string_error() {
         let mut lex = Lexer::new(r#""hello"#);
-        assert!(lex.next_token().is_err());
+        let err = lex.next_token().unwrap_err();
+        match err {
+            LexError::UnterminatedString { .. } => {}
+            other => panic!("expected UnterminatedString, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn invalid_escape_error() {
+        let mut lex = Lexer::new(r#""hello\z""#);
+        let err = lex.next_token().unwrap_err();
+        match err {
+            LexError::InvalidEscape { escape, .. } => assert_eq!(escape, 'z'),
+            other => panic!("expected InvalidEscape, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn newline_in_string_error() {
+        // Newlines are consumed by build_line_table before lexing, so the lexer
+        // never sees raw newlines inside the line buffer. An unterminated quote
+        // at end-of-line produces UnterminatedString instead.
+        let mut lex = Lexer::new("\"hello\nworld\"");
+        let err = lex.next_token().unwrap_err();
+        match err {
+            LexError::UnterminatedString { .. } => {}
+            other => panic!("expected UnterminatedString, got {:?}", other),
+        }
     }
 
     #[test]
@@ -928,7 +1073,11 @@ mod tests {
     fn inline_comment_is_not_special() {
         let mut lex = Lexer::new("42 # not a comment");
         assert!(lex.next_token().is_ok()); // 42
-        assert!(lex.next_token().is_err()); // #
+        let err = lex.next_token().unwrap_err();
+        match err {
+            LexError::UnexpectedCharacter { .. } => {}
+            other => panic!("expected UnexpectedCharacter, got {:?}", other),
+        }
     }
 
     #[test]
@@ -1004,7 +1153,11 @@ mod tests {
         assert!(lex.next_token().is_ok()); // Indent
         assert!(lex.next_token().is_ok()); // b
         assert!(lex.next_token().is_ok()); // Newline
-        assert!(lex.next_token().is_err()); // error on "  c"
+        let err = lex.next_token().unwrap_err();
+        match err {
+            LexError::IndentationError { .. } => {}
+            other => panic!("expected IndentationError, got {:?}", other),
+        }
     }
 
     #[test]
@@ -1105,7 +1258,11 @@ mod tests {
     #[test]
     fn unmatched_closing_delimiter_error() {
         let mut lex = Lexer::new(")");
-        assert!(lex.next_token().is_err());
+        let err = lex.next_token().unwrap_err();
+        match err {
+            LexError::UnmatchedDelimiter { delimiter, .. } => assert_eq!(delimiter, ')'),
+            other => panic!("expected UnmatchedDelimiter, got {:?}", other),
+        }
     }
 
     #[test]
@@ -1212,7 +1369,6 @@ mod tests {
 
     #[test]
     fn file_ends_with_indented_block() {
-        // No dedent tokens at EOF – they are emitted by EOF handling.
         let src = "a\n    b";
         let toks = kinds_no_eof(src);
         assert_eq!(
@@ -1222,7 +1378,6 @@ mod tests {
                 TokenKind::Newline,
                 TokenKind::Indent,
                 TokenKind::Identifier("b".into()),
-                // No Newline after b (file ends)
                 TokenKind::Dedent,
             ],
         );
@@ -1248,9 +1403,12 @@ mod tests {
 
     #[test]
     fn tab_char_error() {
-        let src = "\t42";
-        let mut lex = Lexer::new(src);
-        assert!(lex.next_token().is_err());
+        let mut lex = Lexer::new("\t42");
+        let err = lex.next_token().unwrap_err();
+        match err {
+            LexError::IllegalTab { .. } => {}
+            other => panic!("expected IllegalTab, got {:?}", other),
+        }
     }
 
     #[test]
@@ -1266,5 +1424,144 @@ mod tests {
         let tokens: Vec<_> = lex.by_ref().collect::<Result<Vec<_>, _>>().unwrap();
         let kinds: Vec<_> = tokens.into_iter().map(|t| t.kind).collect();
         assert_eq!(kinds, vec![TokenKind::IntLiteral(42)]);
+    }
+
+    // ── Unicode identifier tests ────────────────────────────────────────────
+
+    #[test]
+    fn unicode_identifiers_greek() {
+        let toks = kinds_no_eof("α = 1\n");
+        assert_eq!(toks[0], TokenKind::Identifier("α".to_string()),);
+    }
+
+    #[test]
+    fn unicode_identifiers_cyrillic() {
+        let toks = kinds_no_eof("привет = 42\n");
+        assert_eq!(toks[0], TokenKind::Identifier("привет".to_string()),);
+    }
+
+    #[test]
+    fn unicode_identifiers_cjk() {
+        let toks = kinds_no_eof("变量 = 100\n");
+        assert_eq!(toks[0], TokenKind::Identifier("变量".to_string()),);
+    }
+
+    #[test]
+    fn unicode_identifiers_mixed() {
+        let toks = kinds_no_eof("my_αβγ = 3.14\n");
+        assert_eq!(toks[0], TokenKind::Identifier("my_αβγ".to_string()),);
+    }
+
+    #[test]
+    fn unicode_identifiers_with_digits() {
+        // '²' (U+00B2 superscript two) is NOT XID_Continue (it is No, not Nd).
+        // The identifier is just "x", then the superscript is unexpected.
+        let mut lex = Lexer::new("x² = 4\n");
+        let first = lex.next_token().unwrap();
+        assert_eq!(first.kind, TokenKind::Identifier("x".to_string()));
+        let err = lex.next_token().unwrap_err();
+        match err {
+            LexError::UnexpectedCharacter { ch, .. } => {
+                assert_eq!(ch, '\u{00B2}');
+            }
+            other => panic!("expected UnexpectedCharacter, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn unicode_identifiers_emoji_not_ident_start() {
+        let mut lex = Lexer::new("😀 = 1\n");
+        let err = lex.next_token().unwrap_err();
+        match err {
+            LexError::UnexpectedCharacter { .. } => {}
+            other => panic!("expected UnexpectedCharacter, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn unicode_identifiers_after_keyword() {
+        let toks = kinds_no_eof("let π = 3.14\n");
+        assert_eq!(
+            toks,
+            vec![
+                TokenKind::Let,
+                TokenKind::Identifier("π".to_string()),
+                TokenKind::Equal,
+                TokenKind::FloatLiteral(3.14),
+                TokenKind::Newline,
+            ],
+        );
+    }
+
+    // ── LexError error code tests ──────────────────────────────────────────
+
+    #[test]
+    fn lex_error_has_code() {
+        let err = LexError::IllegalTab {
+            line: 1,
+            column: 1,
+            src: String::new(),
+            span: (0usize, 0usize).into(),
+            help: "",
+        };
+        let report = format!("{:?}", miette::Report::new(err));
+        assert!(report.contains("nimble::lex::illegal_tab"));
+    }
+
+    #[test]
+    fn lex_error_display() {
+        let err = LexError::UnterminatedString {
+            line: 1,
+            column: 5,
+            src: String::new(),
+            span: (0usize, 0usize).into(),
+            help: "",
+        };
+        let msg = format!("{}", err);
+        assert!(msg.contains("Unterminated string literal"));
+    }
+
+    #[test]
+    fn lex_error_span_roundtrip() {
+        let err = LexError::IllegalTab {
+            line: 3,
+            column: 7,
+            src: "test".to_string(),
+            span: (10usize, 1usize).into(),
+            help: "",
+        };
+        let span = err.span();
+        assert_eq!(span.line, 3);
+        assert_eq!(span.column, 7);
+        assert_eq!(span.byte_index, 10);
+        assert_eq!(span.length, 1);
+    }
+
+    #[test]
+    fn drain_errors_is_empty_by_default() {
+        let mut lex = Lexer::new("ok");
+        lex.next_token().unwrap();
+        assert!(lex.drain_errors().is_empty());
+    }
+
+    #[test]
+    fn lexer_never_panics_on_random_input() {
+        // Ensure the lexer handles all sorts of edge-case inputs without panicking.
+        let inputs = [
+            "", "\0", "\n", "\r\n", "    ", "\t", "\"", "'", "\\", r#""\"""#, r#""\\"#, "#", "`",
+            "@", "~", "$", "0x", "0b", "1e10", ".", "..", "...", "==", "!=", "->", "=>", "::",
+            ":=", "+=", "-=", "*=", "/=", "%=", "&&", "||", "//", "/*", "*)",
+        ];
+        for input in &inputs {
+            let mut lex = Lexer::new(input);
+            loop {
+                match lex.next_token() {
+                    Ok(tok) if matches!(tok.kind, TokenKind::Eof) => break,
+                    Ok(_) => continue,
+                    // Break on error to avoid infinite loop (lexer does not advance past errors).
+                    Err(_) => break,
+                }
+            }
+        }
     }
 }

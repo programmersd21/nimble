@@ -4,27 +4,46 @@
 
 ### 1. Lexing
 
-`Lexer::new(source)` tokenizes the source string into a flat stream of `Token` values with positional `Span` information. Indentation is tracked via an internal stack, producing `Indent` / `Dedent` tokens for blocks.
+`Lexer::new(source)` tokenizes the source string into a flat stream of `Token` values with positional `Span` information. Indentation is tracked via an internal stack, producing `Indent` / `Dedent` tokens for blocks. Supports full UTF-8 Unicode identifiers (XID_Start/XID_Continue). Structured `LexError` recovery via `drain_errors()` — the lexer never hard-panics on malformed input.
 
 ```
-Source chars -> Lexer -> Token stream
+Source chars -> Lexer -> Token stream + Vec<LexError>
 ```
 
 ### 2. Parsing
 
-`Parser::new(source)` consumes the token stream and builds an AST (`Program`). Expression parsing uses Pratt-style precedence climbing.
+`Parser::new(source)` consumes the token stream and builds an AST (`Program`). Expression parsing uses Pratt-style precedence climbing. Features **panic-mode error recovery**: when a statement fails to parse, the error is recorded, the parser skips to the next sync token (`Newline`, `Dedent`, or `Eof`), and parsing continues. All accumulated errors are available via `drain_parse_errors()`.
 
 ```
-Token stream -> Parser -> AST (Program)
+Token stream -> Parser -> AST (Program) + Vec<ParseError>
 ```
 
-### 3. Type Checking
+### 3. HIR Lowering
 
-`TypeChecker::check_program(program)` performs semantic analysis in two passes:
-- **Pass 1**: Register all top-level function signatures.
-- **Pass 2**: Type-check all function bodies against registered signatures.
+`lower_program(&program)` transforms the AST into a High-level Intermediate Representation (`HirProgram`). The HIR removes semantically transparent wrappers (e.g. `Grouping` expressions) while preserving all `Span` information for diagnostics and codegen. Every AST node type has a corresponding HIR variant.
 
-The checker handles:
+```
+AST -> HIR Lowering -> HirProgram
+```
+
+### 4. Name Resolution
+
+`Resolver::resolve(&program)` performs two-pass name resolution:
+- **Pass 1 (collect_definitions)**: Walks the AST, assigns a unique `DefId` to every definition (functions, variables, structs, interfaces, parameters, builtins), and tracks lexical scopes with proper nesting for `if`/`while`/`for`/`defer`/function bodies.
+- **Pass 2 (resolve_references)**: Rebuilds scope chains and resolves every identifier reference to its `DefId`. Reports `UndefinedVariable` and `DuplicateDefinition` errors.
+
+Returns a `ResolvedProgram` with:
+- `resolved: HashMap<usize, DefId>` — maps byte_index to definition
+- `definitions: Vec<Def>` — all definitions with name, kind, span, mutability
+- `lookup(name)` / `lookup_by_span(span)` / `get_def(id)` — query APIs
+
+```
+AST -> Resolver -> ResolvedProgram + Vec<ResolveError>
+```
+
+### 5. Type Checking
+
+`TypeChecker::check_program(program, resolved)` performs semantic analysis using the resolved definitions:
 - Hindley-Milner type inference with unification
 - Generic function monomorphization (fresh type variables per instantiation)
 - Enum variant resolution and pattern matching type checking
@@ -37,10 +56,10 @@ The checker handles:
 Returns an `Environment` mapping every name to its resolved `Symbol`.
 
 ```
-AST -> TypeChecker -> Environment + Subst
+ResolvedProgram -> TypeChecker -> Environment + Subst + Vec<TypeError>
 ```
 
-### 4. Code Generation
+### 6. Code Generation
 
 `Codegen::generate(program, env)` emits textual LLVM IR (`.ll` format). Built-in type mapping:
 

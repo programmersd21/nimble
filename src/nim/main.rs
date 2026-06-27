@@ -11,7 +11,7 @@ use manager::{PackageManager, ProjectManifest};
 #[command(
     name    = "nim",
     version,
-    about   = "Nimble package manager – install libraries and standalone binaries"
+    about   = "Nimble package manager - install libraries and standalone binaries"
 )]
 struct Cli {
     #[command(subcommand)]
