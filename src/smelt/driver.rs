@@ -23,6 +23,12 @@ pub struct CompileOptions {
     pub keep_temps: bool,
     /// Whether to run the compiled executable immediately.
     pub run_after: bool,
+    /// Optimization level (0-3). Default: 2.
+    pub opt_level: u8,
+    /// Include debug info (-g).
+    pub debug: bool,
+    /// Enable link-time optimization (LTO).
+    pub lto: bool,
 }
 
 impl Default for CompileOptions {
@@ -35,6 +41,9 @@ impl Default for CompileOptions {
             runtime_dir: None,
             keep_temps: false,
             run_after: false,
+            opt_level: 2,
+            debug: false,
+            lto: false,
         }
     }
 }
@@ -288,11 +297,23 @@ pub fn compile(source: &str, options: &CompileOptions) -> Result<(), String> {
             .map_err(|e| format!("failed to write IR: {}", e))?;
     }
 
-    let clang_status = Command::new("clang")
-        .arg("-c")
-        .arg("-o")
-        .arg(&obj_path)
-        .arg(&ir_path)
+    let mut clang_cmd = Command::new("clang");
+    clang_cmd.arg("-c").arg("-o").arg(&obj_path).arg(&ir_path);
+    match options.opt_level {
+        0 => clang_cmd.arg("-O0"),
+        1 => clang_cmd.arg("-O1"),
+        2 => clang_cmd.arg("-O2"),
+        3 => clang_cmd.arg("-O3"),
+        _ => clang_cmd.arg("-O2"),
+    };
+    if options.debug {
+        clang_cmd.arg("-g");
+    }
+    if options.lto {
+        clang_cmd.arg("-flto");
+    }
+
+    let clang_status = clang_cmd
         .status()
         .map_err(|e| format!("failed to invoke clang: {} (is LLVM/clang installed?)", e))?;
 

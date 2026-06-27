@@ -237,44 +237,37 @@ async fn main() -> Result<()> {
         }
         Commands::Install { target } => {
             let (url, version) = split_target(&target)?;
-            nimble::nim::commands::install_binary(url, version)
-                .map_err(|e| miette::miette!(e))?;
+            nimble::nim::commands::install_binary(url, version).map_err(|e| miette::miette!(e))?;
         }
         Commands::Uninstall { name } => {
-            nimble::nim::commands::uninstall_binary(&name)
-                .map_err(|e| miette::miette!(e))?;
+            nimble::nim::commands::uninstall_binary(&name).map_err(|e| miette::miette!(e))?;
         }
         Commands::Upgrade { target } => {
             let (url, version) = split_target(&target)?;
-            nimble::nim::commands::uninstall_binary(url)
-                .map_err(|e| miette::miette!(e))?;
-            nimble::nim::commands::install_binary(url, version)
-                .map_err(|e| miette::miette!(e))?;
+            nimble::nim::commands::uninstall_binary(url).map_err(|e| miette::miette!(e))?;
+            nimble::nim::commands::install_binary(url, version).map_err(|e| miette::miette!(e))?;
         }
-        Commands::Pkg { action } => {
-            match action {
-                PkgAction::Install { target } => {
-                    let (url, version) = split_target(&target)?;
-                    nimble::nim::commands::install_pkg_library(url, version)
-                        .map_err(|e| miette::miette!(e))?;
-                }
-                PkgAction::Uninstall { target } => {
-                    let (url, version) = split_target(&target)?;
-                    nimble::nim::commands::uninstall_pkg_library(url, version)
-                        .map_err(|e| miette::miette!(e))?;
-                }
-                PkgAction::Upgrade { target } => {
-                    let (url, version) = split_target(&target)?;
-                    nimble::nim::commands::uninstall_pkg_library(url, version)
-                        .map_err(|e| miette::miette!(e))?;
-                    nimble::nim::commands::install_pkg_library(url, version)
-                        .map_err(|e| miette::miette!(e))?;
-                }
+        Commands::Pkg { action } => match action {
+            PkgAction::Install { target } => {
+                let (url, version) = split_target(&target)?;
+                nimble::nim::commands::install_pkg_library(url, version)
+                    .map_err(|e| miette::miette!(e))?;
             }
-        }
+            PkgAction::Uninstall { target } => {
+                let (url, version) = split_target(&target)?;
+                nimble::nim::commands::uninstall_pkg_library(url, version)
+                    .map_err(|e| miette::miette!(e))?;
+            }
+            PkgAction::Upgrade { target } => {
+                let (url, version) = split_target(&target)?;
+                nimble::nim::commands::uninstall_pkg_library(url, version)
+                    .map_err(|e| miette::miette!(e))?;
+                nimble::nim::commands::install_pkg_library(url, version)
+                    .map_err(|e| miette::miette!(e))?;
+            }
+        },
         Commands::Fetch { path } => {
-            nimble::nim::commands::fetch_deps(&path)
-                .map_err(|e| miette::miette!(e))?;
+            nimble::nim::commands::fetch_deps(&path).map_err(|e| miette::miette!(e))?;
         }
         Commands::Doc { path, output_dir } => {
             let mut docgen = nimble::docgen::DocGenerator::new();

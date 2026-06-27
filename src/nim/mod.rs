@@ -42,7 +42,12 @@ mod tests {
         let mut m = ProjectManifest::default_for("testproj", &dir);
         m.add_dependency(Dependency {
             name: "mylib".into(),
-            source: DepSource::Git { url: "https://github.com/user/mylib".into(), tag: Some("v1.0".into()), branch: None, rev: None },
+            source: DepSource::Git {
+                url: "https://github.com/user/mylib".into(),
+                tag: Some("v1.0".into()),
+                branch: None,
+                rev: None,
+            },
             features: vec![],
         });
         m.save().unwrap();
@@ -58,11 +63,11 @@ mod tests {
 /// Recursively copy a directory (used by commands)
 pub fn copy_dir(src: &Path, dst: &Path) -> Result<(), String> {
     if src.is_file() {
-        std::fs::copy(src, dst).map_err(|e| format!("copy {} -> {}: {}", src.display(), dst.display(), e))?;
+        std::fs::copy(src, dst)
+            .map_err(|e| format!("copy {} -> {}: {}", src.display(), dst.display(), e))?;
         return Ok(());
     }
-    std::fs::create_dir_all(dst)
-        .map_err(|e| format!("cannot create {}: {}", dst.display(), e))?;
+    std::fs::create_dir_all(dst).map_err(|e| format!("cannot create {}: {}", dst.display(), e))?;
     for entry in std::fs::read_dir(src).map_err(|e| format!("read_dir {}: {}", src.display(), e))? {
         let entry = entry.map_err(|e| format!("entry: {}", e))?;
         let file_type = entry.file_type().map_err(|e| format!("file_type: {}", e))?;
@@ -71,8 +76,14 @@ pub fn copy_dir(src: &Path, dst: &Path) -> Result<(), String> {
         if file_type.is_dir() {
             copy_dir(&src_path, &dst_path)?;
         } else {
-            std::fs::copy(&src_path, &dst_path)
-                .map_err(|e| format!("copy {} -> {}: {}", src_path.display(), dst_path.display(), e))?;
+            std::fs::copy(&src_path, &dst_path).map_err(|e| {
+                format!(
+                    "copy {} -> {}: {}",
+                    src_path.display(),
+                    dst_path.display(),
+                    e
+                )
+            })?;
         }
     }
     Ok(())

@@ -1,5 +1,5 @@
-use std::path::{Path, PathBuf};
 use crate::nim::error::{NimError, NimResult};
+use std::path::{Path, PathBuf};
 
 pub struct PackageCache {
     root: PathBuf,
@@ -16,10 +16,18 @@ impl PackageCache {
         PackageCache { root }
     }
 
-    pub fn cache_dir(&self) -> &Path { &self.root }
-    pub fn bin_dir(&self) -> PathBuf { self.root.join("bin") }
-    pub fn repos_dir(&self) -> PathBuf { self.root.join("cache").join("repos") }
-    pub fn pkgs_dir(&self) -> PathBuf { self.root.join("cache").join("pkgs") }
+    pub fn cache_dir(&self) -> &Path {
+        &self.root
+    }
+    pub fn bin_dir(&self) -> PathBuf {
+        self.root.join("bin")
+    }
+    pub fn repos_dir(&self) -> PathBuf {
+        self.root.join("cache").join("repos")
+    }
+    pub fn pkgs_dir(&self) -> PathBuf {
+        self.root.join("cache").join("pkgs")
+    }
 
     pub fn ensure_dirs(&self) -> NimResult<()> {
         for d in &[self.bin_dir(), self.repos_dir(), self.pkgs_dir()] {
@@ -39,7 +47,11 @@ impl PackageCache {
     }
 
     pub fn bin_path(&self, name: &str) -> PathBuf {
-        let exe = if cfg!(windows) { format!("{}.exe", name) } else { name.to_string() };
+        let exe = if cfg!(windows) {
+            format!("{}.exe", name)
+        } else {
+            name.to_string()
+        };
         self.bin_dir().join(exe)
     }
 
@@ -76,8 +88,18 @@ mod tests {
     #[test]
     fn cache_paths() {
         let cache = PackageCache::with_root(PathBuf::from("/tmp/.nimble"));
-        assert!(cache.repo_cache("https://github.com/user/repo").to_string_lossy().contains("user_repo"));
-        assert!(cache.pkg_cache("mylib", "1.0.0").to_string_lossy().contains("mylib@1.0.0"));
+        assert!(
+            cache
+                .repo_cache("https://github.com/user/repo")
+                .to_string_lossy()
+                .contains("user_repo")
+        );
+        assert!(
+            cache
+                .pkg_cache("mylib", "1.0.0")
+                .to_string_lossy()
+                .contains("mylib@1.0.0")
+        );
         let bin = cache.bin_path("mybin");
         #[cfg(windows)]
         assert!(bin.to_string_lossy().ends_with("mybin.exe"));

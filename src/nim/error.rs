@@ -22,7 +22,11 @@ pub enum NimError {
     Git { detail: String },
 
     #[error("git clone failed for `{url}` @ `{refspec}`: {detail}")]
-    GitClone { url: String, refspec: String, detail: String },
+    GitClone {
+        url: String,
+        refspec: String,
+        detail: String,
+    },
 
     #[error("git fetch failed for `{url}`: {detail}")]
     GitFetch { url: String, detail: String },
@@ -37,7 +41,11 @@ pub enum NimError {
     CycleDetected { cycle: String },
 
     #[error("version conflict for `{name}`: requires {required}, but {existing} already resolved")]
-    VersionConflict { name: String, required: String, existing: String },
+    VersionConflict {
+        name: String,
+        required: String,
+        existing: String,
+    },
 
     #[error("cache error: {detail}")]
     Cache { detail: String },
@@ -60,22 +68,38 @@ pub enum NimError {
 
 impl NimError {
     pub fn file_read(path: impl Into<PathBuf>, detail: String) -> Self {
-        NimError::FileRead { path: path.into(), detail }
+        NimError::FileRead {
+            path: path.into(),
+            detail,
+        }
     }
     pub fn file_write(path: impl Into<PathBuf>, detail: String) -> Self {
-        NimError::FileWrite { path: path.into(), detail }
+        NimError::FileWrite {
+            path: path.into(),
+            detail,
+        }
     }
     pub fn invalid_manifest(path: impl Into<PathBuf>, detail: String) -> Self {
-        NimError::InvalidManifest { path: path.into(), detail }
+        NimError::InvalidManifest {
+            path: path.into(),
+            detail,
+        }
     }
     pub fn missing_field(field: String, path: impl Into<PathBuf>) -> Self {
-        NimError::MissingField { field, path: path.into() }
+        NimError::MissingField {
+            field,
+            path: path.into(),
+        }
     }
     pub fn git(detail: String) -> Self {
         NimError::Git { detail }
     }
     pub fn git_clone(url: String, refspec: String, detail: String) -> Self {
-        NimError::GitClone { url, refspec, detail }
+        NimError::GitClone {
+            url,
+            refspec,
+            detail,
+        }
     }
     pub fn cache(detail: String) -> Self {
         NimError::Cache { detail }

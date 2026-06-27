@@ -1,11 +1,16 @@
+use crate::nim::error::{NimError, NimResult};
+use serde::Deserialize;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use serde::Deserialize;
-use crate::nim::error::{NimError, NimResult};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum DepSource {
-    Git { url: String, tag: Option<String>, branch: Option<String>, rev: Option<String> },
+    Git {
+        url: String,
+        tag: Option<String>,
+        branch: Option<String>,
+        rev: Option<String>,
+    },
     Path(PathBuf),
     Version(String),
 }
@@ -38,7 +43,9 @@ pub struct ProjectSection {
     pub readme: Option<String>,
 }
 
-fn default_entry() -> String { "src/main.nbl".to_string() }
+fn default_entry() -> String {
+    "src/main.nbl".to_string()
+}
 
 #[derive(Debug, Clone)]
 pub struct DepEntry {
@@ -63,7 +70,13 @@ pub struct Profile {
 
 impl Default for Profile {
     fn default() -> Self {
-        Profile { opt_level: None, lto: None, strip: None, debug: None, panic: None }
+        Profile {
+            opt_level: None,
+            lto: None,
+            strip: None,
+            debug: None,
+            panic: None,
+        }
     }
 }
 
@@ -87,13 +100,16 @@ impl ProjectManifest {
     }
 
     pub fn parse(path: &Path, raw: &str) -> NimResult<Self> {
-        let raw_val: toml::Value = toml::from_str(raw)
-            .map_err(|e| NimError::invalid_manifest(path, e.to_string()))?;
+        let raw_val: toml::Value =
+            toml::from_str(raw).map_err(|e| NimError::invalid_manifest(path, e.to_string()))?;
 
-        let project: ProjectSection = raw_val.get("project")
+        let project: ProjectSection = raw_val
+            .get("project")
             .ok_or_else(|| NimError::missing_field("project".to_string(), path))
-            .and_then(|v| ProjectSection::deserialize(v.clone())
-                .map_err(|e| NimError::invalid_manifest(path, e.to_string())))?;
+            .and_then(|v| {
+                ProjectSection::deserialize(v.clone())
+                    .map_err(|e| NimError::invalid_manifest(path, e.to_string()))
+            })?;
 
         let dependencies = parse_dep_table(raw_val.get("dependencies"), path)?;
         let dev_dependencies = parse_dep_table(raw_val.get("dev-dependencies"), path)?;
@@ -133,7 +149,10 @@ impl ProjectManifest {
             dependencies: vec![],
             dev_dependencies: vec![],
             build_dependencies: vec![],
-            features: FeaturesSection { default: vec![], optional: HashMap::new() },
+            features: FeaturesSection {
+                default: vec![],
+                optional: HashMap::new(),
+            },
             profiles: HashMap::new(),
         }
     }
@@ -157,30 +176,59 @@ impl ProjectManifest {
             out.push_str(&format!("license = \"{}\"\n", v));
         }
         if !self.project.authors.is_empty() {
-            let authors: String = self.project.authors.iter().map(|a| format!("\"{}\"", a)).collect::<Vec<_>>().join(", ");
+            let authors: String = self
+                .project
+                .authors
+                .iter()
+                .map(|a| format!("\"{}\"", a))
+                .collect::<Vec<_>>()
+                .join(", ");
             out.push_str(&format!("authors = [{}]\n", authors));
         }
 
         fn write_deps(out: &mut String, deps: &[Dependency], key: &str) {
-            if deps.is_empty() { return; }
+            if deps.is_empty() {
+                return;
+            }
             out.push_str(&format!("\n[{}]\n", key));
             for dep in deps {
                 match &dep.source {
                     DepSource::Path(p) => {
                         out.push_str(&format!("{} = {{ path = \"{}\"", dep.name, p.display()));
                         if !dep.features.is_empty() {
-                            let feats: String = dep.features.iter().map(|f| format!("\"{}\"", f)).collect::<Vec<_>>().join(", ");
+                            let feats: String = dep
+                                .features
+                                .iter()
+                                .map(|f| format!("\"{}\"", f))
+                                .collect::<Vec<_>>()
+                                .join(", ");
                             out.push_str(&format!(", features = [{}]", feats));
                         }
                         out.push_str(" }\n");
                     }
-                    DepSource::Git { url, tag, branch, rev } => {
+                    DepSource::Git {
+                        url,
+                        tag,
+                        branch,
+                        rev,
+                    } => {
                         out.push_str(&format!("{} = {{ git = \"{}\"", dep.name, url));
-                        if let Some(t) = tag { out.push_str(&format!(", tag = \"{}\"", t)); }
-                        if let Some(b) = branch { out.push_str(&format!(", branch = \"{}\"", b)); }
-                        if let Some(r) = rev { out.push_str(&format!(", rev = \"{}\"", r)); }
+                        if let Some(t) = tag {
+                            out.push_str(&format!(", tag = \"{}\"", t));
+                        }
+                        if let Some(b) = branch {
+                            out.push_str(&format!(", branch = \"{}\"", b));
+                        }
+                        if let Some(r) = rev {
+                            out.push_str(&format!(", rev = \"{}\"", r));
+                        }
                         if !dep.features.is_empty() {
-                            let feats: String = dep.features.iter().map(|f| format!("\"{}\"", f)).collect::<Vec<_>>().join(", ");
+                            let feats: String = dep
+                                .features
+                                .iter()
+                                .map(|f| format!("\"{}\"", f))
+                                .collect::<Vec<_>>()
+                                .join(", ");
                             out.push_str(&format!(", features = [{}]", feats));
                         }
                         out.push_str(" }\n");
@@ -199,11 +247,21 @@ impl ProjectManifest {
         if !self.features.default.is_empty() || !self.features.optional.is_empty() {
             out.push_str("\n[features]\n");
             if !self.features.default.is_empty() {
-                let defs: String = self.features.default.iter().map(|f| format!("\"{}\"", f)).collect::<Vec<_>>().join(", ");
+                let defs: String = self
+                    .features
+                    .default
+                    .iter()
+                    .map(|f| format!("\"{}\"", f))
+                    .collect::<Vec<_>>()
+                    .join(", ");
                 out.push_str(&format!("default = [{}]\n", defs));
             }
             for (name, deps) in &self.features.optional {
-                let dep_str: String = deps.iter().map(|d| format!("\"{}\"", d)).collect::<Vec<_>>().join(", ");
+                let dep_str: String = deps
+                    .iter()
+                    .map(|d| format!("\"{}\"", d))
+                    .collect::<Vec<_>>()
+                    .join(", ");
                 out.push_str(&format!("{} = [{}]\n", name, dep_str));
             }
         }
@@ -221,7 +279,9 @@ impl ProjectManifest {
         let len = self.dependencies.len();
         self.dependencies.retain(|d| d.name != name);
         if self.dependencies.len() == len {
-            return Err(NimError::DepNotFound { name: name.to_string() });
+            return Err(NimError::DepNotFound {
+                name: name.to_string(),
+            });
         }
         Ok(())
     }
@@ -229,19 +289,30 @@ impl ProjectManifest {
 
 fn parse_dep_table(val: Option<&toml::Value>, path: &Path) -> NimResult<Vec<Dependency>> {
     let Some(val) = val else { return Ok(vec![]) };
-    let table = val.as_table().ok_or_else(|| NimError::invalid_manifest(path, "expected a table".to_string()))?;
+    let table = val
+        .as_table()
+        .ok_or_else(|| NimError::invalid_manifest(path, "expected a table".to_string()))?;
     let mut deps = vec![];
     for (name, v) in table {
         match v {
             toml::Value::String(s) => {
                 let source = if looks_like_git_url(s) {
-                    DepSource::Git { url: s.clone(), tag: None, branch: None, rev: None }
+                    DepSource::Git {
+                        url: s.clone(),
+                        tag: None,
+                        branch: None,
+                        rev: None,
+                    }
                 } else if looks_like_path(s) {
                     DepSource::Path(PathBuf::from(s.clone()))
                 } else {
                     DepSource::Version(s.clone())
                 };
-                deps.push(Dependency { name: name.clone(), source, features: vec![] });
+                deps.push(Dependency {
+                    name: name.clone(),
+                    source,
+                    features: vec![],
+                });
             }
             toml::Value::Table(t) => {
                 let source = if let Some(git) = t.get("git").and_then(|v| v.as_str()) {
@@ -254,16 +325,34 @@ fn parse_dep_table(val: Option<&toml::Value>, path: &Path) -> NimResult<Vec<Depe
                 } else if let Some(p) = t.get("path").and_then(|v| v.as_str()) {
                     DepSource::Path(PathBuf::from(p))
                 } else {
-                    return Err(NimError::invalid_manifest(path, format!("dependency `{}` must have `git`, `path`, or be a version string", name)));
+                    return Err(NimError::invalid_manifest(
+                        path,
+                        format!(
+                            "dependency `{}` must have `git`, `path`, or be a version string",
+                            name
+                        ),
+                    ));
                 };
-                let features = t.get("features")
+                let features = t
+                    .get("features")
                     .and_then(|v| v.as_array())
-                    .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+                    .map(|a| {
+                        a.iter()
+                            .filter_map(|v| v.as_str().map(String::from))
+                            .collect()
+                    })
                     .unwrap_or_default();
-                deps.push(Dependency { name: name.clone(), source, features });
+                deps.push(Dependency {
+                    name: name.clone(),
+                    source,
+                    features,
+                });
             }
             _ => {
-                return Err(NimError::invalid_manifest(path, format!("dependency `{}` must be a string or table", name)));
+                return Err(NimError::invalid_manifest(
+                    path,
+                    format!("dependency `{}` must be a string or table", name),
+                ));
             }
         }
     }
@@ -271,17 +360,42 @@ fn parse_dep_table(val: Option<&toml::Value>, path: &Path) -> NimResult<Vec<Depe
 }
 
 fn parse_features(val: Option<&toml::Value>, _path: &Path) -> FeaturesSection {
-    let Some(val) = val else { return FeaturesSection { default: vec![], optional: HashMap::new() } };
-    let table = match val.as_table() { Some(t) => t, None => return FeaturesSection { default: vec![], optional: HashMap::new() } };
+    let Some(val) = val else {
+        return FeaturesSection {
+            default: vec![],
+            optional: HashMap::new(),
+        };
+    };
+    let table = match val.as_table() {
+        Some(t) => t,
+        None => {
+            return FeaturesSection {
+                default: vec![],
+                optional: HashMap::new(),
+            };
+        }
+    };
     let mut optional = HashMap::new();
-    let default = table.get("default")
+    let default = table
+        .get("default")
         .and_then(|v| v.as_array())
-        .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+        .map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect()
+        })
         .unwrap_or_default();
     for (k, v) in table {
-        if k == "default" { continue; }
-        let deps = v.as_array()
-            .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+        if k == "default" {
+            continue;
+        }
+        let deps = v
+            .as_array()
+            .map(|a| {
+                a.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
             .unwrap_or_default();
         optional.insert(k.clone(), deps);
     }
@@ -345,7 +459,8 @@ full = ["json", "http"]
 
     #[test]
     fn parse_missing_project_section() {
-        let err = ProjectManifest::parse(Path::new("test.toml"), "[dependencies]\nx = \"y\"").unwrap_err();
+        let err = ProjectManifest::parse(Path::new("test.toml"), "[dependencies]\nx = \"y\"")
+            .unwrap_err();
         assert!(matches!(err, NimError::MissingField { .. }));
     }
 
@@ -354,7 +469,8 @@ full = ["json", "http"]
         let dir = std::env::temp_dir().join("nim_test_manifest");
         let _ = std::fs::create_dir_all(&dir);
         let mut f = std::fs::File::create(dir.join("nimble.toml")).unwrap();
-        f.write_all(b"[project]\nname = \"foo\"\nversion = \"0.2.1\"\n").unwrap();
+        f.write_all(b"[project]\nname = \"foo\"\nversion = \"0.2.1\"\n")
+            .unwrap();
         let m = ProjectManifest::load(&dir).unwrap();
         assert_eq!(m.project.name, "foo");
         let _ = std::fs::remove_dir_all(&dir);
@@ -377,7 +493,12 @@ full = ["json", "http"]
 
         m.add_dependency(Dependency {
             name: "json".to_string(),
-            source: DepSource::Git { url: "https://github.com/user/json".into(), tag: Some("v1.0.0".into()), branch: None, rev: None },
+            source: DepSource::Git {
+                url: "https://github.com/user/json".into(),
+                tag: Some("v1.0.0".into()),
+                branch: None,
+                rev: None,
+            },
             features: vec![],
         });
         assert_eq!(m.dependencies.len(), 1);
@@ -397,6 +518,38 @@ full = ["json", "http"]
     }
 
     #[test]
+    fn parse_version_constraint_dep() {
+        let toml = r#"
+[project]
+name = "test"
+version = "0.1.0"
+
+[dependencies]
+json = "1.2.0"
+"#;
+        let m = ProjectManifest::parse(Path::new("test.toml"), toml).unwrap();
+        assert_eq!(m.dependencies.len(), 1);
+        match &m.dependencies[0].source {
+            DepSource::Version(v) => assert_eq!(v, "1.2.0"),
+            _ => panic!("expected Version source"),
+        }
+    }
+
+    #[test]
+    fn detect_git_url_vs_path_in_string() {
+        assert!(looks_like_git_url("https://github.com/user/repo"));
+        assert!(looks_like_git_url("git@github.com:user/repo.git"));
+        assert!(looks_like_git_url("http://example.com/repo.git"));
+        assert!(!looks_like_git_url("../path/to/dep"));
+        assert!(!looks_like_git_url("./local"));
+        assert!(!looks_like_git_url("1.2.0"));
+        assert!(looks_like_path("../path"));
+        assert!(looks_like_path("./local"));
+        assert!(looks_like_path("/absolute/path"));
+        assert!(!looks_like_path("1.2.0"));
+    }
+
+    #[test]
     fn remove_nonexistent_dep_fails() {
         let mut m = ProjectManifest::default_for("test", Path::new("."));
         let err = m.remove_dependency("nonexistent").unwrap_err();
@@ -405,8 +558,12 @@ full = ["json", "http"]
 }
 
 fn looks_like_git_url(s: &str) -> bool {
-    s.starts_with("https://") || s.starts_with("http://") || s.starts_with("git@")
-    || s.starts_with("git://") || s.starts_with("ssh://") || s.ends_with(".git")
+    s.starts_with("https://")
+        || s.starts_with("http://")
+        || s.starts_with("git@")
+        || s.starts_with("git://")
+        || s.starts_with("ssh://")
+        || s.ends_with(".git")
 }
 
 fn looks_like_path(s: &str) -> bool {
@@ -414,18 +571,32 @@ fn looks_like_path(s: &str) -> bool {
 }
 
 fn parse_profiles(val: Option<&toml::Value>, _path: &Path) -> HashMap<String, Profile> {
-    let Some(val) = val else { return HashMap::new() };
-    let table = match val.as_table() { Some(t) => t, None => return HashMap::new() };
+    let Some(val) = val else {
+        return HashMap::new();
+    };
+    let table = match val.as_table() {
+        Some(t) => t,
+        None => return HashMap::new(),
+    };
     let mut profiles = HashMap::new();
     for (k, v) in table {
-        let t = match v.as_table() { Some(t) => t, None => continue };
-        profiles.insert(k.clone(), Profile {
-            opt_level: t.get("opt-level").and_then(|v| v.as_integer()).map(|i| i as u32),
-            lto: t.get("lto").and_then(|v| v.as_bool()),
-            strip: t.get("strip").and_then(|v| v.as_bool()),
-            debug: t.get("debug").and_then(|v| v.as_bool()),
-            panic: t.get("panic").and_then(|v| v.as_str()).map(String::from),
-        });
+        let t = match v.as_table() {
+            Some(t) => t,
+            None => continue,
+        };
+        profiles.insert(
+            k.clone(),
+            Profile {
+                opt_level: t
+                    .get("opt-level")
+                    .and_then(|v| v.as_integer())
+                    .map(|i| i as u32),
+                lto: t.get("lto").and_then(|v| v.as_bool()),
+                strip: t.get("strip").and_then(|v| v.as_bool()),
+                debug: t.get("debug").and_then(|v| v.as_bool()),
+                panic: t.get("panic").and_then(|v| v.as_str()).map(String::from),
+            },
+        );
     }
     profiles
 }

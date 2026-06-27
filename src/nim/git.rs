@@ -1,6 +1,6 @@
+use crate::nim::error::{NimError, NimResult};
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use crate::nim::error::{NimError, NimResult};
 
 pub enum GitRef {
     Tag(String),
@@ -27,16 +27,31 @@ impl GitRepo {
             return Ok(());
         }
         let parent = self.cache_dir.parent().unwrap();
-        std::fs::create_dir_all(parent)
-            .map_err(|e| NimError::cache(format!("cannot create cache dir {}: {}", parent.display(), e)))?;
-        run_git(&["clone", "--depth", "1", &self.url], Some(&self.cache_dir), &self.url, "HEAD")
+        std::fs::create_dir_all(parent).map_err(|e| {
+            NimError::cache(format!(
+                "cannot create cache dir {}: {}",
+                parent.display(),
+                e
+            ))
+        })?;
+        run_git(
+            &["clone", "--depth", "1", &self.url],
+            Some(&self.cache_dir),
+            &self.url,
+            "HEAD",
+        )
     }
 
     pub fn fetch(&self) -> NimResult<()> {
         if !self.cache_dir.join(".git").exists() {
             return self.clone();
         }
-        run_git(&["fetch", "--all", "--tags"], Some(&self.cache_dir), &self.url, "")
+        run_git(
+            &["fetch", "--all", "--tags"],
+            Some(&self.cache_dir),
+            &self.url,
+            "",
+        )
     }
 
     pub fn checkout(&self, git_ref: &GitRef) -> NimResult<()> {
@@ -45,7 +60,12 @@ impl GitRepo {
             GitRef::Branch(b) => b.clone(),
             GitRef::Rev(r) => r.clone(),
         };
-        run_git(&["checkout", &refspec], Some(&self.cache_dir), &self.url, &refspec)
+        run_git(
+            &["checkout", &refspec],
+            Some(&self.cache_dir),
+            &self.url,
+            &refspec,
+        )
     }
 
     pub fn list_tags(&self) -> NimResult<Vec<String>> {
@@ -124,14 +144,23 @@ fn run_git(args: &[&str], cwd: Option<&Path>, url: &str, refspec: &str) -> NimRe
     if let Some(dir) = cwd {
         cmd.current_dir(dir);
     }
-    let output = cmd.output()
+    let output = cmd
+        .output()
         .map_err(|e| NimError::git(format!("failed to run git: {} (is git on PATH?)", e)))?;
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         if refspec.is_empty() || refspec == "HEAD" {
-            return Err(NimError::git_clone(url.to_string(), refspec.to_string(), stderr.trim().to_string()));
+            return Err(NimError::git_clone(
+                url.to_string(),
+                refspec.to_string(),
+                stderr.trim().to_string(),
+            ));
         }
-        return Err(NimError::git(format!("{}: {}", args.join(" "), stderr.trim())));
+        return Err(NimError::git(format!(
+            "{}: {}",
+            args.join(" "),
+            stderr.trim()
+        )));
     }
     Ok(())
 }

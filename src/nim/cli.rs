@@ -1,12 +1,16 @@
-use std::path::{Path, PathBuf};
-use clap::{Parser, Subcommand};
 use crate::nim::commands;
 use crate::nim::error::NimResult;
 use crate::nim::manifest::DepSource;
+use clap::{Parser, Subcommand};
+use std::path::{Path, PathBuf};
 
 fn looks_like_git_url(s: &str) -> bool {
-    s.starts_with("https://") || s.starts_with("http://") || s.starts_with("git@")
-    || s.starts_with("git://") || s.starts_with("ssh://") || s.ends_with(".git")
+    s.starts_with("https://")
+        || s.starts_with("http://")
+        || s.starts_with("git@")
+        || s.starts_with("git://")
+        || s.starts_with("ssh://")
+        || s.ends_with(".git")
 }
 
 #[derive(Parser)]
@@ -83,27 +87,60 @@ pub enum PkgAction {
 impl Cli {
     pub fn run(self) -> NimResult<()> {
         match self.command {
-            Commands::Add { name, git, path, tag, branch, rev } => {
+            Commands::Add {
+                name,
+                git,
+                path,
+                tag,
+                branch,
+                rev,
+            } => {
                 let (dep_name, source) = if let Some(url) = git {
-                    (name.clone(), DepSource::Git { url, tag, branch, rev })
+                    (
+                        name.clone(),
+                        DepSource::Git {
+                            url,
+                            tag,
+                            branch,
+                            rev,
+                        },
+                    )
                 } else if let Some(p) = path {
-                    let dep_name = Path::new(&p).file_stem()
-                        .and_then(|s| s.to_str()).unwrap_or(&name).to_string();
+                    let dep_name = Path::new(&p)
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or(&name)
+                        .to_string();
                     (dep_name, DepSource::Path(PathBuf::from(p)))
                 } else if looks_like_git_url(&name) {
-                    let dep_name = name.rsplit('/').next()
+                    let dep_name = name
+                        .rsplit('/')
+                        .next()
                         .and_then(|s| s.strip_suffix(".git"))
-                        .unwrap_or(&name).to_string();
-                    (dep_name, DepSource::Git { url: name.clone(), tag: None, branch: None, rev: None })
+                        .unwrap_or(&name)
+                        .to_string();
+                    (
+                        dep_name,
+                        DepSource::Git {
+                            url: name.clone(),
+                            tag: None,
+                            branch: None,
+                            rev: None,
+                        },
+                    )
                 } else {
                     let p = PathBuf::from(&name);
                     if p.exists() {
-                        let dep_name = p.file_stem()
-                            .and_then(|s| s.to_str()).unwrap_or(&name).to_string();
+                        let dep_name = p
+                            .file_stem()
+                            .and_then(|s| s.to_str())
+                            .unwrap_or(&name)
+                            .to_string();
                         (dep_name, DepSource::Path(p))
                     } else {
                         return Err(crate::nim::error::NimError::Other(
-                            "use --git <url> or --path <path> to specify the dependency source".into()
+                            "use --git <url> or --path <path> to specify the dependency source"
+                                .into(),
                         ));
                     }
                 };
@@ -125,32 +162,32 @@ impl Cli {
                 commands::uninstall_binary(name)?;
                 commands::install_binary(url, version)
             }
-            Commands::Pkg { action } => {
-                match action {
-                    PkgAction::Install { target } => {
-                        let (url, version) = split_target(&target)?;
-                        commands::install_pkg_library(url, version)
-                    }
-                    PkgAction::Uninstall { target } => {
-                        let (url, version) = split_target(&target)?;
-                        commands::uninstall_pkg_library(url, version)
-                    }
-                    PkgAction::Upgrade { target } => {
-                        let (url, version) = split_target(&target)?;
-                        commands::uninstall_pkg_library(url, version)?;
-                        commands::install_pkg_library(url, version)
-                    }
+            Commands::Pkg { action } => match action {
+                PkgAction::Install { target } => {
+                    let (url, version) = split_target(&target)?;
+                    commands::install_pkg_library(url, version)
                 }
-            }
+                PkgAction::Uninstall { target } => {
+                    let (url, version) = split_target(&target)?;
+                    commands::uninstall_pkg_library(url, version)
+                }
+                PkgAction::Upgrade { target } => {
+                    let (url, version) = split_target(&target)?;
+                    commands::uninstall_pkg_library(url, version)?;
+                    commands::install_pkg_library(url, version)
+                }
+            },
         }
     }
 }
 
 fn split_target(target: &str) -> NimResult<(&str, &str)> {
-    target.rsplit_once('@')
-        .ok_or_else(|| crate::nim::error::NimError::Other(
-            format!("missing version in `{}` (expected URL@version)", target)
+    target.rsplit_once('@').ok_or_else(|| {
+        crate::nim::error::NimError::Other(format!(
+            "missing version in `{}` (expected URL@version)",
+            target
         ))
+    })
 }
 
 fn name_from_url(url: &str) -> &str {

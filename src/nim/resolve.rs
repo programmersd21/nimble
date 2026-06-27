@@ -1,10 +1,10 @@
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::path::Path;
-use semver::{Version, VersionReq};
-use sha2::{Sha256, Digest};
 use crate::nim::error::{NimError, NimResult};
 use crate::nim::git::{GitRef, GitRepo};
 use crate::nim::manifest::{DepSource, Dependency, ProjectManifest};
+use semver::{Version, VersionReq};
+use sha2::{Digest, Sha256};
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::path::Path;
 
 #[derive(Debug, Clone)]
 pub struct LockedDep {
@@ -14,6 +14,15 @@ pub struct LockedDep {
     pub commit: String,
     pub checksum: String,
     pub dependencies: Vec<String>,
+    pub features: Vec<String>,
+    pub kind: DependencyKind,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DependencyKind {
+    Normal,
+    Dev,
+    Build,
 }
 
 #[derive(Debug, Clone)]
@@ -30,23 +39,65 @@ impl Lockfile {
     }
 
     pub fn parse(raw: &str) -> NimResult<Self> {
-        let val: toml::Value = toml::from_str(raw)
-            .map_err(|e| NimError::Other(format!("invalid lockfile: {}", e)))?;
+        let val: toml::Value =
+            toml::from_str(raw).map_err(|e| NimError::Other(format!("invalid lockfile: {}", e)))?;
         let version = val.get("version").and_then(|v| v.as_integer()).unwrap_or(1) as u32;
         let mut packages = vec![];
         if let Some(arr) = val.get("packages").and_then(|v| v.as_array()) {
             for item in arr {
-                let t = item.as_table().ok_or_else(|| NimError::Other("invalid lockfile entry".into()))?;
+                let t = item
+                    .as_table()
+                    .ok_or_else(|| NimError::Other("invalid lockfile entry".into()))?;
+                let kind_str = t.get("kind").and_then(|v| v.as_str()).unwrap_or("normal");
                 packages.push(LockedDep {
-                    name: t.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-                    version: t.get("version").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-                    source: t.get("source").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-                    commit: t.get("commit").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-                    checksum: t.get("checksum").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-                    dependencies: t.get("dependencies")
+                    name: t
+                        .get("name")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string(),
+                    version: t
+                        .get("version")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string(),
+                    source: t
+                        .get("source")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string(),
+                    commit: t
+                        .get("commit")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string(),
+                    checksum: t
+                        .get("checksum")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string(),
+                    dependencies: t
+                        .get("dependencies")
                         .and_then(|v| v.as_array())
-                        .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+                        .map(|a| {
+                            a.iter()
+                                .filter_map(|v| v.as_str().map(String::from))
+                                .collect()
+                        })
                         .unwrap_or_default(),
+                    features: t
+                        .get("features")
+                        .and_then(|v| v.as_array())
+                        .map(|a| {
+                            a.iter()
+                                .filter_map(|v| v.as_str().map(String::from))
+                                .collect()
+                        })
+                        .unwrap_or_default(),
+                    kind: match kind_str {
+                        "dev" => DependencyKind::Dev,
+                        "build" => DependencyKind::Build,
+                        _ => DependencyKind::Normal,
+                    },
                 });
             }
         }
@@ -56,18 +107,43 @@ impl Lockfile {
     pub fn save(&self, project_dir: &Path) -> NimResult<()> {
         let path = project_dir.join("nimble.lock");
         let mut out = String::from("# nimble.lock\nversion = 1\n\n[[packages]]\n");
-        let entries: Vec<String> = self.packages.iter().map(|p| {
-            let deps: String = p.dependencies.iter().map(|d| format!("\"{}\"", d)).collect::<Vec<_>>().join(", ");
-            format!(
-                r#"name = "{}"
+        let entries: Vec<String> = self
+            .packages
+            .iter()
+            .map(|p| {
+                let deps: String = p
+                    .dependencies
+                    .iter()
+                    .map(|d| format!("\"{}\"", d))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                let feats: String = p
+                    .features
+                    .iter()
+                    .map(|f| format!("\"{}\"", f))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                let kind = match p.kind {
+                    DependencyKind::Normal => "normal",
+                    DependencyKind::Dev => "dev",
+                    DependencyKind::Build => "build",
+                };
+                let mut entry = format!(
+                    r#"name = "{}"
 version = "{}"
 source = "{}"
 commit = "{}"
 checksum = "{}"
+kind = "{}"
 dependencies = [{}]"#,
-                p.name, p.version, p.source, p.commit, p.checksum, deps
-            )
-        }).collect();
+                    p.name, p.version, p.source, p.commit, p.checksum, kind, deps
+                );
+                if !p.features.is_empty() {
+                    entry.push_str(&format!("\nfeatures = [{}]", feats));
+                }
+                entry
+            })
+            .collect();
         out.push_str(&entries.join("\n\n[[packages]]\n"));
         out.push('\n');
         std::fs::write(&path, out.as_bytes())
@@ -86,26 +162,67 @@ pub struct Resolver<'a> {
 
 impl<'a> Resolver<'a> {
     pub fn new(manifest: &'a ProjectManifest, cache_root: &'a Path) -> Self {
-        Resolver { manifest, cache_root }
+        Resolver {
+            manifest,
+            cache_root,
+        }
     }
 
     pub fn resolve(&self) -> NimResult<Lockfile> {
+        self.resolve_with_kind(true, false, false)
+    }
+
+    pub fn resolve_all(&self) -> NimResult<Lockfile> {
+        self.resolve_with_kind(true, true, true)
+    }
+
+    pub fn resolve_with_kind(&self, normal: bool, dev: bool, build: bool) -> NimResult<Lockfile> {
         let mut resolved: Vec<LockedDep> = vec![];
         let mut visiting: HashSet<String> = HashSet::new();
         let mut visited: HashSet<String> = HashSet::new();
 
-        for dep in &self.manifest.dependencies {
-            self.resolve_dep(dep, &mut resolved, &mut visiting, &mut visited, &vec![])?;
+        if normal {
+            for dep in &self.manifest.dependencies {
+                self.resolve_dep(
+                    dep,
+                    &mut resolved,
+                    &mut visiting,
+                    &mut visited,
+                    &vec![],
+                    DependencyKind::Normal,
+                )?;
+            }
         }
-        for dep in &self.manifest.dev_dependencies {
-            self.resolve_dep(dep, &mut resolved, &mut visiting, &mut visited, &vec![])?;
+        if dev {
+            for dep in &self.manifest.dev_dependencies {
+                self.resolve_dep(
+                    dep,
+                    &mut resolved,
+                    &mut visiting,
+                    &mut visited,
+                    &vec![],
+                    DependencyKind::Dev,
+                )?;
+            }
         }
-        for dep in &self.manifest.build_dependencies {
-            self.resolve_dep(dep, &mut resolved, &mut visiting, &mut visited, &vec![])?;
+        if build {
+            for dep in &self.manifest.build_dependencies {
+                self.resolve_dep(
+                    dep,
+                    &mut resolved,
+                    &mut visiting,
+                    &mut visited,
+                    &vec![],
+                    DependencyKind::Build,
+                )?;
+            }
         }
 
         let sorted = topological_sort(&resolved)?;
-        Ok(Lockfile { packages: sorted, version: 1 })
+        Ok(Lockfile {
+            packages: sorted,
+            version: 1,
+        })
     }
 
     fn resolve_dep(
@@ -115,17 +232,27 @@ impl<'a> Resolver<'a> {
         visiting: &mut HashSet<String>,
         visited: &mut HashSet<String>,
         chain: &[String],
+        kind: DependencyKind,
     ) -> NimResult<()> {
-        if visited.contains(&dep.name) { return Ok(()); }
+        if visited.contains(&dep.name) {
+            return Ok(());
+        }
         if visiting.contains(&dep.name) {
             let cycle = chain.iter().cloned().collect::<Vec<_>>().join(" -> ");
-            return Err(NimError::CycleDetected { cycle: format!("{} -> {}", cycle, dep.name) });
+            return Err(NimError::CycleDetected {
+                cycle: format!("{} -> {}", cycle, dep.name),
+            });
         }
 
         visiting.insert(dep.name.clone());
 
         match &dep.source {
-            DepSource::Git { url, tag, branch, rev } => {
+            DepSource::Git {
+                url,
+                tag,
+                branch,
+                rev,
+            } => {
                 let repo = GitRepo::new(url, self.cache_root);
                 repo.ensure(&GitRef::Branch("HEAD".into()))?;
 
@@ -143,7 +270,14 @@ impl<'a> Resolver<'a> {
                 let dep_source = format!("git+{}", url);
                 let checksum = compute_checksum(&commit);
 
-                let sub_deps = self.collect_transitive_deps(repo.source_path(), dep.name.clone(), resolved, visiting, visited, chain)?;
+                let sub_deps = self.collect_transitive_deps(
+                    repo.source_path(),
+                    dep.name.clone(),
+                    resolved,
+                    visiting,
+                    visited,
+                    chain,
+                )?;
 
                 let dep_names: Vec<String> = sub_deps.iter().map(|d| d.name.clone()).collect();
 
@@ -161,6 +295,8 @@ impl<'a> Resolver<'a> {
                     commit,
                     checksum,
                     dependencies: dep_names,
+                    features: dep.features.clone(),
+                    kind,
                 };
                 resolved.push(locked);
             }
@@ -182,6 +318,8 @@ impl<'a> Resolver<'a> {
                     commit: String::new(),
                     checksum,
                     dependencies: sub_lock.packages.iter().map(|p| p.name.clone()).collect(),
+                    features: dep.features.clone(),
+                    kind,
                 };
                 resolved.push(locked);
 
@@ -220,12 +358,12 @@ impl<'a> Resolver<'a> {
             Err(_) => return Ok(vec![]),
         };
         let sub_resolver = Resolver::new(&sub_manifest, self.cache_root);
-        let sub_lock = sub_resolver.resolve()?;
+        let sub_lock = sub_resolver.resolve_all()?;
         let mut new_chain = chain.to_vec();
-        new_chain.push(_name);
+        new_chain.push(_name.clone());
         let mut collected = vec![];
         for pkg in &sub_lock.packages {
-            if !visited.contains(&pkg.name) {
+            if !visited.contains(&pkg.name) && pkg.name != _name {
                 visited.insert(pkg.name.clone());
                 collected.push(pkg.clone());
             }
@@ -239,10 +377,13 @@ fn resolve_semver_tag(repo: &GitRepo, name: &str, constraint: &str) -> NimResult
     let req = if constraint.is_empty() {
         VersionReq::parse("*").unwrap()
     } else {
-        VersionReq::parse(constraint)
-            .map_err(|_| NimError::VersionResolve { name: name.to_string(), constraint: constraint.to_string() })?
+        VersionReq::parse(constraint).map_err(|_| NimError::VersionResolve {
+            name: name.to_string(),
+            constraint: constraint.to_string(),
+        })?
     };
-    let mut candidates: Vec<Version> = tags.iter()
+    let mut candidates: Vec<Version> = tags
+        .iter()
         .filter_map(|t| {
             let ver_str = t.strip_prefix('v').unwrap_or(t);
             Version::parse(ver_str).ok()
@@ -251,8 +392,13 @@ fn resolve_semver_tag(repo: &GitRepo, name: &str, constraint: &str) -> NimResult
         .collect();
     candidates.sort();
     candidates.reverse();
-    let best = candidates.into_iter().next()
-        .ok_or_else(|| NimError::VersionResolve { name: name.to_string(), constraint: constraint.to_string() })?;
+    let best = candidates
+        .into_iter()
+        .next()
+        .ok_or_else(|| NimError::VersionResolve {
+            name: name.to_string(),
+            constraint: constraint.to_string(),
+        })?;
     let tag = format!("v{}", best);
     repo.resolve_tag(&tag)?;
     Ok(tag)
@@ -278,7 +424,8 @@ fn topological_sort(packages: &[LockedDep]) -> NimResult<Vec<LockedDep>> {
         }
     }
 
-    let mut queue: VecDeque<&str> = in_degree.iter()
+    let mut queue: VecDeque<&str> = in_degree
+        .iter()
         .filter(|&(_, deg)| *deg == 0)
         .map(|(name, _)| *name)
         .collect();
@@ -302,7 +449,10 @@ fn topological_sort(packages: &[LockedDep]) -> NimResult<Vec<LockedDep>> {
 
     if sorted.len() != packages.len() {
         return Err(NimError::CycleDetected {
-            cycle: format!("dependency cycle among {} packages", packages.len() - sorted.len()),
+            cycle: format!(
+                "dependency cycle among {} packages",
+                packages.len() - sorted.len()
+            ),
         });
     }
     Ok(sorted)
@@ -322,16 +472,16 @@ mod tests {
     fn lockfile_roundtrip() {
         let lf = Lockfile {
             version: 1,
-            packages: vec![
-                LockedDep {
-                    name: "json".into(),
-                    version: "1.0.0".into(),
-                    source: "git+https://github.com/user/json".into(),
-                    commit: "abc123".into(),
-                    checksum: "deadbeef".into(),
-                    dependencies: vec![],
-                },
-            ],
+            packages: vec![LockedDep {
+                name: "json".into(),
+                version: "1.0.0".into(),
+                source: "git+https://github.com/user/json".into(),
+                commit: "abc123".into(),
+                checksum: "deadbeef".into(),
+                dependencies: vec![],
+                features: vec![],
+                kind: DependencyKind::Normal,
+            }],
         };
         let dir = std::env::temp_dir().join("nim_lockfile_test");
         let _ = std::fs::create_dir_all(&dir);
@@ -355,8 +505,26 @@ mod tests {
         let lf = Lockfile {
             version: 1,
             packages: vec![
-                LockedDep { name: "a".into(), version: "1".into(), source: "".into(), commit: "".into(), checksum: "".into(), dependencies: vec![] },
-                LockedDep { name: "b".into(), version: "2".into(), source: "".into(), commit: "".into(), checksum: "".into(), dependencies: vec![] },
+                LockedDep {
+                    name: "a".into(),
+                    version: "1".into(),
+                    source: "".into(),
+                    commit: "".into(),
+                    checksum: "".into(),
+                    dependencies: vec![],
+                    features: vec![],
+                    kind: DependencyKind::Normal,
+                },
+                LockedDep {
+                    name: "b".into(),
+                    version: "2".into(),
+                    source: "".into(),
+                    commit: "".into(),
+                    checksum: "".into(),
+                    dependencies: vec![],
+                    features: vec![],
+                    kind: DependencyKind::Normal,
+                },
             ],
         };
         assert!(lf.find("a").is_some());
@@ -366,9 +534,36 @@ mod tests {
     #[test]
     fn topological_sort_basic() {
         let pkgs = vec![
-            LockedDep { name: "c".into(), version: "1".into(), source: "".into(), commit: "".into(), checksum: "".into(), dependencies: vec![] },
-            LockedDep { name: "b".into(), version: "1".into(), source: "".into(), commit: "".into(), checksum: "".into(), dependencies: vec!["c".into()] },
-            LockedDep { name: "a".into(), version: "1".into(), source: "".into(), commit: "".into(), checksum: "".into(), dependencies: vec!["b".into()] },
+            LockedDep {
+                name: "c".into(),
+                version: "1".into(),
+                source: "".into(),
+                commit: "".into(),
+                checksum: "".into(),
+                dependencies: vec![],
+                features: vec![],
+                kind: DependencyKind::Normal,
+            },
+            LockedDep {
+                name: "b".into(),
+                version: "1".into(),
+                source: "".into(),
+                commit: "".into(),
+                checksum: "".into(),
+                dependencies: vec!["c".into()],
+                features: vec![],
+                kind: DependencyKind::Normal,
+            },
+            LockedDep {
+                name: "a".into(),
+                version: "1".into(),
+                source: "".into(),
+                commit: "".into(),
+                checksum: "".into(),
+                dependencies: vec!["b".into()],
+                features: vec![],
+                kind: DependencyKind::Normal,
+            },
         ];
         let sorted = topological_sort(&pkgs).unwrap();
         let names: Vec<&str> = sorted.iter().map(|p| p.name.as_str()).collect();
@@ -382,8 +577,26 @@ mod tests {
     #[test]
     fn topological_sort_cycle() {
         let pkgs = vec![
-            LockedDep { name: "a".into(), version: "1".into(), source: "".into(), commit: "".into(), checksum: "".into(), dependencies: vec!["b".into()] },
-            LockedDep { name: "b".into(), version: "1".into(), source: "".into(), commit: "".into(), checksum: "".into(), dependencies: vec!["a".into()] },
+            LockedDep {
+                name: "a".into(),
+                version: "1".into(),
+                source: "".into(),
+                commit: "".into(),
+                checksum: "".into(),
+                dependencies: vec!["b".into()],
+                features: vec![],
+                kind: DependencyKind::Normal,
+            },
+            LockedDep {
+                name: "b".into(),
+                version: "1".into(),
+                source: "".into(),
+                commit: "".into(),
+                checksum: "".into(),
+                dependencies: vec!["a".into()],
+                features: vec![],
+                kind: DependencyKind::Normal,
+            },
         ];
         assert!(topological_sort(&pkgs).is_err());
     }
@@ -391,8 +604,26 @@ mod tests {
     #[test]
     fn topological_sort_independent() {
         let pkgs = vec![
-            LockedDep { name: "a".into(), version: "1".into(), source: "".into(), commit: "".into(), checksum: "".into(), dependencies: vec![] },
-            LockedDep { name: "b".into(), version: "1".into(), source: "".into(), commit: "".into(), checksum: "".into(), dependencies: vec![] },
+            LockedDep {
+                name: "a".into(),
+                version: "1".into(),
+                source: "".into(),
+                commit: "".into(),
+                checksum: "".into(),
+                dependencies: vec![],
+                features: vec![],
+                kind: DependencyKind::Normal,
+            },
+            LockedDep {
+                name: "b".into(),
+                version: "1".into(),
+                source: "".into(),
+                commit: "".into(),
+                checksum: "".into(),
+                dependencies: vec![],
+                features: vec![],
+                kind: DependencyKind::Normal,
+            },
         ];
         let sorted = topological_sort(&pkgs).unwrap();
         assert_eq!(sorted.len(), 2);
@@ -405,6 +636,96 @@ mod tests {
         assert_eq!(a, b);
         let c = compute_checksum("world");
         assert_ne!(a, c);
+    }
+
+    #[test]
+    fn lockfile_with_features_and_kind_roundtrip() {
+        let lf = Lockfile {
+            version: 1,
+            packages: vec![
+                LockedDep {
+                    name: "json".into(), version: "1.0.0".into(),
+                    source: "git+https://github.com/user/json".into(),
+                    commit: "abc".into(), checksum: "def".into(),
+                    dependencies: vec!["serde".into()],
+                    features: vec!["serde".into()],
+                    kind: DependencyKind::Dev,
+                },
+            ],
+        };
+        let dir = std::env::temp_dir().join("nim_lock_feat_test");
+        let _ = std::fs::create_dir_all(&dir);
+        lf.save(&dir).unwrap();
+        let loaded = Lockfile::load(&dir).unwrap();
+        assert_eq!(loaded.packages[0].features, vec!["serde"]);
+        assert_eq!(loaded.packages[0].kind, DependencyKind::Dev);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn resolve_with_kind_excludes_dev_and_build() {
+        use crate::nim::manifest::ProjectManifest;
+        let dir = std::env::temp_dir().join("nim_kind_test");
+        let _ = std::fs::create_dir_all(&dir);
+        let toml_path = dir.join("nimble.toml");
+        std::fs::write(&toml_path, r#"
+[project]
+name = "test"
+version = "0.1.0"
+
+[dev-dependencies]
+mylib = { git = "https://github.com/user/mylib" }
+"#).unwrap();
+        let m = ProjectManifest::load(&dir).unwrap();
+        let cache = std::env::temp_dir().join("nim_kind_cache");
+        let resolver = Resolver::new(&m, &cache);
+
+        // resolve() (normal only) should succeed with 0 packages
+        // since only dev-deps exist
+        let lockfile = resolver.resolve().unwrap();
+        assert!(lockfile.packages.is_empty());
+
+        // resolve_all() should include dev deps and fail on git clone
+        assert!(resolver.resolve_all().is_err());
+        let _ = std::fs::remove_dir_all(&dir);
+        let _ = std::fs::remove_dir_all(&cache);
+    }
+
+    #[test]
+    fn version_source_rejected() {
+        let dir = std::env::temp_dir().join("nim_version_reject");
+        let _ = std::fs::create_dir_all(&dir);
+        let toml_path = dir.join("nimble.toml");
+        std::fs::write(&toml_path, r#"
+[project]
+name = "test"
+version = "0.1.0"
+
+[dependencies]
+json = "1.2.0"
+"#).unwrap();
+        let m = ProjectManifest::load(&dir).unwrap();
+        let cache = std::env::temp_dir().join("nim_version_cache");
+        let resolver = Resolver::new(&m, &cache);
+        let err = resolver.resolve().unwrap_err();
+        assert!(err.to_string().contains("version constraint"));
+        assert!(err.to_string().contains("no source URL"));
+        let _ = std::fs::remove_dir_all(&dir);
+        let _ = std::fs::remove_dir_all(&cache);
+    }
+
+    #[test]
+    fn topological_sort_preserves_features_and_kind() {
+        let pkgs = vec![
+            LockedDep { name: "b".into(), version: "1".into(), source: "".into(), commit: "".into(), checksum: "".into(), dependencies: vec![], features: vec!["feat_b".into()], kind: DependencyKind::Build },
+            LockedDep { name: "a".into(), version: "1".into(), source: "".into(), commit: "".into(), checksum: "".into(), dependencies: vec!["b".into()], features: vec!["feat_a".into()], kind: DependencyKind::Normal },
+        ];
+        let sorted = topological_sort(&pkgs).unwrap();
+        assert_eq!(sorted[0].name, "b");
+        assert_eq!(sorted[0].features, vec!["feat_b"]);
+        assert_eq!(sorted[0].kind, DependencyKind::Build);
+        assert_eq!(sorted[1].features, vec!["feat_a"]);
+        assert_eq!(sorted[1].kind, DependencyKind::Normal);
     }
 
     #[test]

@@ -1,6 +1,6 @@
+use crate::nim::manifest::ProjectManifest;
 use std::io::Write;
 use std::path::Path;
-use crate::nim::manifest::ProjectManifest;
 
 /// Create a default `nimble.toml` for `anvil init`.
 pub fn default_manifest(name: &str) -> ProjectManifest {
@@ -60,7 +60,8 @@ version = "0.1.0"
         let dir = std::env::temp_dir().join("anvil_test_manifest");
         let _ = std::fs::create_dir_all(&dir);
         let mut f = std::fs::File::create(dir.join("nimble.toml")).unwrap();
-        f.write_all(b"[project]\nname = \"foo\"\nversion = \"0.2.1\"\n").unwrap();
+        f.write_all(b"[project]\nname = \"foo\"\nversion = \"0.2.1\"\n")
+            .unwrap();
 
         let manifest = ProjectManifest::load(&dir).unwrap();
         assert_eq!(manifest.project.name, "foo");
