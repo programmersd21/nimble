@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::Path;
 use semver::{Version, VersionReq};
 use sha2::{Sha256, Digest};
@@ -104,7 +104,8 @@ impl<'a> Resolver<'a> {
             self.resolve_dep(dep, &mut resolved, &mut visiting, &mut visited, &vec![])?;
         }
 
-        Ok(Lockfile { packages: resolved, version: 1 })
+        let sorted = topological_sort(&resolved)?;
+        Ok(Lockfile { packages: sorted, version: 1 })
     }
 
     fn resolve_dep(
@@ -126,7 +127,7 @@ impl<'a> Resolver<'a> {
         match &dep.source {
             DepSource::Git { url, tag, branch, rev } => {
                 let repo = GitRepo::new(url, self.cache_root);
-                repo.ensure(&GitRef::Branch("HEAD".into()))?; // fetch default first
+                repo.ensure(&GitRef::Branch("HEAD".into()))?;
 
                 let version = if let Some(t) = tag {
                     repo.resolve_tag(t)?
@@ -139,11 +140,19 @@ impl<'a> Resolver<'a> {
                 };
 
                 let commit = repo.current_commit()?;
-
                 let dep_source = format!("git+{}", url);
                 let checksum = compute_checksum(&commit);
 
                 let sub_deps = self.collect_transitive_deps(repo.source_path(), dep.name.clone(), resolved, visiting, visited, chain)?;
+
+                let dep_names: Vec<String> = sub_deps.iter().map(|d| d.name.clone()).collect();
+
+                for pkg in sub_deps {
+                    if !visited.contains(&pkg.name) && pkg.name != dep.name {
+                        visited.insert(pkg.name.clone());
+                        resolved.push(pkg);
+                    }
+                }
 
                 let locked = LockedDep {
                     name: dep.name.clone(),
@@ -151,7 +160,7 @@ impl<'a> Resolver<'a> {
                     source: dep_source,
                     commit,
                     checksum,
-                    dependencies: sub_deps.iter().map(|d| d.name.clone()).collect(),
+                    dependencies: dep_names,
                 };
                 resolved.push(locked);
             }
@@ -182,6 +191,13 @@ impl<'a> Resolver<'a> {
                         resolved.push(pkg);
                     }
                 }
+            }
+            DepSource::Version(constraint) => {
+                return Err(NimError::Other(format!(
+                    "dependency `{}` has version constraint `{}` but no source URL. \
+                     Use `nim add {} --git <url>` or add a table entry with `git` or `path`",
+                    dep.name, constraint, dep.name
+                )));
             }
         }
 
@@ -242,6 +258,56 @@ fn resolve_semver_tag(repo: &GitRepo, name: &str, constraint: &str) -> NimResult
     Ok(tag)
 }
 
+fn topological_sort(packages: &[LockedDep]) -> NimResult<Vec<LockedDep>> {
+    let mut in_degree: HashMap<&str, usize> = HashMap::new();
+    let mut adj: HashMap<&str, Vec<&str>> = HashMap::new();
+    let mut name_to_pkg: HashMap<&str, &LockedDep> = HashMap::new();
+
+    for pkg in packages {
+        in_degree.entry(&pkg.name).or_insert(0);
+        adj.entry(&pkg.name).or_default();
+        name_to_pkg.insert(&pkg.name, pkg);
+    }
+
+    for pkg in packages {
+        for dep_name in &pkg.dependencies {
+            if adj.contains_key(dep_name.as_str()) {
+                adj.get_mut(dep_name.as_str()).unwrap().push(&pkg.name);
+                *in_degree.entry(&pkg.name).or_insert(0) += 1;
+            }
+        }
+    }
+
+    let mut queue: VecDeque<&str> = in_degree.iter()
+        .filter(|&(_, deg)| *deg == 0)
+        .map(|(name, _)| *name)
+        .collect();
+
+    let mut sorted = vec![];
+    while let Some(name) = queue.pop_front() {
+        if let Some(pkg) = name_to_pkg.get(name) {
+            sorted.push((*pkg).clone());
+        }
+        if let Some(neighbors) = adj.get(name) {
+            for &nbr in neighbors {
+                if let Some(deg) = in_degree.get_mut(nbr) {
+                    *deg -= 1;
+                    if *deg == 0 {
+                        queue.push_back(nbr);
+                    }
+                }
+            }
+        }
+    }
+
+    if sorted.len() != packages.len() {
+        return Err(NimError::CycleDetected {
+            cycle: format!("dependency cycle among {} packages", packages.len() - sorted.len()),
+        });
+    }
+    Ok(sorted)
+}
+
 fn compute_checksum(data: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(data.as_bytes());
@@ -295,6 +361,41 @@ mod tests {
         };
         assert!(lf.find("a").is_some());
         assert!(lf.find("c").is_none());
+    }
+
+    #[test]
+    fn topological_sort_basic() {
+        let pkgs = vec![
+            LockedDep { name: "c".into(), version: "1".into(), source: "".into(), commit: "".into(), checksum: "".into(), dependencies: vec![] },
+            LockedDep { name: "b".into(), version: "1".into(), source: "".into(), commit: "".into(), checksum: "".into(), dependencies: vec!["c".into()] },
+            LockedDep { name: "a".into(), version: "1".into(), source: "".into(), commit: "".into(), checksum: "".into(), dependencies: vec!["b".into()] },
+        ];
+        let sorted = topological_sort(&pkgs).unwrap();
+        let names: Vec<&str> = sorted.iter().map(|p| p.name.as_str()).collect();
+        let a_pos = names.iter().position(|&n| n == "a").unwrap();
+        let b_pos = names.iter().position(|&n| n == "b").unwrap();
+        let c_pos = names.iter().position(|&n| n == "c").unwrap();
+        assert!(c_pos < b_pos, "c should come before b");
+        assert!(b_pos < a_pos, "b should come before a");
+    }
+
+    #[test]
+    fn topological_sort_cycle() {
+        let pkgs = vec![
+            LockedDep { name: "a".into(), version: "1".into(), source: "".into(), commit: "".into(), checksum: "".into(), dependencies: vec!["b".into()] },
+            LockedDep { name: "b".into(), version: "1".into(), source: "".into(), commit: "".into(), checksum: "".into(), dependencies: vec!["a".into()] },
+        ];
+        assert!(topological_sort(&pkgs).is_err());
+    }
+
+    #[test]
+    fn topological_sort_independent() {
+        let pkgs = vec![
+            LockedDep { name: "a".into(), version: "1".into(), source: "".into(), commit: "".into(), checksum: "".into(), dependencies: vec![] },
+            LockedDep { name: "b".into(), version: "1".into(), source: "".into(), commit: "".into(), checksum: "".into(), dependencies: vec![] },
+        ];
+        let sorted = topological_sort(&pkgs).unwrap();
+        assert_eq!(sorted.len(), 2);
     }
 
     #[test]

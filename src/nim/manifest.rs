@@ -7,6 +7,7 @@ use crate::nim::error::{NimError, NimResult};
 pub enum DepSource {
     Git { url: String, tag: Option<String>, branch: Option<String>, rev: Option<String> },
     Path(PathBuf),
+    Version(String),
 }
 
 #[derive(Debug, Clone)]
@@ -184,6 +185,9 @@ impl ProjectManifest {
                         }
                         out.push_str(" }\n");
                     }
+                    DepSource::Version(v) => {
+                        out.push_str(&format!("{} = \"{}\"\n", dep.name, v));
+                    }
                 }
             }
         }
@@ -230,11 +234,14 @@ fn parse_dep_table(val: Option<&toml::Value>, path: &Path) -> NimResult<Vec<Depe
     for (name, v) in table {
         match v {
             toml::Value::String(s) => {
-                deps.push(Dependency {
-                    name: name.clone(),
-                    source: DepSource::Git { url: s.clone(), tag: None, branch: None, rev: None },
-                    features: vec![],
-                });
+                let source = if looks_like_git_url(s) {
+                    DepSource::Git { url: s.clone(), tag: None, branch: None, rev: None }
+                } else if looks_like_path(s) {
+                    DepSource::Path(PathBuf::from(s.clone()))
+                } else {
+                    DepSource::Version(s.clone())
+                };
+                deps.push(Dependency { name: name.clone(), source, features: vec![] });
             }
             toml::Value::Table(t) => {
                 let source = if let Some(git) = t.get("git").and_then(|v| v.as_str()) {
@@ -395,6 +402,15 @@ full = ["json", "http"]
         let err = m.remove_dependency("nonexistent").unwrap_err();
         assert!(matches!(err, NimError::DepNotFound { .. }));
     }
+}
+
+fn looks_like_git_url(s: &str) -> bool {
+    s.starts_with("https://") || s.starts_with("http://") || s.starts_with("git@")
+    || s.starts_with("git://") || s.starts_with("ssh://") || s.ends_with(".git")
+}
+
+fn looks_like_path(s: &str) -> bool {
+    s.starts_with('.') || s.starts_with('/') || s.starts_with('~') || s.starts_with("..")
 }
 
 fn parse_profiles(val: Option<&toml::Value>, _path: &Path) -> HashMap<String, Profile> {

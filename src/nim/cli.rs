@@ -1,8 +1,13 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use clap::{Parser, Subcommand};
 use crate::nim::commands;
 use crate::nim::error::NimResult;
 use crate::nim::manifest::DepSource;
+
+fn looks_like_git_url(s: &str) -> bool {
+    s.starts_with("https://") || s.starts_with("http://") || s.starts_with("git@")
+    || s.starts_with("git://") || s.starts_with("ssh://") || s.ends_with(".git")
+}
 
 #[derive(Parser)]
 #[command(name = "nim", version, about = "Nimble package manager")]
@@ -79,16 +84,30 @@ impl Cli {
     pub fn run(self) -> NimResult<()> {
         match self.command {
             Commands::Add { name, git, path, tag, branch, rev } => {
-                let source = if let Some(url) = git {
-                    DepSource::Git { url, tag, branch, rev }
+                let (dep_name, source) = if let Some(url) = git {
+                    (name.clone(), DepSource::Git { url, tag, branch, rev })
                 } else if let Some(p) = path {
-                    DepSource::Path(PathBuf::from(p))
+                    let dep_name = Path::new(&p).file_stem()
+                        .and_then(|s| s.to_str()).unwrap_or(&name).to_string();
+                    (dep_name, DepSource::Path(PathBuf::from(p)))
+                } else if looks_like_git_url(&name) {
+                    let dep_name = name.rsplit('/').next()
+                        .and_then(|s| s.strip_suffix(".git"))
+                        .unwrap_or(&name).to_string();
+                    (dep_name, DepSource::Git { url: name.clone(), tag: None, branch: None, rev: None })
                 } else {
-                    return Err(crate::nim::error::NimError::Other(
-                        "use --git <url> or --path <path> to specify the dependency source".into()
-                    ));
+                    let p = PathBuf::from(&name);
+                    if p.exists() {
+                        let dep_name = p.file_stem()
+                            .and_then(|s| s.to_str()).unwrap_or(&name).to_string();
+                        (dep_name, DepSource::Path(p))
+                    } else {
+                        return Err(crate::nim::error::NimError::Other(
+                            "use --git <url> or --path <path> to specify the dependency source".into()
+                        ));
+                    }
                 };
-                commands::add_dep(&std::env::current_dir().unwrap(), &name, source)
+                commands::add_dep(&std::env::current_dir().unwrap(), &dep_name, source)
             }
             Commands::Remove { name } => {
                 commands::remove_dep(&std::env::current_dir().unwrap(), &name)

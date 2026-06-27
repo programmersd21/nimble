@@ -1,4 +1,5 @@
 use std::path::Path;
+use std::sync::{Arc, Mutex};
 use crate::nim::cache::PackageCache;
 use crate::nim::error::{NimError, NimResult};
 use crate::nim::git::{GitRef, GitRepo};
@@ -31,6 +32,37 @@ pub fn fetch_deps(project_dir: &Path) -> NimResult<()> {
     let cache = PackageCache::new()?;
     cache.ensure_dirs()?;
     let repos_dir = cache.repos_dir();
+
+    let errors = Arc::new(Mutex::new(Vec::new()));
+    let handles: Vec<_> = manifest.dependencies.iter().filter_map(|dep| {
+        let url = match &dep.source {
+            DepSource::Git { url, .. } => url.clone(),
+            _ => return None,
+        };
+        let repos_dir = repos_dir.clone();
+        let errors = Arc::clone(&errors);
+        Some(std::thread::spawn(move || {
+            let repo = GitRepo::new(&url, &repos_dir);
+            if repo.source_path().join(".git").exists() {
+                if let Err(e) = repo.fetch() {
+                    errors.lock().unwrap().push((url, e));
+                }
+            } else if let Err(e) = repo.clone() {
+                errors.lock().unwrap().push((url, e));
+            }
+        }))
+    }).collect();
+
+    for h in handles { let _ = h.join(); }
+
+    let errs = Arc::into_inner(errors).unwrap().into_inner().unwrap();
+    if !errs.is_empty() {
+        for (url, e) in &errs {
+            eprintln!("  \x1b[31merror\x1b[0m {}: {}", url, e);
+        }
+        return Err(NimError::Other(format!("{} fetch errors", errs.len())));
+    }
+
     let resolver = Resolver::new(&manifest, &repos_dir);
     let lockfile = resolver.resolve()?;
     lockfile.save(project_dir)?;
