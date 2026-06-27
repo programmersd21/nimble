@@ -4,7 +4,7 @@ use std::io::Write;
 use std::path::Path;
 use std::process::Command;
 
-use crate::anvil::config::ProjectManifest;
+use crate::nim::manifest::ProjectManifest;
 
 /// Create a new Nimble project in `dir` with a default layout.
 ///
@@ -27,18 +27,8 @@ pub fn init_project(dir: &Path, name: &str) -> Result<(), String> {
     let src_dir = dir.join("src");
     fs_create_dir_all(&src_dir)?;
 
-    // nimble.toml
-    let manifest = ProjectManifest::default_for(name);
-    let toml_str = format!(
-        r#"[project]
-name = "{}"
-version = "{}"
-entry_point = "{}"
-"#,
-        manifest.project.name, manifest.project.version, manifest.project.entry_point,
-    );
-    let manifest_path = dir.join("nimble.toml");
-    fs_write(&manifest_path, toml_str.as_bytes())?;
+    let manifest = crate::anvil::config::default_manifest(name);
+    crate::anvil::config::write_init_manifest(dir, &manifest)?;
 
     // src/main.nbl
     let main_content = "fn main() -> Int:\n    print(\"hello, world\")\n    return 0\n";
@@ -60,7 +50,7 @@ entry_point = "{}"
 ///   2. Read entry source file
 ///   3. Invoke `smelt` to compile and link
 pub fn build_project(project_dir: &Path, run_after: bool, clean_after: bool) -> Result<(), String> {
-    let manifest = ProjectManifest::load(project_dir)?;
+    let manifest = ProjectManifest::load(project_dir).map_err(|e| e.to_string())?;
     let entry_path = project_dir.join(&manifest.project.entry_point);
 
     let source = fs_read_to_string(&entry_path)?;
@@ -114,7 +104,7 @@ pub fn build_project(project_dir: &Path, run_after: bool, clean_after: bool) -> 
 
 /// Run a previously built project executable.
 pub fn run_project(project_dir: &Path) -> Result<(), String> {
-    let manifest = ProjectManifest::load(project_dir)?;
+    let manifest = ProjectManifest::load(project_dir).map_err(|e| e.to_string())?;
     let exe_name = format!("{}.exe", manifest.project.name);
     let exe_path = project_dir.join("target").join(&exe_name);
 

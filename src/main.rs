@@ -236,60 +236,45 @@ async fn main() -> Result<()> {
                 .await;
         }
         Commands::Install { target } => {
-            let (uri, version) = split_target(&target)?;
-            nimble::nim::manager::PackageManager::new()
-                .map_err(|e| miette::miette!(e))?
-                .install_standalone_binary(uri, version)
+            let (url, version) = split_target(&target)?;
+            nimble::nim::commands::install_binary(url, version)
                 .map_err(|e| miette::miette!(e))?;
         }
         Commands::Uninstall { name } => {
-            nimble::nim::manager::PackageManager::new()
-                .map_err(|e| miette::miette!(e))?
-                .uninstall_binary(&name)
+            nimble::nim::commands::uninstall_binary(&name)
                 .map_err(|e| miette::miette!(e))?;
         }
         Commands::Upgrade { target } => {
-            let (uri, version) = split_target(&target)?;
-            nimble::nim::manager::PackageManager::new()
-                .map_err(|e| miette::miette!(e))?
-                .upgrade_binary(uri, version)
+            let (url, version) = split_target(&target)?;
+            nimble::nim::commands::uninstall_binary(url)
+                .map_err(|e| miette::miette!(e))?;
+            nimble::nim::commands::install_binary(url, version)
                 .map_err(|e| miette::miette!(e))?;
         }
         Commands::Pkg { action } => {
-            let pm = nimble::nim::manager::PackageManager::new().map_err(|e| miette::miette!(e))?;
             match action {
                 PkgAction::Install { target } => {
-                    let (uri, version) = split_target(&target)?;
-                    pm.install_pkg_library(uri, version)
+                    let (url, version) = split_target(&target)?;
+                    nimble::nim::commands::install_pkg_library(url, version)
                         .map_err(|e| miette::miette!(e))?;
                 }
                 PkgAction::Uninstall { target } => {
-                    let (uri, version) = split_target(&target)?;
-                    pm.uninstall_pkg_library(uri, version)
+                    let (url, version) = split_target(&target)?;
+                    nimble::nim::commands::uninstall_pkg_library(url, version)
                         .map_err(|e| miette::miette!(e))?;
                 }
                 PkgAction::Upgrade { target } => {
-                    let (uri, version) = split_target(&target)?;
-                    pm.upgrade_pkg_library(uri, version)
+                    let (url, version) = split_target(&target)?;
+                    nimble::nim::commands::uninstall_pkg_library(url, version)
+                        .map_err(|e| miette::miette!(e))?;
+                    nimble::nim::commands::install_pkg_library(url, version)
                         .map_err(|e| miette::miette!(e))?;
                 }
             }
         }
         Commands::Fetch { path } => {
-            let manifest = nimble::nim::manager::ProjectManifest::load(&path)
+            nimble::nim::commands::fetch_deps(&path)
                 .map_err(|e| miette::miette!(e))?;
-            let pm = nimble::nim::manager::PackageManager::new().map_err(|e| miette::miette!(e))?;
-            let cached = pm
-                .fetch_manifest_deps(&manifest)
-                .map_err(|e| miette::miette!(e))?;
-            if cached.is_empty() {
-                println!("    Finished no dependencies declared");
-            } else {
-                println!(
-                    "    \x1b[1mFinished\x1b[0m {} package(s) ready",
-                    cached.len()
-                );
-            }
         }
         Commands::Doc { path, output_dir } => {
             let mut docgen = nimble::docgen::DocGenerator::new();

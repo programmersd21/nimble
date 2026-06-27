@@ -138,7 +138,7 @@ impl LanguageServer for Backend {
         Ok(InitializeResult {
             server_info: Some(ServerInfo {
                 name: "lantern".to_string(),
-                version: Some("0.2.0".to_string()),
+                version: Some("0.2.1".to_string()),
             }),
             capabilities: ServerCapabilities {
                 text_document_sync: Some(TextDocumentSyncCapability::Kind(
