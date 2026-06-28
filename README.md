@@ -18,7 +18,8 @@ A statically typed language with Python-style indentation, LLVM-based code gener
 - **Option[T] / Result[T, E]** algebraic types in stdlib
 - **LLVM codegen** with optional debug info emission
 - **Cross-platform linker** — auto-discovers `cc`, `clang`, `gcc`, or `link.exe`
-- **Standard library** with 23 modules covering I/O, math, collections, testing, async, sync, crypto, net, FFI, and more
+- **Standard library** with 28 modules covering I/O, math, collections, encoding, hashing, strings, networking, filesystem, CLI, threading, synchronization, and more — all backed by a Rust runtime library
+- **Rich runtime library** (`ember`) — 120+ C-ABI functions implementing string ops, math, random, hashing, base64/hex encoding, filesystem, networking, CLI, time, atomics, mutex, channels
 - **C FFI** — `extern fn` for binding native libraries
 - **Rich diagnostics** — ~300 error codes with structured spans, suggestions, and pretty printing via miette
 - **Integrated LSP server** with hover info, goto-definition, and autocompletion
@@ -122,31 +123,37 @@ let result = await future
 
 ### Standard Library
 
-The standard library lives under `std/` and can be imported with `load`:
+The standard library lives under `std/` and provides **28 modules** — all backed by the Rust runtime:
 
-- `load std` — root aggregator module
-- `load std.io` — I/O (print, read_file, write_file, read_line)
-- `load std.math` — math functions (sin, cos, sqrt, log, PI, E, ...)
-- `load std.collections` — Vec[T], HashMap[K,V]
-- `load std.core` — Result, Option, common utilities
-- `load std.testing` — assert_eq, assert_true, assert_ok, run_test
-- `load std.async` — Future, Channel, Mutex, async/await primitives
-- `load std.sync` — AtomicInt, Arc
-- `load std.thread` — Thread, spawn, join
-- `load std.fmt` — formatting utilities
-- `load std.alloc` — allocation helpers
-- `load std.log` — logging helpers
-- `load std.fs` — file system
-- `load std.net` — networking
-- `load std.json` — JSON parsing
-- `load std.crypto` — random numbers
-- `load std.os` — OS interaction
-- `load std.process` — process management
-- `load std.time` — time utilities
-- `load std.mem` — memory helpers
-- `load std.ffi` — foreign function interface
-- `load std.reflect` — reflection utilities
-- `load std.builtin` — built-in type definitions
+`load std` — root aggregator (loads all modules)
+- **`std.io`** — print, read/write/append file, file metadata, type-to-string conversion
+- **`std.str`** — string manipulation: length, concat, find, trim, case, replace, repeat, split
+- **`std.math`** — 30+ math functions: trig, log, pow, rounding, IEEE 754 checks, constants (PI, E, TAU, INF)
+- **`std.collections`** — Vec[T], HashMap[K,V] generic data structures
+- **`std.core`** — abs, min, max, clamp, popcount, bit ops, checked/saturating/wrapping arithmetic
+- **`std.testing`** — assert_eq, assert_true, assert_ok, run_test
+- **`std.async`** — Future, Channel, Mutex, async/await primitives
+- **`std.sync`** — AtomicInt (load/store/add/sub/swap/CAS), Mutex, Arc
+- **`std.thread`** — Thread, spawn, join, sleep, available_parallelism
+- **`std.fmt`** — formatting utilities
+- **`std.alloc`** — allocation helpers
+- **`std.log`** — logging helpers (info, warn, error)
+- **`std.fs`** — filesystem: read/write/append/exists/size/delete/rename, directory ops
+- **`std.net`** — TCP connect/send/recv/close, DNS resolution
+- **`std.json`** — JSON parsing and stringification
+- **`std.crypto`** — random number generation
+- **`std.random`** — random int/float/range with Xoshiro256** PRNG
+- **`std.hash`** — FNV-1a, SipHash, xxHash3 hashing
+- **`std.encoding`** — base64 (standard + URL-safe), hex (upper/lower), UTF-8 validation
+- **`std.cli`** — command-line args, terminal detection, terminal size
+- **`std.text`** — text pattern matching (contains, replace_all)
+- **`std.os`** — environment variables (get/set), hostname, OS name, CPU count
+- **`std.process`** — process management (exit, abort)
+- **`std.time`** — epoch seconds, nanoseconds, monotonic clock, sleep, time formatting
+- **`std.mem`** — memory helpers
+- **`std.ffi`** — foreign function interface
+- **`std.reflect`** — reflection utilities
+- **`std.builtin`** — built-in type definitions
 
 See [`docs/manual/stdlib.md`](docs/manual/stdlib.md) for the full stdlib overview and API reference.
 
@@ -212,7 +219,7 @@ The Nimble compiler adopts a **query-based, demand-driven compiler architecture*
 | 4 | **Name Resolution** | `src/resolver.rs` | Two-pass resolver: collects definitions then resolves references to `DefId`s. |
 | 5 | **Type Checking** | `src/typechecker.rs` | Hindley-Milner inference with unification, generics, closures, method desugaring, interface conformance. |
 | 6 | **Code Generation** | `src/codegen.rs` | Emits textual LLVM IR with debug info, defer stacks, lambda trampolines, enum tagged unions. |
-| 7 | **Linking** | `smelt` driver | Auto-discovers system linker and links with `ember` runtime. |
+| 7 | **Linking** | `smelt` driver | Auto-discovers system linker and links with `ember` runtime library. |
 
 ### Diagnostics System
 
@@ -256,6 +263,31 @@ The package manager (`src/nim/`) is a **registry-less, Git-native** dependency r
 - **Cache** at `~/.nimble/{bin, cache/repos, cache/pkgs}`
 - **Compiler integration** — `install_binary` compiles via `smelt::driver::compile`
 
+## Runtime Library (ember)
+
+The Nimble runtime library (`src/ember/mod.rs`) is a Rust static library (`ember.lib` / `libember.a`) that provides all stdlib backing functions via C ABI. It implements **120+ `extern "C"` functions** organized into these categories:
+
+| Category | Functions |
+|----------|-----------|
+| **Memory** | alloc, free, realloc, string_new, string_free |
+| **String** | length, concat, eq, substring, find, trim, to_upper, to_lower, starts_with, ends_with, replace, repeat, split, split_nth, to_int, to_float |
+| **Print** | print, print_str, print_i64, print_f64, print_bool, flush, read_line |
+| **I/O** | read_file, write_file, append_file, file_exists, file_size, delete_file |
+| **Math** | sin, cos, tan, asin, acos, atan, atan2, sinh, cosh, tanh, sqrt, cbrt, pow, floor, ceil, round, trunc, fabs, log, log2, log10, exp, fma, hypot, fmod, clamp_f64, is_nan, is_infinite, is_finite, next_after |
+| **Integer** | abs_i64, min_i64, max_i64, clamp_i64, popcount, clz, ctz, byte_swap, rotl, rotr, checked_add/sub/mul/div, saturating_add/sub, wrapping_add/sub/mul |
+| **Random** | Xoshiro256** PRNG: rand_i64, rand_f64, rand_range, srand |
+| **Hashing** | FNV-1a, SipHash (1-3), xxHash3 |
+| **Encoding** | base64_encode (standard + URL-safe), base64_decode, hex_encode (upper + lower), hex_decode, utf8_validate |
+| **Filesystem** | create_dir, remove_dir, list_dir, current_dir, rename_file, delete_file |
+| **Networking** | TCP connect/send/recv/close via handle map, DNS resolve |
+| **CLI** | args_count, args_get, is_terminal, terminal_width, terminal_height, getenv, setenv, hostname, os_name, cpu_count |
+| **Time** | clock_monotonic, time_nanos, time_seconds, time_format, sleep_ms |
+| **Sync** | atomic_load/store/add/sub/swap, mutex_create/lock/unlock |
+| **JSON** | parse, stringify, get_field |
+| **Conversion** | int_to_string, float_to_string, bool_to_string |
+
+The runtime library is automatically built by the smelt driver (using `rustc`) and linked into every compiled Nimble program via `clang` or the system linker.
+
 ## Current Status
 
 ### Implemented
@@ -275,7 +307,7 @@ The package manager (`src/nim/`) is a **registry-less, Git-native** dependency r
 - Compile-time macros with AST substitution
 - Async/await with channel, mutex, atomic primitives
 - Reference types (`&T`, `&mut T`)
-- Standard library with 23 modules
+- Standard library with 28 modules, all runtime-backed
 
 **Diagnostics System:**
 - ~300 stable error codes (N0001–N9025)
@@ -301,7 +333,13 @@ The package manager (`src/nim/`) is a **registry-less, Git-native** dependency r
 - Transitive dependency collection with cycle detection and topological sort
 - Parallel dependency fetching
 - Binary installation and library caching
-- Checked/statured/wrapping arithmetic, bit manipulation
+
+**Runtime Library (ember):**
+- 120+ C-ABI functions covering memory, strings, print, I/O, filesystem, math, integer operations, random, hashing, encoding, networking, CLI, time, synchronization, JSON
+- Xoshiro256** PRNG, FNV-1a / SipHash / xxHash3 hashing
+- Base64 (standard + URL-safe), hex (upper + lower), UTF-8 validation
+- TCP networking with handle map, DNS resolution
+- Atomics (load/store/add/sub/swap/CAS), mutex, Arc
 
 ### Still Early
 
@@ -310,7 +348,7 @@ The package manager (`src/nim/`) is a **registry-less, Git-native** dependency r
 
 ## Test Suite
 
-The compiler has **257 unit tests** across all subsystems:
+The compiler has **261 unit tests** across all subsystems:
 
 | Subsystem | Test count | Coverage |
 |-----------|-----------|----------|
@@ -323,7 +361,8 @@ The compiler has **257 unit tests** across all subsystems:
 | Diagnostics | 5 | Pretty printing, span rendering, JSON output |
 | Lint | 3 | Dead code detection, unused variable detection |
 | Nim module | 21 | Manifest, cache, git, resolve, topological sort, features/kind |
-| Other | 74 | Env, types, ember, query system, anvil, chisel, selfhost, etc. |
+| Ember runtime | 12 | Memory, strings, math, random, hashing, encoding, file ops, atomics |
+| Other | 66 | Env, types, query system, anvil, chisel, selfhost, etc. |
 
 ## Build Options
 
@@ -345,6 +384,40 @@ cargo clippy
 cargo fmt --all --check
 ```
 
+## Examples
+
+21 sample programs are provided in `examples/`, covering every stdlib module:
+
+| Example | Demonstrates |
+|---------|-------------|
+| `hello_world.nbl` | Basic program structure |
+| `fibonacci.nbl` | Recursive functions |
+| `fizzbuzz.nbl` | Loops and conditionals |
+| `types.nbl` | Primitive types (Int, Float, Bool, String) |
+| `structs.nbl` | Struct definition, field access, area/perimeter |
+| `variables.nbl` | Immutable `let`, mutable `var`, compound assignment |
+| `booleans.nbl` | Boolean logic (and, or, not) |
+| `control_flow.nbl` | if/elif/else, while, break, continue |
+| `functions.nbl` | Functions, recursion, composition |
+| `generics.nbl` | Generic struct annotations |
+| `interfaces.nbl` | Structural typing via interfaces |
+| `operators.nbl` | Arithmetic, comparison, logical operators |
+| `ffi_example.nbl` | C FFI via `extern fn` |
+| `stdlib.nbl` | Standard library composition demo |
+| `strings.nbl` | String operations (length, concat, find, trim, case, replace) |
+| `math.nbl` | Math library (trig, sqrt, pow, rounding, abs, min/max) |
+| `encoding_demo.nbl` | Base64 and hex encoding/decoding |
+| `hash_demo.nbl` | FNV-1a, SipHash, xxHash3 hashing |
+| `random_demo.nbl` | Random number generation |
+| `time_demo.nbl` | Time functions (timestamp, sleep) |
+| `test_print.nbl` | Minimal I/O verification |
+
+Run all examples with:
+
+```sh
+python run_examples.py
+```
+
 ## Project Structure
 
 ```
@@ -353,13 +426,13 @@ nimble/
 ├── docs/
 │   ├── manual/            Language specification (types, expressions, etc.)
 │   └── sdocs/             Standard library documentation (per-module)
-├── examples/              Sample .nbl programs
+├── examples/              21 sample .nbl programs
 ├── src/
 │   ├── nim/               Package manager (cache, git, resolve, manifest, commands)
 │   ├── anvil/             Build system
 │   ├── chisel/            Code formatter
 │   ├── diagnostics/       Structured error codes, pretty printing, LSP integration
-│   ├── ember/             Runtime library (C static lib)
+│   ├── ember/             Runtime library (C static lib, 120+ functions)
 │   ├── forge/             REPL (JIT and simple modes)
 │   ├── lantern/           LSP server
 │   ├── smelt/             Compiler driver (linking, runtime build)
@@ -367,10 +440,11 @@ nimble/
 │   ├── query.rs           Compiler database (query-based, memoized, cached)
 │   ├── lib.rs             Crate root
 │   └── main.rs            CLI entry point
-└── std/                   Standard library (.nbl source)
-    ├── io/, math/, collections/, core/, testing/, async/, sync/
+└── std/                   Standard library (.nbl source, 28 modules)
+    ├── io/, math/, str/, collections/, core/, testing/, async/, sync/
     ├── thread/, fmt/, alloc/, log/, fs/, net/, json/, crypto/
-    ├── os/, process/, time/, mem/, ffi/, reflect/, builtin/
+    ├── random/, hash/, encoding/, cli/, text/, os/, process/
+    ├── time/, mem/, ffi/, reflect/, builtin/
     └── mod.nbl            Root aggregator module
 ```
 

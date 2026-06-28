@@ -1,41 +1,54 @@
 # Standard Library
 
-Nimble provides a standard library under the `std` namespace. Standard modules are loaded using the `load` keyword:
+Nimble provides a standard library under the `std` namespace backed by a Rust runtime library (`ember`) that exposes ~120 C-ABI functions. Standard modules are loaded using the `load` keyword.
 
-- `load std.io` - basic I/O helpers (print, read_file, write_file, read_line)
-- `load std.math` - math functions backed by the host math library (sin, cos, sqrt, log, PI, E, ...)
-- `load std.collections` - generic Vec[T] and HashMap[K, V] data structures
-- `load std.alloc` - allocation and reallocation helpers
-- `load std.core` - core utilities: Result, Option, max_i, min_i, clamp, panic, expect
-- `load std.testing` - assertion framework with assert_eq, assert_true, assert_ok, run_test
-- `load std.fmt` - formatting utilities (print_label, format_int)
-- `load std.async` - async primitives: Future, Channel, Mutex, spawn, join, sleep
-- `load std.sync` - synchronization: AtomicInt, Arc
-- `load std.thread` - threading: Thread, spawn, join
-- `load std.log` - simple logging helpers (info, warn, error)
-- `load std.fs` - file system operations (open, close)
-- `load std.net` - networking (connect, send, recv)
-- `load std.json` - JSON parsing (parse, stringify)
-- `load std.crypto` - random numbers (rand, srand)
-- `load std.os` - OS interaction (get_env, execute)
-- `load std.process` - process management (terminate)
-- `load std.time` - time utilities (now)
-- `load std.mem` - memory management (alloc_bytes, free_bytes)
-- `load std.ffi` - foreign function interface helpers (printf)
-- `load std.reflect` - reflection utilities (type_name, size_of)
-- `load std` - root `std` module aggregator that loads every available stdlib module
+## All Standard Modules
+
+| Module | Path | Description |
+|--------|------|-------------|
+| **Root** | `std` | Aggregator — loads every stdlib module |
+| **IO** | `std.io` | Print, read/write/append file, file metadata, type-to-string conversion |
+| **String** | `std.str` | String ops: length, concat, find, trim, case, replace, repeat, split, to_int, to_float |
+| **Math** | `std.math` | 30+ functions: trig, log, pow, rounding, IEEE 754 checks, constants (PI, E, TAU, INF) |
+| **Collections** | `std.collections` | Vec[T], HashMap[K,V] generic data structures |
+| **Core** | `std.core` | abs, min, max, clamp, popcount, bit ops, checked/saturating/wrapping arithmetic |
+| **Testing** | `std.testing` | assert_eq, assert_true, assert_ok, run_test |
+| **Async** | `std.async` | Future, Channel, Mutex, async/await primitives |
+| **Sync** | `std.sync` | AtomicInt (load/store/add/sub/swap/CAS), Mutex, Arc |
+| **Thread** | `std.thread` | Thread, spawn, join, sleep, available_parallelism |
+| **Format** | `std.fmt` | Formatting utilities (print_label, format_int) |
+| **Alloc** | `std.alloc` | Memory allocation helpers (alloc, free, realloc) |
+| **Log** | `std.log` | Logging helpers (info, warn, error) |
+| **Filesystem** | `std.fs` | Filesystem: read/write/append/exists/size/delete/rename, directory ops |
+| **Networking** | `std.net` | TCP connect/send/recv/close, DNS resolution |
+| **JSON** | `std.json` | JSON parsing and stringification |
+| **Crypto** | `std.crypto` | Random number generation |
+| **Random** | `std.random` | Random int/float/range with Xoshiro256** PRNG |
+| **Hashing** | `std.hash` | FNV-1a, SipHash, xxHash3 hashing |
+| **Encoding** | `std.encoding` | Base64 (standard + URL-safe), hex (upper/lower), UTF-8 validation |
+| **CLI** | `std.cli` | Command-line args, terminal detection, terminal size |
+| **Text** | `std.text` | Text pattern matching (contains, replace_all) |
+| **OS** | `std.os` | Environment variables (get/set), hostname, OS name, CPU count |
+| **Process** | `std.process` | Process management (exit, abort) |
+| **Time** | `std.time` | Epoch seconds, nanoseconds, monotonic clock, sleep, time formatting |
+| **Memory** | `std.mem` | Higher-level memory management helpers |
+| **FFI** | `std.ffi` | Foreign function interface helpers (printf) |
+| **Reflection** | `std.reflect` | Reflection utilities (type_name, size_of) |
+| **Builtins** | `std.builtin` | Built-in type definitions |
+
+All modules are backed by the Rust runtime (`src/ember/mod.rs`) and linked as a static library during compilation — no stubs or unimplemented functions.
 
 ## Root `std` Module
 
-The root `std` module is defined in `std/mod.nbl` and imports available standard library submodules. Use it when you want one import point for the standard library:
+The root `std` module is defined in `std/mod.nbl` and imports every available standard library submodule. Use it for a single import point:
 
 ```nimble
 load std
 
 fn main() -> Int:
-    std.io.println("Hello from std")
+    std.io.print("Hello from std")
     std.log.info("root std module loaded")
-    std.testing.assert_eq(10, std.core.max_i(3, 10))
+    std.testing.assert_eq(10, std.core.max(3, 10))
     return 0
 ```
 
@@ -44,12 +57,12 @@ fn main() -> Int:
 Use selective imports or aliasing for a smaller namespace:
 
 ```nimble
-load std.io::{println, print_int_val}
+load std.io::{print, print_int}
 load std.math as m
 
 fn main() -> Int:
-    println("sqrt(16) =")
-    print_int_val(4)
+    print("sqrt(16) =")
+    print_int(4)
     return 0
 ```
 
@@ -59,17 +72,13 @@ fn main() -> Int:
 load std
 
 fn main() -> Int:
-    std.io.println("Nimble standard library demo")
-    std.log.info("Testing stdlib helpers")
-    std.testing.assert_eq(7, std.core.max_i(3, 7))
-    std.testing.assert_eq(3, std.core.min_i(3, 7))
-    std.fmt.print_label("clamp(10,0,5) = ", std.core.clamp(10, 0, 5))
+    std.io.print("Nimble standard library demo")
 
-    # File I/O with Result propagation
-    let content = std.io.read_file("test.txt")?
-    std.io.println(content)
+    # Core utilities
+    std.testing.assert_eq(7, std.core.max(3, 7))
+    std.testing.assert_eq(3, std.core.min(3, 7))
 
-    # Math with constants
+    # Math
     let half_pi = std.math.PI / 2.0
     let s = std.math.sin(half_pi)
 
@@ -77,52 +86,66 @@ fn main() -> Int:
     let vec = std.collections.new_vec[Int]()
     let vec = std.collections.push(vec, 42)
 
-    # Async
-    let future = std.async.spawn(fn(): 42)
-    let result = std.async.await(future)?
+    # String operations
+    let h = std.str.concat("hello", " world")
+
+    # Encoding
+    let b64 = std.encoding.base64.encode("hello")
+
+    # Hashing
+    let h1 = std.hash.fnv1a("data")
+
+    # Random
+    let r = std.random.random_range(1, 100)
+
+    # CLI
+    let n = std.cli.arg_count()
+    let t = std.cli.is_terminal()
 
     return 0
 ```
 
-## Available standard modules
+## Runtime Architecture
+
+All stdlib functions delegate to the **ember** Rust runtime (`src/ember/mod.rs`), a C-ABI static library. When a Nimble program calls `std.str.length(s)`, the chain is:
+
+1. Nimble codegen emits `call void @nimble_string_length(ptr %s)`
+2. The LLVM IR is assembled and linked against `ember.lib` / `libember.a`
+3. At runtime, the call resolves to the Rust `extern "C" fn nimble_string_length()` implementation
+
+This architecture provides:
+- **Performance**: Rust implementations for all stdlib operations
+- **Correctness**: Well-tested algorithms (Xoshiro256**, FNV-1a, SipHash, etc.)
+- **Portability**: Platform-specific logic (filesystem, networking, threading) handled by Rust's standard library
+
+## Available documentation
 
 For detailed information on each module, see the [stdlib documentation](../sdocs/):
 
-- [std.io](../sdocs/io.md) - print, read_file, write_file, read_line
-- [std.math](../sdocs/math.md) - sin, cos, sqrt, log, PI, E, floor, ceil, round
-- [std.collections](../sdocs/collections.md) - Vec[T], HashMap[K,V]
-- [std.testing](../sdocs/testing.md) - assert_eq, assert_true, assert_ok, run_test
-- [std.fmt](../sdocs/fmt.md) - print_label, format_int
-- [std.async](../sdocs/async.md) - Future, Channel, Mutex
-- [std.sync](../sdocs/sync.md) - AtomicInt, Arc
-- [std.thread](../sdocs/thread.md) - Thread, spawn, join
-- [std.core](../sdocs/core.md) - Result, Option, panic, expect, unwrap
-- [std.alloc](../sdocs/alloc.md) - alloc, free, realloc
-- [std.log](../sdocs/log.md) - info, warn, error
-- [std.fs](../sdocs/fs.md) - open, close
-- [std.net](../sdocs/net.md) - connect, send, recv
-- [std.json](../sdocs/json.md) - parse, stringify
-- [std.ffi](../sdocs/ffi.md) - printf helpers
-
-## math module example
-
-The `std.math` module exposes floating-point math functions from the host platform.
-
-```nimble
-load std.math as m
-load std.io
-load std.log
-
-fn main() -> Int:
-    std.log.info("math module demo")
-
-    let zero = m.sin(0.0)
-    let root = m.sqrt(16.0)
-    let power = m.pow(2.0, 10.0)
-
-    if zero == 0.0 && root == 4.0 && power == 1024.0:
-        std.log.info("std.math functions are working")
-        return 0
-    std.log.error("std.math validation failed")
-    return 1
-```
+- [std.io](../sdocs/io.md)
+- [std.str](../sdocs/str.md)
+- [std.math](../sdocs/math.md)
+- [std.collections](../sdocs/collections.md)
+- [std.core](../sdocs/core.md)
+- [std.testing](../sdocs/testing.md)
+- [std.sync](../sdocs/sync.md)
+- [std.thread](../sdocs/thread.md)
+- [std.fmt](../sdocs/fmt.md)
+- [std.alloc](../sdocs/alloc.md)
+- [std.log](../sdocs/log.md)
+- [std.fs](../sdocs/fs.md)
+- [std.net](../sdocs/net.md)
+- [std.json](../sdocs/json.md)
+- [std.crypto](../sdocs/crypto.md)
+- [std.random](../sdocs/random.md)
+- [std.hash](../sdocs/hash.md)
+- [std.encoding](../sdocs/encoding.md)
+- [std.cli](../sdocs/cli.md)
+- [std.text](../sdocs/text.md)
+- [std.os](../sdocs/os.md)
+- [std.process](../sdocs/process.md)
+- [std.time](../sdocs/time.md)
+- [std.mem](../sdocs/mem.md)
+- [std.ffi](../sdocs/ffi.md)
+- [std.reflect](../sdocs/reflect.md)
+- [std.builtin](../sdocs/builtin.md)
