@@ -213,6 +213,10 @@ impl Codegen {
         self.push("declare void @nimble_print_str(ptr)\n");
         self.push("declare void @nimble_print_i64(i64)\n");
         self.push("declare void @nimble_print_f64(double)\n");
+        self.declared_externs.insert("nimble_print".to_string());
+        self.declared_externs.insert("nimble_print_str".to_string());
+        self.declared_externs.insert("nimble_print_i64".to_string());
+        self.declared_externs.insert("nimble_print_f64".to_string());
 
         for ext in module_externs {
             self.gen_stmt(ext, env)?;

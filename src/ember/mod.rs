@@ -86,7 +86,10 @@ pub struct NimbleString {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_string_new(raw: *const u8, len: i64) -> NimbleString {
     if len <= 0 {
-        return NimbleString { data: std::ptr::null_mut(), length: 0 };
+        return NimbleString {
+            data: std::ptr::null_mut(),
+            length: 0,
+        };
     }
     let size = len as usize;
     let data = nimble_alloc(size + 1);
@@ -116,7 +119,9 @@ unsafe fn to_cstr(ptr: *const u8) -> &'static str {
     if ptr.is_null() {
         return "";
     }
-    unsafe { CStr::from_ptr(ptr as *const i8) }.to_str().unwrap_or("")
+    unsafe { CStr::from_ptr(ptr as *const i8) }
+        .to_str()
+        .unwrap_or("")
 }
 
 // ── String operations ────────────────────────────────────────────────
@@ -212,16 +217,28 @@ pub unsafe extern "C" fn nimble_string_to_lower(s: *const u8) -> *mut u8 {
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_string_starts_with(s: *const u8, prefix: *const u8) -> i64 {
-    if to_cstr(s).starts_with(to_cstr(prefix)) { 1 } else { 0 }
+    if to_cstr(s).starts_with(to_cstr(prefix)) {
+        1
+    } else {
+        0
+    }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_string_ends_with(s: *const u8, suffix: *const u8) -> i64 {
-    if to_cstr(s).ends_with(to_cstr(suffix)) { 1 } else { 0 }
+    if to_cstr(s).ends_with(to_cstr(suffix)) {
+        1
+    } else {
+        0
+    }
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn nimble_string_replace(s: *const u8, from: *const u8, to: *const u8) -> *mut u8 {
+pub unsafe extern "C" fn nimble_string_replace(
+    s: *const u8,
+    from: *const u8,
+    to: *const u8,
+) -> *mut u8 {
     let src = to_cstr(s);
     let result = src.replace(to_cstr(from), to_cstr(to));
     let bytes = result.as_bytes();
@@ -324,7 +341,9 @@ pub unsafe extern "C" fn nimble_bool_to_string(val: i64) -> *mut u8 {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_print_string(msg: *const u8, len: i64) {
     init_console_utf8();
-    if msg.is_null() || len <= 0 { return; }
+    if msg.is_null() || len <= 0 {
+        return;
+    }
     let bytes = unsafe { std::slice::from_raw_parts(msg, len as usize) };
     let _ = io::stdout().write_all(bytes);
     let _ = io::stdout().flush();
@@ -333,7 +352,9 @@ pub unsafe extern "C" fn nimble_print_string(msg: *const u8, len: i64) {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_print(ptr: *const u8) {
     init_console_utf8();
-    if ptr.is_null() { return; }
+    if ptr.is_null() {
+        return;
+    }
     let s = unsafe { CStr::from_ptr(ptr as *const i8) };
     let _ = writeln!(io::stdout(), "{}", s.to_string_lossy());
     let _ = io::stdout().flush();
@@ -342,7 +363,9 @@ pub unsafe extern "C" fn nimble_print(ptr: *const u8) {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_print_str(ptr: *const u8) {
     init_console_utf8();
-    if ptr.is_null() { return; }
+    if ptr.is_null() {
+        return;
+    }
     let s = unsafe { CStr::from_ptr(ptr as *const i8) };
     let _ = write!(io::stdout(), "{}", s.to_string_lossy());
     let _ = io::stdout().flush();
@@ -417,13 +440,15 @@ pub unsafe extern "C" fn nimble_write_file(path: *const u8, content: *const u8) 
 pub unsafe extern "C" fn nimble_append_file(path: *const u8, content: *const u8) -> i64 {
     let p = to_cstr(path);
     let c = to_cstr(content);
-    match std::fs::OpenOptions::new().append(true).create(true).open(p) {
-        Ok(mut file) => {
-            match file.write_all(c.as_bytes()) {
-                Ok(_) => 0,
-                Err(_) => -2,
-            }
-        }
+    match std::fs::OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(p)
+    {
+        Ok(mut file) => match file.write_all(c.as_bytes()) {
+            Ok(_) => 0,
+            Err(_) => -2,
+        },
         Err(_) => -1,
     }
 }
@@ -431,7 +456,11 @@ pub unsafe extern "C" fn nimble_append_file(path: *const u8, content: *const u8)
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_file_exists(path: *const u8) -> i64 {
     let p = to_cstr(path);
-    if std::path::Path::new(p).exists() { 1 } else { 0 }
+    if std::path::Path::new(p).exists() {
+        1
+    } else {
+        0
+    }
 }
 
 #[unsafe(no_mangle)]
@@ -568,115 +597,217 @@ pub extern "C" fn nimble_sleep_ms(ms: i64) {
 // ── Math (extended) ──────────────────────────────────────────────────
 
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_sin(x: f64) -> f64 { x.sin() }
+pub extern "C" fn nimble_sin(x: f64) -> f64 {
+    x.sin()
+}
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_cos(x: f64) -> f64 { x.cos() }
+pub extern "C" fn nimble_cos(x: f64) -> f64 {
+    x.cos()
+}
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_tan(x: f64) -> f64 { x.tan() }
+pub extern "C" fn nimble_tan(x: f64) -> f64 {
+    x.tan()
+}
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_asin(x: f64) -> f64 { x.asin() }
+pub extern "C" fn nimble_asin(x: f64) -> f64 {
+    x.asin()
+}
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_acos(x: f64) -> f64 { x.acos() }
+pub extern "C" fn nimble_acos(x: f64) -> f64 {
+    x.acos()
+}
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_atan(x: f64) -> f64 { x.atan() }
+pub extern "C" fn nimble_atan(x: f64) -> f64 {
+    x.atan()
+}
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_atan2(y: f64, x: f64) -> f64 { y.atan2(x) }
+pub extern "C" fn nimble_atan2(y: f64, x: f64) -> f64 {
+    y.atan2(x)
+}
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_sinh(x: f64) -> f64 { x.sinh() }
+pub extern "C" fn nimble_sinh(x: f64) -> f64 {
+    x.sinh()
+}
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_cosh(x: f64) -> f64 { x.cosh() }
+pub extern "C" fn nimble_cosh(x: f64) -> f64 {
+    x.cosh()
+}
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_tanh(x: f64) -> f64 { x.tanh() }
+pub extern "C" fn nimble_tanh(x: f64) -> f64 {
+    x.tanh()
+}
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_sqrt(x: f64) -> f64 { x.sqrt() }
+pub extern "C" fn nimble_sqrt(x: f64) -> f64 {
+    x.sqrt()
+}
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_cbrt(x: f64) -> f64 { x.cbrt() }
+pub extern "C" fn nimble_cbrt(x: f64) -> f64 {
+    x.cbrt()
+}
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_pow(b: f64, e: f64) -> f64 { b.powf(e) }
+pub extern "C" fn nimble_pow(b: f64, e: f64) -> f64 {
+    b.powf(e)
+}
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_floor(x: f64) -> f64 { x.floor() }
+pub extern "C" fn nimble_floor(x: f64) -> f64 {
+    x.floor()
+}
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_ceil(x: f64) -> f64 { x.ceil() }
+pub extern "C" fn nimble_ceil(x: f64) -> f64 {
+    x.ceil()
+}
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_round(x: f64) -> f64 { x.round() }
+pub extern "C" fn nimble_round(x: f64) -> f64 {
+    x.round()
+}
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_trunc(x: f64) -> f64 { x.trunc() }
+pub extern "C" fn nimble_trunc(x: f64) -> f64 {
+    x.trunc()
+}
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_fabs(x: f64) -> f64 { x.abs() }
+pub extern "C" fn nimble_fabs(x: f64) -> f64 {
+    x.abs()
+}
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_log(x: f64) -> f64 { x.ln() }
+pub extern "C" fn nimble_log(x: f64) -> f64 {
+    x.ln()
+}
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_log2(x: f64) -> f64 { x.log2() }
+pub extern "C" fn nimble_log2(x: f64) -> f64 {
+    x.log2()
+}
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_log10(x: f64) -> f64 { x.log10() }
+pub extern "C" fn nimble_log10(x: f64) -> f64 {
+    x.log10()
+}
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_exp(x: f64) -> f64 { x.exp() }
+pub extern "C" fn nimble_exp(x: f64) -> f64 {
+    x.exp()
+}
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_fma(a: f64, b: f64, c: f64) -> f64 { a.mul_add(b, c) }
+pub extern "C" fn nimble_fma(a: f64, b: f64, c: f64) -> f64 {
+    a.mul_add(b, c)
+}
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_hypot(a: f64, b: f64) -> f64 { a.hypot(b) }
+pub extern "C" fn nimble_hypot(a: f64, b: f64) -> f64 {
+    a.hypot(b)
+}
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_fmod(a: f64, b: f64) -> f64 { a % b }
+pub extern "C" fn nimble_fmod(a: f64, b: f64) -> f64 {
+    a % b
+}
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_is_nan(x: f64) -> i64 { if x.is_nan() { 1 } else { 0 } }
+pub extern "C" fn nimble_is_nan(x: f64) -> i64 {
+    if x.is_nan() { 1 } else { 0 }
+}
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_is_infinite(x: f64) -> i64 { if x.is_infinite() { 1 } else { 0 } }
+pub extern "C" fn nimble_is_infinite(x: f64) -> i64 {
+    if x.is_infinite() { 1 } else { 0 }
+}
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_is_finite(x: f64) -> i64 { if x.is_finite() { 1 } else { 0 } }
+pub extern "C" fn nimble_is_finite(x: f64) -> i64 {
+    if x.is_finite() { 1 } else { 0 }
+}
 #[unsafe(no_mangle)]
 pub extern "C" fn nimble_next_after(x: f64, y: f64) -> f64 {
-    if x < y { (x + (y - x) * 0.001).min(y) }
-    else if x > y { (x - (x - y) * 0.001).max(y) }
-    else { x }
+    if x < y {
+        (x + (y - x) * 0.001).min(y)
+    } else if x > y {
+        (x - (x - y) * 0.001).max(y)
+    } else {
+        x
+    }
 }
 
 // Integer math
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_abs_i64(x: i64) -> i64 { x.abs() }
+pub extern "C" fn nimble_abs_i64(x: i64) -> i64 {
+    x.abs()
+}
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_min_i64(a: i64, b: i64) -> i64 { a.min(b) }
+pub extern "C" fn nimble_min_i64(a: i64, b: i64) -> i64 {
+    a.min(b)
+}
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_max_i64(a: i64, b: i64) -> i64 { a.max(b) }
+pub extern "C" fn nimble_max_i64(a: i64, b: i64) -> i64 {
+    a.max(b)
+}
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_clamp_i64(v: i64, lo: i64, hi: i64) -> i64 { v.clamp(lo, hi) }
+pub extern "C" fn nimble_clamp_i64(v: i64, lo: i64, hi: i64) -> i64 {
+    v.clamp(lo, hi)
+}
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_popcount(x: i64) -> i64 { x.count_ones() as i64 }
+pub extern "C" fn nimble_popcount(x: i64) -> i64 {
+    x.count_ones() as i64
+}
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_clz(x: i64) -> i64 { x.leading_zeros() as i64 }
+pub extern "C" fn nimble_clz(x: i64) -> i64 {
+    x.leading_zeros() as i64
+}
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_ctz(x: i64) -> i64 { x.trailing_zeros() as i64 }
+pub extern "C" fn nimble_ctz(x: i64) -> i64 {
+    x.trailing_zeros() as i64
+}
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_byte_swap(x: i64) -> i64 { x.swap_bytes() }
+pub extern "C" fn nimble_byte_swap(x: i64) -> i64 {
+    x.swap_bytes()
+}
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_rotl(x: i64, n: i64) -> i64 { x.rotate_left(n as u32) }
+pub extern "C" fn nimble_rotl(x: i64, n: i64) -> i64 {
+    x.rotate_left(n as u32)
+}
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_rotr(x: i64, n: i64) -> i64 { x.rotate_right(n as u32) }
+pub extern "C" fn nimble_rotr(x: i64, n: i64) -> i64 {
+    x.rotate_right(n as u32)
+}
 #[unsafe(no_mangle)]
 pub extern "C" fn nimble_checked_add(a: i64, b: i64) -> i64 {
-    match a.checked_add(b) { Some(v) => v, None => panic!("integer overflow") }
+    match a.checked_add(b) {
+        Some(v) => v,
+        None => panic!("integer overflow"),
+    }
 }
 #[unsafe(no_mangle)]
 pub extern "C" fn nimble_checked_sub(a: i64, b: i64) -> i64 {
-    match a.checked_sub(b) { Some(v) => v, None => panic!("integer underflow") }
+    match a.checked_sub(b) {
+        Some(v) => v,
+        None => panic!("integer underflow"),
+    }
 }
 #[unsafe(no_mangle)]
 pub extern "C" fn nimble_checked_mul(a: i64, b: i64) -> i64 {
-    match a.checked_mul(b) { Some(v) => v, None => panic!("integer overflow") }
+    match a.checked_mul(b) {
+        Some(v) => v,
+        None => panic!("integer overflow"),
+    }
 }
 #[unsafe(no_mangle)]
 pub extern "C" fn nimble_checked_div(a: i64, b: i64) -> i64 {
-    match a.checked_div(b) { Some(v) => v, None => panic!("division by zero") }
+    match a.checked_div(b) {
+        Some(v) => v,
+        None => panic!("division by zero"),
+    }
 }
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_saturating_add(a: i64, b: i64) -> i64 { a.saturating_add(b) }
+pub extern "C" fn nimble_saturating_add(a: i64, b: i64) -> i64 {
+    a.saturating_add(b)
+}
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_saturating_sub(a: i64, b: i64) -> i64 { a.saturating_sub(b) }
+pub extern "C" fn nimble_saturating_sub(a: i64, b: i64) -> i64 {
+    a.saturating_sub(b)
+}
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_wrapping_add(a: i64, b: i64) -> i64 { a.wrapping_add(b) }
+pub extern "C" fn nimble_wrapping_add(a: i64, b: i64) -> i64 {
+    a.wrapping_add(b)
+}
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_wrapping_sub(a: i64, b: i64) -> i64 { a.wrapping_sub(b) }
+pub extern "C" fn nimble_wrapping_sub(a: i64, b: i64) -> i64 {
+    a.wrapping_sub(b)
+}
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_wrapping_mul(a: i64, b: i64) -> i64 { a.wrapping_mul(b) }
+pub extern "C" fn nimble_wrapping_mul(a: i64, b: i64) -> i64 {
+    a.wrapping_mul(b)
+}
 
 // ── Random numbers ──────────────────────────────────────────────────
 
@@ -712,7 +843,9 @@ pub extern "C" fn nimble_rand_f64() -> f64 {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn nimble_rand_range(lo: i64, hi: i64) -> i64 {
-    if lo >= hi { return lo; }
+    if lo >= hi {
+        return lo;
+    }
     let range = (hi - lo).unsigned_abs();
     let val = xoshiro256ss_next() % range;
     lo + val as i64
@@ -720,7 +853,9 @@ pub extern "C" fn nimble_rand_range(lo: i64, hi: i64) -> i64 {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn nimble_srand(seed: u64) {
-    unsafe { RNG_STATE = seed; }
+    unsafe {
+        RNG_STATE = seed;
+    }
 }
 
 // ── Hashing ──────────────────────────────────────────────────────────
@@ -768,7 +903,11 @@ const BASE64_URL_CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrst
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_base64_encode(data: *const u8, len: i64, url_safe: i64) -> *mut u8 {
     let bytes = unsafe { std::slice::from_raw_parts(data, len.max(0) as usize) };
-    let chars = if url_safe != 0 { BASE64_URL_CHARS } else { BASE64_CHARS };
+    let chars = if url_safe != 0 {
+        BASE64_URL_CHARS
+    } else {
+        BASE64_CHARS
+    };
     let encoded = base64_encode_slice(bytes, chars);
     let ptr = nimble_alloc(encoded.len() + 1);
     unsafe {
@@ -780,7 +919,9 @@ pub unsafe extern "C" fn nimble_base64_encode(data: *const u8, len: i64, url_saf
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_base64_decode(data: *const u8, len: i64) -> *mut u8 {
-    let s = unsafe { std::str::from_utf8_unchecked(std::slice::from_raw_parts(data, len.max(0) as usize)) };
+    let s = unsafe {
+        std::str::from_utf8_unchecked(std::slice::from_raw_parts(data, len.max(0) as usize))
+    };
     match base64_decode_to_string(s) {
         Some(decoded) => {
             let ptr = nimble_alloc(decoded.len() + 1);
@@ -803,8 +944,16 @@ fn base64_encode_slice(data: &[u8], chars: &[u8]) -> Vec<u8> {
         let triple = (b0 << 16) | (b1 << 8) | b2;
         result.push(chars[((triple >> 18) & 0x3F) as usize]);
         result.push(chars[((triple >> 12) & 0x3F) as usize]);
-        result.push(if chunk.len() > 1 { chars[((triple >> 6) & 0x3F) as usize] } else { b'=' });
-        result.push(if chunk.len() > 2 { chars[(triple & 0x3F) as usize] } else { b'=' });
+        result.push(if chunk.len() > 1 {
+            chars[((triple >> 6) & 0x3F) as usize]
+        } else {
+            b'='
+        });
+        result.push(if chunk.len() > 2 {
+            chars[(triple & 0x3F) as usize]
+        } else {
+            b'='
+        });
     }
     result
 }
@@ -826,8 +975,12 @@ fn base64_decode_to_string(s: &str) -> Option<Vec<u8>> {
             quad |= val << (6 * (3 - i));
         }
         result.push(((quad >> 16) & 0xFF) as u8);
-        if chunk.len() > 2 { result.push(((quad >> 8) & 0xFF) as u8); }
-        if chunk.len() > 3 { result.push((quad & 0xFF) as u8); }
+        if chunk.len() > 2 {
+            result.push(((quad >> 8) & 0xFF) as u8);
+        }
+        if chunk.len() > 3 {
+            result.push((quad & 0xFF) as u8);
+        }
     }
     Some(result)
 }
@@ -852,9 +1005,13 @@ pub unsafe extern "C" fn nimble_hex_encode(data: *const u8, len: i64, upper: i64
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_hex_decode(hex: *const u8, len: i64) -> *mut u8 {
-    let s = unsafe { std::str::from_utf8_unchecked(std::slice::from_raw_parts(hex, len.max(0) as usize)) };
+    let s = unsafe {
+        std::str::from_utf8_unchecked(std::slice::from_raw_parts(hex, len.max(0) as usize))
+    };
     let s = s.trim();
-    if s.len() % 2 != 0 { return std::ptr::null_mut(); }
+    if s.len() % 2 != 0 {
+        return std::ptr::null_mut();
+    }
     let mut bytes = Vec::with_capacity(s.len() / 2);
     for chunk in s.as_bytes().chunks(2) {
         let hi = match (chunk[0] as char).to_digit(16) {
@@ -880,7 +1037,11 @@ pub unsafe extern "C" fn nimble_hex_decode(hex: *const u8, len: i64) -> *mut u8 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_utf8_validate(data: *const u8, len: i64) -> i64 {
     let bytes = unsafe { std::slice::from_raw_parts(data, len.max(0) as usize) };
-    if std::str::from_utf8(bytes).is_ok() { 1 } else { 0 }
+    if std::str::from_utf8(bytes).is_ok() {
+        1
+    } else {
+        0
+    }
 }
 
 // ── JSON ─────────────────────────────────────────────────────────────
@@ -938,12 +1099,19 @@ pub unsafe extern "C" fn nimble_json_get_field(json: *const u8, field: *const u8
 
 fn find_json_value_end(s: &str) -> usize {
     let s = s.trim_start();
-    if s.is_empty() { return 0; }
+    if s.is_empty() {
+        return 0;
+    }
     if s.starts_with('"') {
         let mut chars = s[1..].char_indices();
         while let Some((i, c)) = chars.next() {
-            if c == '\\' { chars.next(); continue; }
-            if c == '"' { return i + 2; }
+            if c == '\\' {
+                chars.next();
+                continue;
+            }
+            if c == '"' {
+                return i + 2;
+            }
         }
         return s.len();
     }
@@ -951,15 +1119,19 @@ fn find_json_value_end(s: &str) -> usize {
         let close = if s.starts_with('{') { '}' } else { ']' };
         let mut depth = 0;
         for (i, c) in s.char_indices() {
-            if c == '{' || c == '[' { depth += 1; }
-            else if c == '}' || c == ']' {
+            if c == '{' || c == '[' {
+                depth += 1;
+            } else if c == '}' || c == ']' {
                 depth -= 1;
-                if depth == 0 { return i + 1; }
+                if depth == 0 {
+                    return i + 1;
+                }
             }
         }
         return s.len();
     }
-    s.find(|c: char| c == ',' || c == '}' || c == ']' || c.is_whitespace()).unwrap_or(s.len())
+    s.find(|c: char| c == ',' || c == '}' || c == ']' || c.is_whitespace())
+        .unwrap_or(s.len())
 }
 
 fn json_parse_to_string(s: &str) -> Option<String> {
@@ -985,17 +1157,23 @@ pub unsafe extern "C" fn nimble_getenv(name: *const u8) -> *mut u8 {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn nimble_setenv(name: *const u8, value: *const u8) -> i64 {
-    #[cfg(windows)] {
+    #[cfg(windows)]
+    {
         unsafe extern "system" {
             fn SetEnvironmentVariableA(lpName: *const u8, lpValue: *const u8) -> i32;
         }
-        unsafe { SetEnvironmentVariableA(name, value); }
+        unsafe {
+            SetEnvironmentVariableA(name, value);
+        }
     }
-    #[cfg(not(windows))] {
+    #[cfg(not(windows))]
+    {
         unsafe extern "C" {
             fn setenv(name: *const u8, value: *const u8, overwrite: i32) -> i32;
         }
-        unsafe { setenv(name, value, 1); }
+        unsafe {
+            setenv(name, value, 1);
+        }
     }
     0
 }
@@ -1034,37 +1212,53 @@ pub extern "C" fn nimble_abort() {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn nimble_is_terminal() -> i64 {
-    #[cfg(windows)] {
+    #[cfg(windows)]
+    {
         unsafe extern "system" {
             fn GetStdHandle(nStdHandle: u32) -> isize;
             fn GetConsoleMode(hConsoleHandle: isize, lpMode: *mut u32) -> i32;
         }
         let handle = unsafe { GetStdHandle(0xFFFFFFF5) };
-        if handle == -1 || handle == 0 { return 0; }
+        if handle == -1 || handle == 0 {
+            return 0;
+        }
         let mut mode: u32 = 0;
-        if unsafe { GetConsoleMode(handle, &mut mode) } != 0 { 1 } else { 0 }
+        if unsafe { GetConsoleMode(handle, &mut mode) } != 0 {
+            1
+        } else {
+            0
+        }
     }
-    #[cfg(not(windows))] {
-        if unsafe { libc::isatty(1) } != 0 { 1 } else { 0 }
+    #[cfg(not(windows))]
+    {
+        if unsafe { libc::isatty(1) } != 0 {
+            1
+        } else {
+            0
+        }
     }
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn nimble_terminal_width() -> i64 {
-    #[cfg(windows)] {
+    #[cfg(windows)]
+    {
         80
     }
-    #[cfg(not(windows))] {
+    #[cfg(not(windows))]
+    {
         80
     }
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn nimble_terminal_height() -> i64 {
-    #[cfg(windows)] {
+    #[cfg(windows)]
+    {
         24
     }
-    #[cfg(not(windows))] {
+    #[cfg(not(windows))]
+    {
         24
     }
 }
@@ -1073,7 +1267,8 @@ pub extern "C" fn nimble_terminal_height() -> i64 {
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_hostname() -> *mut u8 {
-    #[cfg(windows)] {
+    #[cfg(windows)]
+    {
         let mut buffer = [0u8; 256];
         unsafe extern "system" {
             fn GetComputerNameA(lpBuffer: *mut u8, nSize: *mut u32) -> i32;
@@ -1087,7 +1282,8 @@ pub unsafe extern "C" fn nimble_hostname() -> *mut u8 {
             return ptr;
         }
     }
-    #[cfg(not(windows))] {
+    #[cfg(not(windows))]
+    {
         let hostname = std::process::Command::new("hostname")
             .output()
             .ok()
@@ -1106,7 +1302,13 @@ pub unsafe extern "C" fn nimble_hostname() -> *mut u8 {
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_os_name() -> *mut u8 {
-    let s = if cfg!(windows) { "windows" } else if cfg!(target_os = "macos") { "macos" } else { "linux" };
+    let s = if cfg!(windows) {
+        "windows"
+    } else if cfg!(target_os = "macos") {
+        "macos"
+    } else {
+        "linux"
+    };
     let bytes = s.as_bytes();
     let ptr = nimble_alloc(bytes.len() + 1);
     std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, bytes.len());
@@ -1116,7 +1318,9 @@ pub unsafe extern "C" fn nimble_os_name() -> *mut u8 {
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_cpu_count() -> i64 {
-    std::thread::available_parallelism().map(|n| n.get() as i64).unwrap_or(1)
+    std::thread::available_parallelism()
+        .map(|n| n.get() as i64)
+        .unwrap_or(1)
 }
 
 // ── Panic ────────────────────────────────────────────────────────────
@@ -1138,7 +1342,10 @@ struct Channel {
 #[unsafe(no_mangle)]
 pub extern "C" fn nimble_channel_create() -> i64 {
     let (tx, rx) = mpsc::channel::<i64>();
-    let chan = Box::into_raw(Box::new(Channel { sender: tx, receiver: rx }));
+    let chan = Box::into_raw(Box::new(Channel {
+        sender: tx,
+        receiver: rx,
+    }));
     chan as i64
 }
 
@@ -1170,7 +1377,9 @@ pub unsafe extern "C" fn nimble_mutex_lock(mtx: *mut std::sync::Mutex<()>) {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_mutex_unlock(mtx: *mut std::sync::Mutex<()>) {
     if let Some(m) = mtx.as_ref() {
-        if let Ok(guard) = m.lock() { drop(guard); }
+        if let Ok(guard) = m.lock() {
+            drop(guard);
+        }
     }
 }
 
@@ -1194,27 +1403,46 @@ pub unsafe extern "C" fn nimble_atomic_load(ptr: *mut i64) -> i64 {
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_atomic_store(ptr: *mut i64, val: i64) {
-    unsafe { std::sync::atomic::AtomicI64::from_ptr(ptr).store(val, std::sync::atomic::Ordering::SeqCst) }
+    unsafe {
+        std::sync::atomic::AtomicI64::from_ptr(ptr).store(val, std::sync::atomic::Ordering::SeqCst)
+    }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_atomic_add(ptr: *mut i64, val: i64) -> i64 {
-    unsafe { std::sync::atomic::AtomicI64::from_ptr(ptr).fetch_add(val, std::sync::atomic::Ordering::SeqCst) }
+    unsafe {
+        std::sync::atomic::AtomicI64::from_ptr(ptr)
+            .fetch_add(val, std::sync::atomic::Ordering::SeqCst)
+    }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_atomic_sub(ptr: *mut i64, val: i64) -> i64 {
-    unsafe { std::sync::atomic::AtomicI64::from_ptr(ptr).fetch_sub(val, std::sync::atomic::Ordering::SeqCst) }
+    unsafe {
+        std::sync::atomic::AtomicI64::from_ptr(ptr)
+            .fetch_sub(val, std::sync::atomic::Ordering::SeqCst)
+    }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_atomic_swap(ptr: *mut i64, val: i64) -> i64 {
-    unsafe { std::sync::atomic::AtomicI64::from_ptr(ptr).swap(val, std::sync::atomic::Ordering::SeqCst) }
+    unsafe {
+        std::sync::atomic::AtomicI64::from_ptr(ptr).swap(val, std::sync::atomic::Ordering::SeqCst)
+    }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_atomic_cas(ptr: *mut i64, old: i64, new: i64) -> i64 {
-    unsafe { std::sync::atomic::AtomicI64::from_ptr(ptr).compare_exchange(old, new, std::sync::atomic::Ordering::SeqCst, std::sync::atomic::Ordering::SeqCst).unwrap_or(old) }
+    unsafe {
+        std::sync::atomic::AtomicI64::from_ptr(ptr)
+            .compare_exchange(
+                old,
+                new,
+                std::sync::atomic::Ordering::SeqCst,
+                std::sync::atomic::Ordering::SeqCst,
+            )
+            .unwrap_or(old)
+    }
 }
 
 // ── Sort (runtime helper) ───────────────────────────────────────────
@@ -1234,10 +1462,11 @@ pub unsafe extern "C" fn nimble_sort_f64(data: *mut f64, len: i64) {
 // ── Networking ────────────────────────────────────────────────────────
 
 use std::net::{TcpStream, ToSocketAddrs};
-use std::sync::Mutex as StdMutex;
 use std::sync::LazyLock;
+use std::sync::Mutex as StdMutex;
 
-static TCP_CONNECTIONS: LazyLock<StdMutex<HashMap<i64, TcpStream>>> = LazyLock::new(|| StdMutex::new(HashMap::new()));
+static TCP_CONNECTIONS: LazyLock<StdMutex<HashMap<i64, TcpStream>>> =
+    LazyLock::new(|| StdMutex::new(HashMap::new()));
 static NEXT_TCP_ID: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(1);
 
 #[unsafe(no_mangle)]
@@ -1261,7 +1490,10 @@ pub unsafe extern "C" fn nimble_net_send(fd: i64, data: *const u8, len: i64) -> 
     let bytes = unsafe { std::slice::from_raw_parts(data, len.max(0) as usize) };
     if let Ok(mut map) = TCP_CONNECTIONS.lock() {
         if let Some(stream) = map.get_mut(&fd) {
-            match stream.write(bytes) { Ok(n) => return n as i64, Err(_) => return -1 }
+            match stream.write(bytes) {
+                Ok(n) => return n as i64,
+                Err(_) => return -1,
+            }
         }
     }
     -1
@@ -1273,7 +1505,10 @@ pub unsafe extern "C" fn nimble_net_recv(fd: i64, buffer: *mut u8, size: i64) ->
     if let Ok(mut map) = TCP_CONNECTIONS.lock() {
         if let Some(stream) = map.get_mut(&fd) {
             let _ = stream.set_read_timeout(Some(time::Duration::from_secs(5)));
-            match stream.read(buf) { Ok(n) => return n as i64, Err(_) => return -1 }
+            match stream.read(buf) {
+                Ok(n) => return n as i64,
+                Err(_) => return -1,
+            }
         }
     }
     -1
@@ -1322,7 +1557,9 @@ mod tests {
     fn alloc_and_free() {
         let ptr = nimble_alloc(64);
         assert!(!ptr.is_null());
-        unsafe { nimble_free(ptr, 64); }
+        unsafe {
+            nimble_free(ptr, 64);
+        }
     }
 
     #[test]
@@ -1348,7 +1585,10 @@ mod tests {
             let decoded = nimble_base64_decode(encoded, enc_len as i64);
             assert!(!decoded.is_null());
             let dec_len = CStr::from_ptr(decoded as *const i8).to_bytes().len();
-            assert_eq!(CStr::from_ptr(decoded as *const i8).to_str().unwrap(), "hello world");
+            assert_eq!(
+                CStr::from_ptr(decoded as *const i8).to_str().unwrap(),
+                "hello world"
+            );
             nimble_free(encoded, enc_len + 1);
             nimble_free(decoded, dec_len + 1);
         }
@@ -1361,7 +1601,10 @@ mod tests {
             let encoded = nimble_hex_encode(data.as_ptr(), data.len() as i64, 1);
             assert!(!encoded.is_null());
             let enc_len = CStr::from_ptr(encoded as *const i8).to_bytes().len();
-            assert_eq!(CStr::from_ptr(encoded as *const i8).to_str().unwrap(), "0102FF");
+            assert_eq!(
+                CStr::from_ptr(encoded as *const i8).to_str().unwrap(),
+                "0102FF"
+            );
             let decoded = nimble_hex_decode(encoded, enc_len as i64);
             assert!(!decoded.is_null());
             let dec_len = CStr::from_ptr(decoded as *const i8).to_bytes().len();
@@ -1433,7 +1676,10 @@ mod tests {
             let valid = b"hello";
             assert_eq!(nimble_utf8_validate(valid.as_ptr(), valid.len() as i64), 1);
             let invalid = [0xFF, 0xFF];
-            assert_eq!(nimble_utf8_validate(invalid.as_ptr(), invalid.len() as i64), 0);
+            assert_eq!(
+                nimble_utf8_validate(invalid.as_ptr(), invalid.len() as i64),
+                0
+            );
         }
     }
 
