@@ -25,18 +25,18 @@ pub fn to_lsp_diagnostics(diagnostic: &Diagnostic, source_map: &SourceMap) -> Ve
     // Group related info
     let mut related_information = Vec::new();
     for label in &diagnostic.labels {
-        if !label.is_primary {
-            if let Some(file) = source_map.get(label.span.file_id) {
-                let range = span_to_range(&label.span, &file);
-                let uri = match lsp::Url::from_file_path(&file.path) {
-                    Ok(u) => u,
-                    Err(_) => continue,
-                };
-                related_information.push(lsp::DiagnosticRelatedInformation {
-                    location: lsp::Location { uri, range },
-                    message: label.message.clone(),
-                });
-            }
+        if !label.is_primary
+            && let Some(file) = source_map.get(label.span.file_id)
+        {
+            let range = span_to_range(&label.span, &file);
+            let uri = match lsp::Url::from_file_path(&file.path) {
+                Ok(u) => u,
+                Err(_) => continue,
+            };
+            related_information.push(lsp::DiagnosticRelatedInformation {
+                location: lsp::Location { uri, range },
+                message: label.message.clone(),
+            });
         }
     }
 

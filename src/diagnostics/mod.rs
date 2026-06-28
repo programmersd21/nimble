@@ -35,6 +35,12 @@ pub struct DiagnosticEngine {
     pub json_mode: Mutex<bool>,
 }
 
+impl Default for DiagnosticEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DiagnosticEngine {
     pub fn new() -> Self {
         DiagnosticEngine {

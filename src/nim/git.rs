@@ -22,7 +22,7 @@ impl GitRepo {
         }
     }
 
-    pub fn clone(&self) -> NimResult<()> {
+    pub fn clone_repo(&self) -> NimResult<()> {
         if self.cache_dir.join(".git").exists() || self.cache_dir.exists() {
             return Ok(());
         }
@@ -44,7 +44,7 @@ impl GitRepo {
 
     pub fn fetch(&self) -> NimResult<()> {
         if !self.cache_dir.join(".git").exists() {
-            return self.clone();
+            return self.clone_repo();
         }
         run_git(
             &["fetch", "--all", "--tags"],
@@ -119,7 +119,7 @@ impl GitRepo {
 
     pub fn ensure(&self, git_ref: &GitRef) -> NimResult<()> {
         if !self.cache_dir.join(".git").exists() {
-            self.clone()?;
+            self.clone_repo()?;
         }
         self.checkout(git_ref)
     }

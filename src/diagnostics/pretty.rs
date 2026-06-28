@@ -106,22 +106,22 @@ pub fn render_diagnostic(diagnostic: &Diagnostic, source_map: &SourceMap) -> Str
             // For simplicity and completeness, we iterate through lines, and print a separator `...` if gap > 2.
             let mut last_printed_line = None;
             for (&line_num, line_labels) in &line_to_labels {
-                if let Some(last) = last_printed_line {
-                    if line_num > last + 1 {
-                        if line_num > last + 2 {
-                            out.push_str(&format!("... |\n"));
-                        } else {
-                            // Print intermediate line without labels
-                            let inter_line = last + 1;
-                            if let Some(content) = file.get_line(inter_line - 1) {
-                                out.push_str(&format!(
-                                    "{:pad$} {} | {}\n",
-                                    inter_line,
-                                    theme.border,
-                                    content,
-                                    pad = pad_len
-                                ));
-                            }
+                if let Some(last) = last_printed_line
+                    && line_num > last + 1
+                {
+                    if line_num > last + 2 {
+                        out.push_str("... |\n");
+                    } else {
+                        // Print intermediate line without labels
+                        let inter_line = last + 1;
+                        if let Some(content) = file.get_line(inter_line - 1) {
+                            out.push_str(&format!(
+                                "{:pad$} {} | {}\n",
+                                inter_line,
+                                theme.border,
+                                content,
+                                pad = pad_len
+                            ));
                         }
                     }
                 }
@@ -214,7 +214,7 @@ pub fn render_diagnostic(diagnostic: &Diagnostic, source_map: &SourceMap) -> Str
 
                     if has_carets {
                         // Colorize carets
-                        for (_col, &ch) in column_markers.iter().enumerate() {
+                        for &ch in column_markers.iter() {
                             if ch != ' ' {
                                 let c_color = if ch == '^' {
                                     theme.primary_label
@@ -235,7 +235,7 @@ pub fn render_diagnostic(diagnostic: &Diagnostic, source_map: &SourceMap) -> Str
                             label_text_to_append.sort_by_key(|t| t.0);
                             let messages: Vec<String> =
                                 label_text_to_append.into_iter().map(|t| t.1).collect();
-                            caret_line.push_str(" ");
+                            caret_line.push(' ');
                             caret_line.push_str(&messages.join(", "));
                         }
 
@@ -325,7 +325,7 @@ pub fn render_diagnostic(diagnostic: &Diagnostic, source_map: &SourceMap) -> Str
                             format!("{:pad$} {} | ", "", theme.border, pad = pad_len);
                         for i in 0..suggested_line.len() {
                             if i >= offset_in_line && i < offset_in_line + sub.replacement.len() {
-                                plus_line.push_str(&format!("\x1b[1;32m+\x1b[0m"));
+                                plus_line.push_str("\x1b[1;32m+\x1b[0m");
                             } else {
                                 plus_line.push(' ');
                             }

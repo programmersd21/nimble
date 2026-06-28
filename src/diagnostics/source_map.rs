@@ -65,7 +65,7 @@ impl SourceFile {
             self.source.len()
         };
         let line_content = &self.source[start..end];
-        Some(line_content.trim_end_matches(|c| c == '\r' || c == '\n'))
+        Some(line_content.trim_end_matches(['\r', '\n']))
     }
 }
 
@@ -73,6 +73,12 @@ pub struct SourceMap {
     files: DashMap<FileId, Arc<SourceFile>>,
     paths: DashMap<PathBuf, FileId>,
     next_id: std::sync::atomic::AtomicUsize,
+}
+
+impl Default for SourceMap {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl SourceMap {

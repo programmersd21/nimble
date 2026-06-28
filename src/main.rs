@@ -354,7 +354,7 @@ async fn main() -> Result<()> {
             }
         }
         Commands::Explain { code } => {
-            if let Some(err_code) = nimble::diagnostics::codes::ErrorCode::from_str(&code) {
+            if let Some(err_code) = nimble::diagnostics::codes::ErrorCode::parse_str(&code) {
                 println!("{}", err_code.explanation());
             } else {
                 eprintln!("error: unknown error code `{}`", code);

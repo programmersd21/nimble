@@ -68,7 +68,7 @@ fn parallel_fetch_git_deps(deps: &[&Dependency], repos_dir: &Path) -> NimResult<
                     if let Err(e) = repo.fetch() {
                         errors.lock().unwrap().push((url, e));
                     }
-                } else if let Err(e) = repo.clone() {
+                } else if let Err(e) = repo.clone_repo() {
                     errors.lock().unwrap().push((url, e));
                 }
             }))
@@ -199,7 +199,7 @@ pub fn install_pkg_library(url: &str, version: &str) -> NimResult<()> {
     if !pkg_dir.exists() {
         std::fs::create_dir_all(pkg_dir.parent().unwrap())
             .map_err(|e| NimError::cache(format!("cannot create pkg dir: {}", e)))?;
-        crate::nim::copy_dir(repo.source_path(), &pkg_dir).map_err(|e| NimError::cache(e))?;
+        crate::nim::copy_dir(repo.source_path(), &pkg_dir).map_err(NimError::cache)?;
     }
 
     eprintln!(

@@ -138,7 +138,7 @@ impl LanguageServer for Backend {
         Ok(InitializeResult {
             server_info: Some(ServerInfo {
                 name: "lantern".to_string(),
-                version: Some("0.2.1".to_string()),
+                version: Some("0.2.2".to_string()),
             }),
             capabilities: ServerCapabilities {
                 text_document_sync: Some(TextDocumentSyncCapability::Kind(
@@ -324,22 +324,21 @@ impl LanguageServer for Backend {
         if let Some(source) = self.documents.get(uri)
             && let Ok(prog) = Parser::new(&source).and_then(|mut p| p.parse())
             && let Ok(env) = TypeChecker::new(&source).check_program(&prog)
+            && let Ok(globals) = env.get_globals()
         {
-            if let Ok(globals) = env.get_globals() {
-                for (name, sym) in globals {
-                    let kind = match sym.kind {
-                        SymbolKind::Function => CompletionItemKind::FUNCTION,
-                        SymbolKind::Variable => CompletionItemKind::VARIABLE,
-                        SymbolKind::Struct => CompletionItemKind::STRUCT,
-                        SymbolKind::Interface => CompletionItemKind::INTERFACE,
-                    };
-                    items.push(CompletionItem {
-                        label: name.clone(),
-                        kind: Some(kind),
-                        detail: Some(sym.type_.to_string()),
-                        ..Default::default()
-                    });
-                }
+            for (name, sym) in globals {
+                let kind = match sym.kind {
+                    SymbolKind::Function => CompletionItemKind::FUNCTION,
+                    SymbolKind::Variable => CompletionItemKind::VARIABLE,
+                    SymbolKind::Struct => CompletionItemKind::STRUCT,
+                    SymbolKind::Interface => CompletionItemKind::INTERFACE,
+                };
+                items.push(CompletionItem {
+                    label: name.clone(),
+                    kind: Some(kind),
+                    detail: Some(sym.type_.to_string()),
+                    ..Default::default()
+                });
             }
         }
         Ok(Some(CompletionResponse::Array(items)))

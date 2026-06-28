@@ -188,7 +188,7 @@ impl<'a> Resolver<'a> {
                     &mut resolved,
                     &mut visiting,
                     &mut visited,
-                    &vec![],
+                    &[],
                     DependencyKind::Normal,
                 )?;
             }
@@ -200,7 +200,7 @@ impl<'a> Resolver<'a> {
                     &mut resolved,
                     &mut visiting,
                     &mut visited,
-                    &vec![],
+                    &[],
                     DependencyKind::Dev,
                 )?;
             }
@@ -212,7 +212,7 @@ impl<'a> Resolver<'a> {
                     &mut resolved,
                     &mut visiting,
                     &mut visited,
-                    &vec![],
+                    &[],
                     DependencyKind::Build,
                 )?;
             }
@@ -238,7 +238,7 @@ impl<'a> Resolver<'a> {
             return Ok(());
         }
         if visiting.contains(&dep.name) {
-            let cycle = chain.iter().cloned().collect::<Vec<_>>().join(" -> ");
+            let cycle = chain.to_vec().join(" -> ");
             return Err(NimError::CycleDetected {
                 cycle: format!("{} -> {}", cycle, dep.name),
             });
@@ -642,16 +642,16 @@ mod tests {
     fn lockfile_with_features_and_kind_roundtrip() {
         let lf = Lockfile {
             version: 1,
-            packages: vec![
-                LockedDep {
-                    name: "json".into(), version: "1.0.0".into(),
-                    source: "git+https://github.com/user/json".into(),
-                    commit: "abc".into(), checksum: "def".into(),
-                    dependencies: vec!["serde".into()],
-                    features: vec!["serde".into()],
-                    kind: DependencyKind::Dev,
-                },
-            ],
+            packages: vec![LockedDep {
+                name: "json".into(),
+                version: "1.0.0".into(),
+                source: "git+https://github.com/user/json".into(),
+                commit: "abc".into(),
+                checksum: "def".into(),
+                dependencies: vec!["serde".into()],
+                features: vec!["serde".into()],
+                kind: DependencyKind::Dev,
+            }],
         };
         let dir = std::env::temp_dir().join("nim_lock_feat_test");
         let _ = std::fs::create_dir_all(&dir);
@@ -668,14 +668,18 @@ mod tests {
         let dir = std::env::temp_dir().join("nim_kind_test");
         let _ = std::fs::create_dir_all(&dir);
         let toml_path = dir.join("nimble.toml");
-        std::fs::write(&toml_path, r#"
+        std::fs::write(
+            &toml_path,
+            r#"
 [project]
 name = "test"
 version = "0.1.0"
 
 [dev-dependencies]
 mylib = { git = "https://github.com/user/mylib" }
-"#).unwrap();
+"#,
+        )
+        .unwrap();
         let m = ProjectManifest::load(&dir).unwrap();
         let cache = std::env::temp_dir().join("nim_kind_cache");
         let resolver = Resolver::new(&m, &cache);
@@ -696,14 +700,18 @@ mylib = { git = "https://github.com/user/mylib" }
         let dir = std::env::temp_dir().join("nim_version_reject");
         let _ = std::fs::create_dir_all(&dir);
         let toml_path = dir.join("nimble.toml");
-        std::fs::write(&toml_path, r#"
+        std::fs::write(
+            &toml_path,
+            r#"
 [project]
 name = "test"
 version = "0.1.0"
 
 [dependencies]
 json = "1.2.0"
-"#).unwrap();
+"#,
+        )
+        .unwrap();
         let m = ProjectManifest::load(&dir).unwrap();
         let cache = std::env::temp_dir().join("nim_version_cache");
         let resolver = Resolver::new(&m, &cache);
@@ -717,8 +725,26 @@ json = "1.2.0"
     #[test]
     fn topological_sort_preserves_features_and_kind() {
         let pkgs = vec![
-            LockedDep { name: "b".into(), version: "1".into(), source: "".into(), commit: "".into(), checksum: "".into(), dependencies: vec![], features: vec!["feat_b".into()], kind: DependencyKind::Build },
-            LockedDep { name: "a".into(), version: "1".into(), source: "".into(), commit: "".into(), checksum: "".into(), dependencies: vec!["b".into()], features: vec!["feat_a".into()], kind: DependencyKind::Normal },
+            LockedDep {
+                name: "b".into(),
+                version: "1".into(),
+                source: "".into(),
+                commit: "".into(),
+                checksum: "".into(),
+                dependencies: vec![],
+                features: vec!["feat_b".into()],
+                kind: DependencyKind::Build,
+            },
+            LockedDep {
+                name: "a".into(),
+                version: "1".into(),
+                source: "".into(),
+                commit: "".into(),
+                checksum: "".into(),
+                dependencies: vec!["b".into()],
+                features: vec!["feat_a".into()],
+                kind: DependencyKind::Normal,
+            },
         ];
         let sorted = topological_sort(&pkgs).unwrap();
         assert_eq!(sorted[0].name, "b");

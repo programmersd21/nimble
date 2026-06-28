@@ -230,10 +230,8 @@ impl Database {
             if db_ref.is_query_valid(&key) {
                 if let Some(tokens) = db_ref.memo_lex.get(path) {
                     Some(tokens.clone())
-                } else if let Some(tokens) = db_ref.load_cached_value::<Vec<Token>>(&key) {
-                    Some(tokens)
                 } else {
-                    None
+                    db_ref.load_cached_value::<Vec<Token>>(&key)
                 }
             } else {
                 None
@@ -286,10 +284,8 @@ impl Database {
             if db_ref.is_query_valid(&key) {
                 if let Some(prog) = db_ref.memo_parse.get(path) {
                     Some(prog.clone())
-                } else if let Some(prog) = db_ref.load_cached_value::<Program>(&key) {
-                    Some(prog)
                 } else {
-                    None
+                    db_ref.load_cached_value::<Program>(&key)
                 }
             } else {
                 None
@@ -337,10 +333,8 @@ impl Database {
             if db_ref.is_query_valid(&key) {
                 if let Some(res) = db_ref.memo_typecheck.get(path) {
                     Some(res.clone())
-                } else if let Some(res) = db_ref.load_cached_value::<TypecheckResult>(&key) {
-                    Some(res)
                 } else {
-                    None
+                    db_ref.load_cached_value::<TypecheckResult>(&key)
                 }
             } else {
                 None
@@ -413,10 +407,8 @@ impl Database {
             if db_ref.is_query_valid(&key) {
                 if let Some(ir) = db_ref.memo_codegen.get(path) {
                     Some(ir.clone())
-                } else if let Some(ir) = db_ref.load_cached_value::<String>(&key) {
-                    Some(ir)
                 } else {
-                    None
+                    db_ref.load_cached_value::<String>(&key)
                 }
             } else {
                 None

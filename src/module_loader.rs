@@ -226,7 +226,7 @@ impl ModuleLoader {
 
         let (prog, externs) = if let Some(ref db_cell) = self.db {
             let prog = crate::query::Database::query_parse(db_cell.clone(), &file_path)
-                .map_err(|e| ModuleError::Parse(e))?;
+                .map_err(ModuleError::Parse)?;
             let externs: Vec<Stmt> = prog
                 .statements
                 .iter()
@@ -260,7 +260,7 @@ impl ModuleLoader {
 
         let (env, externs_loaded, fn_defs_with_envs) = if let Some(ref db_cell) = self.db {
             let tc_res = crate::query::Database::query_typecheck(db_cell.clone(), &file_path)
-                .map_err(|e| ModuleError::TypeError(e))?;
+                .map_err(ModuleError::TypeError)?;
             (tc_res.env, tc_res.externs, tc_res.module_stmts)
         } else {
             let mut nested_loader = self.clone();

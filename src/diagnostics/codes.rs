@@ -1035,7 +1035,7 @@ impl ErrorCode {
     }
 
     /// Parse an error code from its string representation.
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse_str(s: &str) -> Option<Self> {
         // Use the as_str output as canonical repr
         let upper = s.to_uppercase();
         // Walk all variants via as_str

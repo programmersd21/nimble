@@ -60,12 +60,12 @@ version = "0.1.0"
         let dir = std::env::temp_dir().join("anvil_test_manifest");
         let _ = std::fs::create_dir_all(&dir);
         let mut f = std::fs::File::create(dir.join("nimble.toml")).unwrap();
-        f.write_all(b"[project]\nname = \"foo\"\nversion = \"0.2.1\"\n")
+        f.write_all(b"[project]\nname = \"foo\"\nversion = \"0.2.2\"\n")
             .unwrap();
 
         let manifest = ProjectManifest::load(&dir).unwrap();
         assert_eq!(manifest.project.name, "foo");
-        assert_eq!(manifest.project.version, "0.2.1");
+        assert_eq!(manifest.project.version, "0.2.2");
 
         let _ = std::fs::remove_dir_all(&dir);
     }

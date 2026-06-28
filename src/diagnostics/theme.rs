@@ -18,6 +18,12 @@ pub struct Theme {
     pub caret: &'static str,
 }
 
+impl Default for Theme {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Theme {
     pub fn new() -> Self {
         if Self::color_disabled() {

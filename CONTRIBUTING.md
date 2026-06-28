@@ -48,15 +48,22 @@ cargo bench --bench compiler_perf
 ## Project Structure
 
 ```
-.github/workflows/   CI configuration
-anvil/               Build system (`anvil` binary)
-benches/             Criterion benchmarks
-chisel/              Code formatter (`chisel` binary)
-docs/                Language specification
-ember/               Runtime library (`ember` staticlib)
-examples/            Sample .nbl programs
-forge/               REPL (`forge` binary, requires `--features jit`)
-lantern/             LSP server (`lantern` binary)
-smelt/               Compiler driver (`smelt` binary)
-src/                 Core compiler library
+.github/workflows/     CI configuration
+benches/               Criterion benchmarks
+docs/
+  ├── manual/          Language specification (types, expressions, statements, etc.)
+  └── sdocs/           Standard library documentation (per-module)
+examples/              Sample .nbl programs
+src/
+  ├── anvil/           Build system (`init`, `build`, `run`)
+  ├── chisel/          Code formatter (`fmt`)
+  ├── diagnostics/     Structured error codes, pretty printing, LSP conversion
+  ├── ember/           Runtime library C source
+  ├── forge/           REPL (requires `--features jit` for JIT execution)
+  ├── lantern/         LSP server
+  ├── nim/             Package manager (cache, git, resolve, manifest)
+  ├── smelt/           Compiler driver (linking, runtime build)
+  ├── lib.rs           Crate root
+  └── main.rs          CLI entry point (all tools in one binary)
+std/                   Standard library source files (.nbl)
 ```

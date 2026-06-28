@@ -17,7 +17,7 @@ pub struct FixIt {
 impl FixIt {
     pub fn new(span: DiagnosticSpan, replacement: impl Into<String>) -> Self {
         FixIt {
-            span: span,
+            span,
             replacement: replacement.into(),
         }
     }

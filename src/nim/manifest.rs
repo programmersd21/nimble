@@ -59,25 +59,13 @@ pub struct FeaturesSection {
     pub optional: HashMap<String, Vec<String>>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Profile {
     pub opt_level: Option<u32>,
     pub lto: Option<bool>,
     pub strip: Option<bool>,
     pub debug: Option<bool>,
     pub panic: Option<String>,
-}
-
-impl Default for Profile {
-    fn default() -> Self {
-        Profile {
-            opt_level: None,
-            lto: None,
-            strip: None,
-            debug: None,
-            panic: None,
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -159,7 +147,7 @@ impl ProjectManifest {
 
     pub fn save(&self) -> NimResult<()> {
         let mut out = String::new();
-        out.push_str(&format!("[project]\n"));
+        out.push_str("[project]\n");
         out.push_str(&format!("name = \"{}\"\n", self.project.name));
         out.push_str(&format!("version = \"{}\"\n", self.project.version));
         out.push_str(&format!("entry_point = \"{}\"\n", self.project.entry_point));
@@ -469,7 +457,7 @@ full = ["json", "http"]
         let dir = std::env::temp_dir().join("nim_test_manifest");
         let _ = std::fs::create_dir_all(&dir);
         let mut f = std::fs::File::create(dir.join("nimble.toml")).unwrap();
-        f.write_all(b"[project]\nname = \"foo\"\nversion = \"0.2.1\"\n")
+        f.write_all(b"[project]\nname = \"foo\"\nversion = \"0.2.2\"\n")
             .unwrap();
         let m = ProjectManifest::load(&dir).unwrap();
         assert_eq!(m.project.name, "foo");
