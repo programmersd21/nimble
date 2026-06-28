@@ -1,7 +1,9 @@
+#![allow(clippy::missing_safety_doc, unsafe_op_in_unsafe_fn)]
+
 use std::alloc::{self, Layout};
 use std::collections::HashMap;
 use std::ffi::CStr;
-use std::io::{self, BufRead, Read, Write};
+use std::io::{self, Read, Write};
 use std::process;
 use std::sync::Once;
 use std::sync::mpsc;
@@ -107,6 +109,7 @@ pub unsafe extern "C" fn nimble_string_free(s: NimbleString) {
     }
 }
 
+#[allow(dead_code)]
 unsafe fn to_str(ptr: *const u8, len: i64) -> &'static str {
     if ptr.is_null() || len <= 0 {
         return "";
@@ -128,108 +131,116 @@ unsafe fn to_cstr(ptr: *const u8) -> &'static str {
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_string_length(s: *const u8) -> i64 {
-    to_cstr(s).len() as i64
+    unsafe { to_cstr(s).len() as i64 }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_string_concat(a: *const u8, b: *const u8) -> *mut u8 {
-    let sa = to_cstr(a);
-    let sb = to_cstr(b);
-    let result = format!("{}{}", sa, sb);
-    let bytes = result.as_bytes();
-    let len = bytes.len();
-    let ptr = nimble_alloc(len + 1);
     unsafe {
+        let sa = to_cstr(a);
+        let sb = to_cstr(b);
+        let result = format!("{}{}", sa, sb);
+        let bytes = result.as_bytes();
+        let len = bytes.len();
+        let ptr = nimble_alloc(len + 1);
         std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, len);
         *ptr.add(len) = 0;
+        ptr
     }
-    ptr
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_string_eq(a: *const u8, b: *const u8) -> i64 {
-    let sa = to_cstr(a);
-    let sb = to_cstr(b);
-    if sa == sb { 1 } else { 0 }
+    unsafe {
+        let sa = to_cstr(a);
+        let sb = to_cstr(b);
+        if sa == sb { 1 } else { 0 }
+    }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_string_substring(s: *const u8, start: i64, end: i64) -> *mut u8 {
-    let src = to_cstr(s);
-    let len = src.len() as i64;
-    let s = start.max(0).min(len);
-    let e = end.max(s).min(len);
-    let sub = &src[s as usize..e as usize];
-    let bytes = sub.as_bytes();
-    let ptr = nimble_alloc(bytes.len() + 1);
     unsafe {
+        let src = to_cstr(s);
+        let len = src.len() as i64;
+        let s = start.max(0).min(len);
+        let e = end.max(s).min(len);
+        let sub = &src[s as usize..e as usize];
+        let bytes = sub.as_bytes();
+        let ptr = nimble_alloc(bytes.len() + 1);
         std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, bytes.len());
         *ptr.add(bytes.len()) = 0;
+        ptr
     }
-    ptr
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_string_find(s: *const u8, needle: *const u8) -> i64 {
-    let src = to_cstr(s);
-    let n = to_cstr(needle);
-    src.find(n).map(|i| i as i64).unwrap_or(-1)
+    unsafe {
+        let src = to_cstr(s);
+        let n = to_cstr(needle);
+        src.find(n).map(|i| i as i64).unwrap_or(-1)
+    }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_string_trim(s: *const u8) -> *mut u8 {
-    let src = to_cstr(s);
-    let trimmed = src.trim();
-    let bytes = trimmed.as_bytes();
-    let ptr = nimble_alloc(bytes.len() + 1);
     unsafe {
+        let src = to_cstr(s);
+        let trimmed = src.trim();
+        let bytes = trimmed.as_bytes();
+        let ptr = nimble_alloc(bytes.len() + 1);
         std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, bytes.len());
         *ptr.add(bytes.len()) = 0;
+        ptr
     }
-    ptr
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_string_to_upper(s: *const u8) -> *mut u8 {
-    let src = to_cstr(s);
-    let result: String = src.to_uppercase();
-    let bytes = result.as_bytes();
-    let ptr = nimble_alloc(bytes.len() + 1);
     unsafe {
+        let src = to_cstr(s);
+        let result: String = src.to_uppercase();
+        let bytes = result.as_bytes();
+        let ptr = nimble_alloc(bytes.len() + 1);
         std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, bytes.len());
         *ptr.add(bytes.len()) = 0;
+        ptr
     }
-    ptr
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_string_to_lower(s: *const u8) -> *mut u8 {
-    let src = to_cstr(s);
-    let result: String = src.to_lowercase();
-    let bytes = result.as_bytes();
-    let ptr = nimble_alloc(bytes.len() + 1);
     unsafe {
+        let src = to_cstr(s);
+        let result: String = src.to_lowercase();
+        let bytes = result.as_bytes();
+        let ptr = nimble_alloc(bytes.len() + 1);
         std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, bytes.len());
         *ptr.add(bytes.len()) = 0;
+        ptr
     }
-    ptr
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_string_starts_with(s: *const u8, prefix: *const u8) -> i64 {
-    if to_cstr(s).starts_with(to_cstr(prefix)) {
-        1
-    } else {
-        0
+    unsafe {
+        if to_cstr(s).starts_with(to_cstr(prefix)) {
+            1
+        } else {
+            0
+        }
     }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_string_ends_with(s: *const u8, suffix: *const u8) -> i64 {
-    if to_cstr(s).ends_with(to_cstr(suffix)) {
-        1
-    } else {
-        0
+    unsafe {
+        if to_cstr(s).ends_with(to_cstr(suffix)) {
+            1
+        } else {
+            0
+        }
     }
 }
 
@@ -239,54 +250,56 @@ pub unsafe extern "C" fn nimble_string_replace(
     from: *const u8,
     to: *const u8,
 ) -> *mut u8 {
-    let src = to_cstr(s);
-    let result = src.replace(to_cstr(from), to_cstr(to));
-    let bytes = result.as_bytes();
-    let ptr = nimble_alloc(bytes.len() + 1);
     unsafe {
+        let src = to_cstr(s);
+        let result = src.replace(to_cstr(from), to_cstr(to));
+        let bytes = result.as_bytes();
+        let ptr = nimble_alloc(bytes.len() + 1);
         std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, bytes.len());
         *ptr.add(bytes.len()) = 0;
+        ptr
     }
-    ptr
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_string_repeat(s: *const u8, count: i64) -> *mut u8 {
-    let src = to_cstr(s);
-    let result = src.repeat(count.max(0) as usize);
-    let bytes = result.as_bytes();
-    let ptr = nimble_alloc(bytes.len() + 1);
     unsafe {
+        let src = to_cstr(s);
+        let result = src.repeat(count.max(0) as usize);
+        let bytes = result.as_bytes();
+        let ptr = nimble_alloc(bytes.len() + 1);
         std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, bytes.len());
         *ptr.add(bytes.len()) = 0;
+        ptr
     }
-    ptr
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_string_split(s: *const u8, delim: i64) -> i64 {
-    let src = to_cstr(s);
-    let d = char::from_u32(delim as u32).unwrap_or(',');
-    let count = src.split(d).count() as i64;
-    count
+    unsafe {
+        let src = to_cstr(s);
+        let d = char::from_u32(delim as u32).unwrap_or(',');
+
+        src.split(d).count() as i64
+    }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_string_split_nth(s: *const u8, delim: i64, n: i64) -> *mut u8 {
-    let src = to_cstr(s);
-    let d = char::from_u32(delim as u32).unwrap_or(',');
-    let parts: Vec<&str> = src.split(d).collect();
-    if n >= 0 && (n as usize) < parts.len() {
-        let part = parts[n as usize];
-        let bytes = part.as_bytes();
-        let ptr = nimble_alloc(bytes.len() + 1);
-        unsafe {
+    unsafe {
+        let src = to_cstr(s);
+        let d = char::from_u32(delim as u32).unwrap_or(',');
+        let parts: Vec<&str> = src.split(d).collect();
+        if n >= 0 && (n as usize) < parts.len() {
+            let part = parts[n as usize];
+            let bytes = part.as_bytes();
+            let ptr = nimble_alloc(bytes.len() + 1);
             std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, bytes.len());
             *ptr.add(bytes.len()) = 0;
+            ptr
+        } else {
+            std::ptr::null_mut()
         }
-        ptr
-    } else {
-        std::ptr::null_mut()
     }
 }
 
@@ -295,10 +308,8 @@ pub unsafe extern "C" fn nimble_int_to_string(val: i64) -> *mut u8 {
     let s = format!("{}", val);
     let bytes = s.as_bytes();
     let ptr = nimble_alloc(bytes.len() + 1);
-    unsafe {
-        std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, bytes.len());
-        *ptr.add(bytes.len()) = 0;
-    }
+    std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, bytes.len());
+    *ptr.add(bytes.len()) = 0;
     ptr
 }
 
@@ -316,12 +327,12 @@ pub unsafe extern "C" fn nimble_float_to_string(val: f64) -> *mut u8 {
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_string_to_int(s: *const u8) -> i64 {
-    to_cstr(s).trim().parse::<i64>().unwrap_or(0)
+    unsafe { to_cstr(s).trim().parse::<i64>().unwrap_or(0) }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_string_to_float(s: *const u8) -> f64 {
-    to_cstr(s).trim().parse::<f64>().unwrap_or(0.0)
+    unsafe { to_cstr(s).trim().parse::<f64>().unwrap_or(0.0) }
 }
 
 #[unsafe(no_mangle)]
@@ -329,10 +340,8 @@ pub unsafe extern "C" fn nimble_bool_to_string(val: i64) -> *mut u8 {
     let s = if val != 0 { "true" } else { "false" };
     let bytes = s.as_bytes();
     let ptr = nimble_alloc(bytes.len() + 1);
-    unsafe {
-        std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, bytes.len());
-        *ptr.add(bytes.len()) = 0;
-    }
+    std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, bytes.len());
+    *ptr.add(bytes.len()) = 0;
     ptr
 }
 
@@ -396,137 +405,157 @@ pub extern "C" fn nimble_flush() {
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_read_line() -> *mut u8 {
-    init_console_utf8();
-    let mut input = String::new();
-    match io::stdin().read_line(&mut input) {
-        Ok(_) => {
-            let trimmed = input.trim_end_matches('\n').trim_end_matches('\r');
-            let bytes = trimmed.as_bytes();
-            let ptr = nimble_alloc(bytes.len() + 1);
-            std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, bytes.len());
-            *ptr.add(bytes.len()) = 0;
-            ptr
+    unsafe {
+        init_console_utf8();
+        let mut input = String::new();
+        match io::stdin().read_line(&mut input) {
+            Ok(_) => {
+                let trimmed = input.trim_end_matches('\n').trim_end_matches('\r');
+                let bytes = trimmed.as_bytes();
+                let ptr = nimble_alloc(bytes.len() + 1);
+                std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, bytes.len());
+                *ptr.add(bytes.len()) = 0;
+                ptr
+            }
+            Err(_) => std::ptr::null_mut(),
         }
-        Err(_) => std::ptr::null_mut(),
     }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_read_file(path: *const u8) -> *mut u8 {
-    let p = to_cstr(path);
-    match std::fs::read_to_string(p) {
-        Ok(content) => {
-            let bytes = content.as_bytes();
-            let ptr = nimble_alloc(bytes.len() + 1);
-            std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, bytes.len());
-            *ptr.add(bytes.len()) = 0;
-            ptr
+    unsafe {
+        let p = to_cstr(path);
+        match std::fs::read_to_string(p) {
+            Ok(content) => {
+                let bytes = content.as_bytes();
+                let ptr = nimble_alloc(bytes.len() + 1);
+                std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, bytes.len());
+                *ptr.add(bytes.len()) = 0;
+                ptr
+            }
+            Err(_) => std::ptr::null_mut(),
         }
-        Err(_) => std::ptr::null_mut(),
     }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_write_file(path: *const u8, content: *const u8) -> i64 {
-    let p = to_cstr(path);
-    let c = to_cstr(content);
-    match std::fs::write(p, c) {
-        Ok(_) => 0,
-        Err(_) => -1,
+    unsafe {
+        let p = to_cstr(path);
+        let c = to_cstr(content);
+        match std::fs::write(p, c) {
+            Ok(_) => 0,
+            Err(_) => -1,
+        }
     }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_append_file(path: *const u8, content: *const u8) -> i64 {
-    let p = to_cstr(path);
-    let c = to_cstr(content);
-    match std::fs::OpenOptions::new()
-        .append(true)
-        .create(true)
-        .open(p)
-    {
-        Ok(mut file) => match file.write_all(c.as_bytes()) {
-            Ok(_) => 0,
-            Err(_) => -2,
-        },
-        Err(_) => -1,
+    unsafe {
+        let p = to_cstr(path);
+        let c = to_cstr(content);
+        match std::fs::OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open(p)
+        {
+            Ok(mut file) => match file.write_all(c.as_bytes()) {
+                Ok(_) => 0,
+                Err(_) => -2,
+            },
+            Err(_) => -1,
+        }
     }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_file_exists(path: *const u8) -> i64 {
-    let p = to_cstr(path);
-    if std::path::Path::new(p).exists() {
-        1
-    } else {
-        0
+    unsafe {
+        let p = to_cstr(path);
+        if std::path::Path::new(p).exists() {
+            1
+        } else {
+            0
+        }
     }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_file_size(path: *const u8) -> i64 {
-    let p = to_cstr(path);
-    std::fs::metadata(p).map(|m| m.len() as i64).unwrap_or(-1)
+    unsafe {
+        let p = to_cstr(path);
+        std::fs::metadata(p).map(|m| m.len() as i64).unwrap_or(-1)
+    }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_delete_file(path: *const u8) -> i64 {
-    let p = to_cstr(path);
-    match std::fs::remove_file(p) {
-        Ok(_) => 0,
-        Err(_) => -1,
+    unsafe {
+        let p = to_cstr(path);
+        match std::fs::remove_file(p) {
+            Ok(_) => 0,
+            Err(_) => -1,
+        }
     }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_rename_file(old: *const u8, new: *const u8) -> i64 {
-    let o = to_cstr(old);
-    let n = to_cstr(new);
-    match std::fs::rename(o, n) {
-        Ok(_) => 0,
-        Err(_) => -1,
+    unsafe {
+        let o = to_cstr(old);
+        let n = to_cstr(new);
+        match std::fs::rename(o, n) {
+            Ok(_) => 0,
+            Err(_) => -1,
+        }
     }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_create_dir(path: *const u8) -> i64 {
-    let p = to_cstr(path);
-    match std::fs::create_dir_all(p) {
-        Ok(_) => 0,
-        Err(_) => -1,
+    unsafe {
+        let p = to_cstr(path);
+        match std::fs::create_dir_all(p) {
+            Ok(_) => 0,
+            Err(_) => -1,
+        }
     }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_remove_dir(path: *const u8) -> i64 {
-    let p = to_cstr(path);
-    match std::fs::remove_dir_all(p) {
-        Ok(_) => 0,
-        Err(_) => -1,
+    unsafe {
+        let p = to_cstr(path);
+        match std::fs::remove_dir_all(p) {
+            Ok(_) => 0,
+            Err(_) => -1,
+        }
     }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_list_dir(path: *const u8) -> *mut u8 {
-    let p = to_cstr(path);
-    match std::fs::read_dir(p) {
-        Ok(entries) => {
-            let mut result = String::new();
-            for entry in entries.flatten() {
-                if let Ok(name) = entry.file_name().into_string() {
-                    result.push_str(&name);
-                    result.push('\n');
+    unsafe {
+        let p = to_cstr(path);
+        match std::fs::read_dir(p) {
+            Ok(entries) => {
+                let mut result = String::new();
+                for entry in entries.flatten() {
+                    if let Ok(name) = entry.file_name().into_string() {
+                        result.push_str(&name);
+                        result.push('\n');
+                    }
                 }
-            }
-            let bytes = result.as_bytes();
-            let ptr = nimble_alloc(bytes.len() + 1);
-            unsafe {
+                let bytes = result.as_bytes();
+                let ptr = nimble_alloc(bytes.len() + 1);
                 std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, bytes.len());
                 *ptr.add(bytes.len()) = 0;
+                ptr
             }
-            ptr
+            Err(_) => std::ptr::null_mut(),
         }
-        Err(_) => std::ptr::null_mut(),
     }
 }
 
@@ -574,19 +603,19 @@ pub extern "C" fn nimble_time_seconds() -> i64 {
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_time_format(fmt: *const u8) -> *mut u8 {
-    let format_str = to_cstr(fmt);
-    let now = time::SystemTime::now()
-        .duration_since(time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs() as i64;
-    let result = format!("{}", now);
-    let bytes = result.as_bytes();
-    let ptr = nimble_alloc(bytes.len() + 1);
     unsafe {
+        let _format_str = to_cstr(fmt);
+        let now = time::SystemTime::now()
+            .duration_since(time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64;
+        let result = format!("{}", now);
+        let bytes = result.as_bytes();
+        let ptr = nimble_alloc(bytes.len() + 1);
         std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, bytes.len());
         *ptr.add(bytes.len()) = 0;
+        ptr
     }
-    ptr
 }
 
 #[unsafe(no_mangle)]
@@ -936,7 +965,7 @@ pub unsafe extern "C" fn nimble_base64_decode(data: *const u8, len: i64) -> *mut
 }
 
 fn base64_encode_slice(data: &[u8], chars: &[u8]) -> Vec<u8> {
-    let mut result = Vec::with_capacity(((data.len() + 2) / 3) * 4);
+    let mut result = Vec::with_capacity(data.len().div_ceil(3) * 4);
     for chunk in data.chunks(3) {
         let b0 = chunk[0] as u32;
         let b1 = chunk.get(1).copied().unwrap_or(0) as u32;
@@ -1048,53 +1077,55 @@ pub unsafe extern "C" fn nimble_utf8_validate(data: *const u8, len: i64) -> i64 
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_json_parse(json: *const u8) -> *mut u8 {
-    let s = to_cstr(json);
-    match json_parse_to_string(s) {
-        Some(parsed) => {
-            let bytes = parsed.as_bytes();
-            let ptr = nimble_alloc(bytes.len() + 1);
-            std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, bytes.len());
-            *ptr.add(bytes.len()) = 0;
-            ptr
+    unsafe {
+        let s = to_cstr(json);
+        match json_parse_to_string(s) {
+            Some(parsed) => {
+                let bytes = parsed.as_bytes();
+                let ptr = nimble_alloc(bytes.len() + 1);
+                std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, bytes.len());
+                *ptr.add(bytes.len()) = 0;
+                ptr
+            }
+            None => std::ptr::null_mut(),
         }
-        None => std::ptr::null_mut(),
     }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_json_stringify(value: *const u8) -> *mut u8 {
-    let s = to_cstr(value);
-    let bytes = s.as_bytes();
-    let ptr = nimble_alloc(bytes.len() + 1);
     unsafe {
+        let s = to_cstr(value);
+        let bytes = s.as_bytes();
+        let ptr = nimble_alloc(bytes.len() + 1);
         std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, bytes.len());
         *ptr.add(bytes.len()) = 0;
+        ptr
     }
-    ptr
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_json_get_field(json: *const u8, field: *const u8) -> *mut u8 {
-    let s = to_cstr(json);
-    let f = to_cstr(field);
-    let key = format!("\"{}\"", f);
-    if let Some(pos) = s.find(&key) {
-        let rest = &s[pos + key.len()..];
-        let trimmed = rest.trim_start();
-        if trimmed.starts_with(':') {
-            let value = trimmed[1..].trim_start();
-            let end = find_json_value_end(value);
-            let val = &value[..end];
-            let bytes = val.as_bytes();
-            let ptr = nimble_alloc(bytes.len() + 1);
-            unsafe {
+    unsafe {
+        let s = to_cstr(json);
+        let f = to_cstr(field);
+        let key = format!("\"{}\"", f);
+        if let Some(pos) = s.find(&key) {
+            let rest = &s[pos + key.len()..];
+            let trimmed = rest.trim_start();
+            if let Some(rest) = trimmed.strip_prefix(':') {
+                let value = rest.trim_start();
+                let end = find_json_value_end(value);
+                let val = &value[..end];
+                let bytes = val.as_bytes();
+                let ptr = nimble_alloc(bytes.len() + 1);
                 std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, bytes.len());
                 *ptr.add(bytes.len()) = 0;
+                return ptr;
             }
-            return ptr;
         }
+        std::ptr::null_mut()
     }
-    std::ptr::null_mut()
 }
 
 fn find_json_value_end(s: &str) -> usize {
@@ -1102,8 +1133,8 @@ fn find_json_value_end(s: &str) -> usize {
     if s.is_empty() {
         return 0;
     }
-    if s.starts_with('"') {
-        let mut chars = s[1..].char_indices();
+    if let Some(rest) = s.strip_prefix('"') {
+        let mut chars = rest.char_indices();
         while let Some((i, c)) = chars.next() {
             if c == '\\' {
                 chars.next();
@@ -1116,7 +1147,7 @@ fn find_json_value_end(s: &str) -> usize {
         return s.len();
     }
     if s.starts_with('{') || s.starts_with('[') {
-        let close = if s.starts_with('{') { '}' } else { ']' };
+        let _close = if s.starts_with('{') { '}' } else { ']' };
         let mut depth = 0;
         for (i, c) in s.char_indices() {
             if c == '{' || c == '[' {
@@ -1142,21 +1173,23 @@ fn json_parse_to_string(s: &str) -> Option<String> {
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_getenv(name: *const u8) -> *mut u8 {
-    let n = to_cstr(name);
-    match std::env::var(n) {
-        Ok(val) => {
-            let bytes = val.as_bytes();
-            let ptr = nimble_alloc(bytes.len() + 1);
-            std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, bytes.len());
-            *ptr.add(bytes.len()) = 0;
-            ptr
+    unsafe {
+        let n = to_cstr(name);
+        match std::env::var(n) {
+            Ok(val) => {
+                let bytes = val.as_bytes();
+                let ptr = nimble_alloc(bytes.len() + 1);
+                std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, bytes.len());
+                *ptr.add(bytes.len()) = 0;
+                ptr
+            }
+            Err(_) => std::ptr::null_mut(),
         }
-        Err(_) => std::ptr::null_mut(),
     }
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_setenv(name: *const u8, value: *const u8) -> i64 {
+pub unsafe extern "C" fn nimble_setenv(name: *const u8, value: *const u8) -> i64 {
     #[cfg(windows)]
     {
         unsafe extern "system" {
@@ -1185,16 +1218,18 @@ pub unsafe extern "C" fn nimble_args_count() -> i64 {
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_args_get(index: i64) -> *mut u8 {
-    let args: Vec<String> = std::env::args().skip(1).collect();
-    if index >= 0 && (index as usize) < args.len() {
-        let s = &args[index as usize];
-        let bytes = s.as_bytes();
-        let ptr = nimble_alloc(bytes.len() + 1);
-        std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, bytes.len());
-        *ptr.add(bytes.len()) = 0;
-        ptr
-    } else {
-        std::ptr::null_mut()
+    unsafe {
+        let args: Vec<String> = std::env::args().skip(1).collect();
+        if index >= 0 && (index as usize) < args.len() {
+            let s = &args[index as usize];
+            let bytes = s.as_bytes();
+            let ptr = nimble_alloc(bytes.len() + 1);
+            std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, bytes.len());
+            *ptr.add(bytes.len()) = 0;
+            ptr
+        } else {
+            std::ptr::null_mut()
+        }
     }
 }
 
@@ -1267,53 +1302,57 @@ pub extern "C" fn nimble_terminal_height() -> i64 {
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_hostname() -> *mut u8 {
-    #[cfg(windows)]
-    {
-        let mut buffer = [0u8; 256];
-        unsafe extern "system" {
-            fn GetComputerNameA(lpBuffer: *mut u8, nSize: *mut u32) -> i32;
+    unsafe {
+        #[cfg(windows)]
+        {
+            let mut buffer = [0u8; 256];
+            unsafe extern "system" {
+                fn GetComputerNameA(lpBuffer: *mut u8, nSize: *mut u32) -> i32;
+            }
+            let mut size: u32 = 256;
+            if GetComputerNameA(buffer.as_mut_ptr(), &mut size) != 0 {
+                let len = size as usize;
+                let ptr = nimble_alloc(len + 1);
+                std::ptr::copy_nonoverlapping(buffer.as_ptr(), ptr, len);
+                *ptr.add(len) = 0;
+                return ptr;
+            }
         }
-        let mut size: u32 = 256;
-        if unsafe { GetComputerNameA(buffer.as_mut_ptr(), &mut size) } != 0 {
-            let len = size as usize;
-            let ptr = nimble_alloc(len + 1);
-            std::ptr::copy_nonoverlapping(buffer.as_ptr(), ptr, len);
-            *ptr.add(len) = 0;
-            return ptr;
+        #[cfg(not(windows))]
+        {
+            let hostname = std::process::Command::new("hostname")
+                .output()
+                .ok()
+                .and_then(|o| String::from_utf8(o.stdout).ok());
+            if let Some(h) = hostname {
+                let trimmed = h.trim().to_string();
+                let bytes = trimmed.as_bytes();
+                let ptr = nimble_alloc(bytes.len() + 1);
+                std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, bytes.len());
+                *ptr.add(bytes.len()) = 0;
+                return ptr;
+            }
         }
+        std::ptr::null_mut()
     }
-    #[cfg(not(windows))]
-    {
-        let hostname = std::process::Command::new("hostname")
-            .output()
-            .ok()
-            .and_then(|o| String::from_utf8(o.stdout).ok());
-        if let Some(h) = hostname {
-            let trimmed = h.trim().to_string();
-            let bytes = trimmed.as_bytes();
-            let ptr = nimble_alloc(bytes.len() + 1);
-            std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, bytes.len());
-            *ptr.add(bytes.len()) = 0;
-            return ptr;
-        }
-    }
-    std::ptr::null_mut()
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_os_name() -> *mut u8 {
-    let s = if cfg!(windows) {
-        "windows"
-    } else if cfg!(target_os = "macos") {
-        "macos"
-    } else {
-        "linux"
-    };
-    let bytes = s.as_bytes();
-    let ptr = nimble_alloc(bytes.len() + 1);
-    std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, bytes.len());
-    *ptr.add(bytes.len()) = 0;
-    ptr
+    unsafe {
+        let s = if cfg!(windows) {
+            "windows"
+        } else if cfg!(target_os = "macos") {
+            "macos"
+        } else {
+            "linux"
+        };
+        let bytes = s.as_bytes();
+        let ptr = nimble_alloc(bytes.len() + 1);
+        std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, bytes.len());
+        *ptr.add(bytes.len()) = 0;
+        ptr
+    }
 }
 
 #[unsafe(no_mangle)]
@@ -1326,7 +1365,7 @@ pub unsafe extern "C" fn nimble_cpu_count() -> i64 {
 // ── Panic ────────────────────────────────────────────────────────────
 
 #[unsafe(no_mangle)]
-pub extern "C" fn nimble_panic(msg: *const u8) {
+pub unsafe extern "C" fn nimble_panic(msg: *const u8) {
     let s = unsafe { to_cstr(msg) };
     let _ = writeln!(io::stderr(), "Panic: {}", s);
     process::abort();
@@ -1376,8 +1415,10 @@ pub unsafe extern "C" fn nimble_mutex_lock(mtx: *mut std::sync::Mutex<()>) {
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_mutex_unlock(mtx: *mut std::sync::Mutex<()>) {
-    if let Some(m) = mtx.as_ref() {
-        if let Ok(guard) = m.lock() {
+    unsafe {
+        if let Some(m) = mtx.as_ref()
+            && let Ok(guard) = m.lock()
+        {
             drop(guard);
         }
     }
@@ -1488,12 +1529,12 @@ pub unsafe extern "C" fn nimble_net_connect(host: *const u8, port: i64) -> i64 {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_net_send(fd: i64, data: *const u8, len: i64) -> i64 {
     let bytes = unsafe { std::slice::from_raw_parts(data, len.max(0) as usize) };
-    if let Ok(mut map) = TCP_CONNECTIONS.lock() {
-        if let Some(stream) = map.get_mut(&fd) {
-            match stream.write(bytes) {
-                Ok(n) => return n as i64,
-                Err(_) => return -1,
-            }
+    if let Ok(mut map) = TCP_CONNECTIONS.lock()
+        && let Some(stream) = map.get_mut(&fd)
+    {
+        match stream.write(bytes) {
+            Ok(n) => return n as i64,
+            Err(_) => return -1,
         }
     }
     -1
@@ -1502,13 +1543,13 @@ pub unsafe extern "C" fn nimble_net_send(fd: i64, data: *const u8, len: i64) -> 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn nimble_net_recv(fd: i64, buffer: *mut u8, size: i64) -> i64 {
     let buf = unsafe { std::slice::from_raw_parts_mut(buffer, size.max(0) as usize) };
-    if let Ok(mut map) = TCP_CONNECTIONS.lock() {
-        if let Some(stream) = map.get_mut(&fd) {
-            let _ = stream.set_read_timeout(Some(time::Duration::from_secs(5)));
-            match stream.read(buf) {
-                Ok(n) => return n as i64,
-                Err(_) => return -1,
-            }
+    if let Ok(mut map) = TCP_CONNECTIONS.lock()
+        && let Some(stream) = map.get_mut(&fd)
+    {
+        let _ = stream.set_read_timeout(Some(time::Duration::from_secs(5)));
+        match stream.read(buf) {
+            Ok(n) => return n as i64,
+            Err(_) => return -1,
         }
     }
     -1
@@ -1532,7 +1573,7 @@ pub unsafe extern "C" fn nimble_dns_resolve(host: *const u8) -> *mut u8 {
     match (h, 0u16).to_socket_addrs() {
         Ok(addrs) => {
             let result: String = addrs
-                .filter_map(|a| Some(a.ip().to_string()))
+                .map(|a| a.ip().to_string())
                 .collect::<Vec<_>>()
                 .join("\n");
             let bytes = result.as_bytes();
