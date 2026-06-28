@@ -21,22 +21,8 @@ pub struct Parser<'a> {
 impl<'a> Parser<'a> {
     pub fn new(source: &'a str) -> Result<Self, ParseError> {
         let mut lexer = Lexer::new(source);
-        let current = lexer.next_token().map_err(|e| {
-            let span = (0usize, 0usize).into();
-            ParseError::Internal {
-                msg: format!("{}", e),
-                src: source.to_string(),
-                span,
-            }
-        })?;
-        let next = lexer.next_token().map_err(|e| {
-            let span = (0usize, 0usize).into();
-            ParseError::Internal {
-                msg: format!("{}", e),
-                src: source.to_string(),
-                span,
-            }
-        })?;
+        let current = lexer.next_token().map_err(|e| ParseError::Lex { err: e })?;
+        let next = lexer.next_token().map_err(|e| ParseError::Lex { err: e })?;
         Ok(Parser {
             lexer,
             current,

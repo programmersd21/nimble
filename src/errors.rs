@@ -5,7 +5,7 @@ use crate::lexer::{Span, TokenKind};
 
 // ── Lexer Errors ──────────────────────────────────────────────────────────
 
-#[derive(Debug, Error, Diagnostic)]
+#[derive(Debug, Clone, Error, Diagnostic)]
 pub enum LexError {
     #[error("Illegal tab character")]
     #[diagnostic(code("nimble::lex::illegal_tab"))]
@@ -274,6 +274,11 @@ pub enum ParseError {
         span: SourceSpan,
     },
 
+    // Lex errors
+    #[error(transparent)]
+    #[diagnostic(transparent)]
+    Lex { err: LexError },
+
     // Internal errors
     #[error("Internal error: {msg}")]
     #[diagnostic(code("nimble::parse::internal"))]
@@ -347,6 +352,7 @@ impl ParseError {
             ParseError::ExpectedIdentifier { span, .. } => *span,
             ParseError::ExpectedType { span, .. } => *span,
             ParseError::ExpectedParameter { span, .. } => *span,
+            ParseError::Lex { .. } => (0usize, 0usize).into(),
             ParseError::Internal { span, .. } => *span,
         };
         crate::lexer::Span::new_with_len(0, 0, span.offset(), span.len())

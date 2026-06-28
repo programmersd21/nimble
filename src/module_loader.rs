@@ -203,7 +203,6 @@ impl ModuleLoader {
             return Err(ModuleError::Cyclic(module_key));
         }
 
-        // Load from cache if already loaded.
         if let Some(loaded) = self.state.borrow().loaded.get(&module_key) {
             let pairs: Vec<(Stmt, Environment)> = loaded
                 .stmts
@@ -239,9 +238,9 @@ impl ModuleLoader {
                 name: module_key.clone(),
             })?;
             let prog = Parser::new(&src)
-                .map_err(|e| ModuleError::Parse(format!("{:?}", e)))?
+                .map_err(|e| ModuleError::Parse(format!("{:?}", miette::Report::from(e))))?
                 .parse()
-                .map_err(|e| ModuleError::Parse(format!("{:?}", e)))?;
+                .map_err(|e| ModuleError::Parse(format!("{:?}", miette::Report::from(e))))?;
             let externs: Vec<Stmt> = prog
                 .statements
                 .iter()
@@ -261,7 +260,9 @@ impl ModuleLoader {
         let (env, externs_loaded, fn_defs_with_envs) = if let Some(ref db_cell) = self.db {
             let tc_res = crate::query::Database::query_typecheck(db_cell.clone(), &file_path)
                 .map_err(ModuleError::TypeError)?;
-            (tc_res.env, tc_res.externs, tc_res.module_stmts)
+            let mut all_fns = tc_res.module_stmts;
+            all_fns.extend(fn_defs.clone().into_iter().map(|s| (s, tc_res.env.clone())));
+            (tc_res.env, tc_res.externs, all_fns)
         } else {
             let mut nested_loader = self.clone();
             nested_loader.source_dir = module_dir.clone();
@@ -271,7 +272,7 @@ impl ModuleLoader {
             let env = TypeChecker::with_externs(&src, collected_externs.clone())
                 .with_loader(nested_loader)
                 .check_program(&prog)
-                .map_err(|e| ModuleError::TypeError(format!("{:?}", e)))?;
+                .map_err(|e| ModuleError::TypeError(format!("{:?}", miette::Report::from(e))))?;
             let pairs: Vec<(Stmt, Environment)> =
                 fn_defs.into_iter().map(|s| (s, env.clone())).collect();
             (env, externs.clone(), pairs)
@@ -287,7 +288,6 @@ impl ModuleLoader {
             },
         );
 
-        // Store the loaded module statements for later code generation.
         collected_externs.borrow_mut().extend(externs_loaded);
         collected_module_stmts
             .borrow_mut()

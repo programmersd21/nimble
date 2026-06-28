@@ -40,34 +40,33 @@ pub(crate) fn user_home_dir() -> Option<PathBuf> {
         .or_else(|| std::env::var_os("USERPROFILE").map(PathBuf::from))
 }
 
-/// Find the stdlib directory by searching near the workspace root and user home.
 pub(crate) fn find_stdlib_dirs() -> Vec<PathBuf> {
     let mut candidates = Vec::new();
 
-    // Explicit override via NIMBLE_STDLIB
     if let Ok(dir) = std::env::var("NIMBLE_STDLIB") {
         candidates.push(PathBuf::from(dir));
     }
 
-    // User home stdlib path: ~/nimble/std or %USERPROFILE%\nimble\std
     if let Some(home) = user_home_dir() {
         candidates.push(home.join("nimble").join("std"));
     }
 
-    // Relative to CWD (workspace root)
-    candidates.push(PathBuf::from("src/std"));
+    let cwd_candidates = ["src/std", "std"];
+    for c in &cwd_candidates {
+        candidates.push(PathBuf::from(c));
+    }
 
-    // Relative to CARGO_MANIFEST_DIR
     if let Ok(dir) = std::env::var("CARGO_MANIFEST_DIR") {
-        candidates.push(PathBuf::from(dir).join("src").join("std"));
+        for c in &cwd_candidates {
+            candidates.push(PathBuf::from(&dir).join(c));
+        }
     }
 
     let mut dirs: Vec<PathBuf> = candidates.into_iter().filter(|d| d.exists()).collect();
-    // Remove duplicates
     dirs.sort();
     dirs.dedup();
     if dirs.is_empty() {
-        dirs.push(PathBuf::from("src/std")); // fallback
+        dirs.push(PathBuf::from("std"));
     }
     dirs
 }

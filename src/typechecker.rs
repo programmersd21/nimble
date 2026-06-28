@@ -838,15 +838,24 @@ impl TypeChecker {
                 member,
                 span,
             } => {
-                let obj_ty = self.infer_expr(object, env)?;
-                let obj_ty = self.resolve(&obj_ty);
-                if let Type::Struct(name) = obj_ty
-                    && let Some(fields) = env.get_struct_fields(&name)
-                    && let Some((_, ty)) = fields.iter().find(|(n, _)| n == member)
-                {
-                    return Ok(ty.clone());
+                if let Ok(obj_ty) = self.infer_expr(object, env) {
+                    let obj_ty = self.resolve(&obj_ty);
+                    if let Type::Struct(name) = obj_ty
+                        && let Some(fields) = env.get_struct_fields(&name)
+                        && let Some((_, ty)) = fields.iter().find(|(n, _)| n == member)
+                    {
+                        return Ok(ty.clone());
+                    }
+                    return Err(TypeError::undefined_variable(&self.source, member, *span));
                 }
-                Err(TypeError::undefined_variable(&self.source, member, *span))
+                if let Expr::Identifier(prefix, _) = object.as_ref() {
+                    let qualified = format!("{}.{}", prefix, member);
+                    if let Some(sym) = env.lookup(&qualified) {
+                        return Ok(sym.type_.clone());
+                    }
+                }
+                self.infer_expr(object, env)?;
+                unreachable!()
             }
 
             Expr::StructLiteral { name, fields, span } => {

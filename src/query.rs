@@ -255,7 +255,9 @@ impl Database {
         let mut lexer = crate::lexer::Lexer::new(&content);
         let mut tokens = Vec::new();
         loop {
-            let tok = lexer.next_token().map_err(|e| format!("{}", e))?;
+            let tok = lexer
+                .next_token()
+                .map_err(|e| format!("{:?}", miette::Report::from(e)))?;
             let is_eof = tok.kind == crate::lexer::TokenKind::Eof;
             tokens.push(tok);
             if is_eof {

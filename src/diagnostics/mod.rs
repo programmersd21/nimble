@@ -281,6 +281,7 @@ impl DiagnosticEngine {
                     .primary_label(diag_span, "expected parameter name")
                     .build()
             }
+            ParseError::Lex { err } => self.convert_lex_error(err, file_id, _source),
             ParseError::Internal { msg, .. } => {
                 DiagnosticBuilder::bug(format!("Internal error: {}", msg))
                     .primary_label(diag_span, "internal error occurred here")
