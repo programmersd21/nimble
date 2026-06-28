@@ -163,7 +163,7 @@ pub enum ErrorCode {
     N2009, // Access to private item
     N2010, // Cyclic module dependency detected
     N2011, // Cyclic type definition
-    N2012, // Ambiguous name — multiple matching definitions
+    N2012, // Ambiguous name - multiple matching definitions
     N2013, // Invalid visibility qualifier
     N2014, // Module not found
     N2015, // Symbol is not exported from module
@@ -213,7 +213,7 @@ pub enum ErrorCode {
     N3006, // Missing required method / interface unsatisfied
     N3007, // Recursive type without indirection
     N3008, // Infinite type / recursive unification
-    N3009, // Cannot infer type — annotation needed
+    N3009, // Cannot infer type - annotation needed
     N3010, // Type annotation required
     N3011, // Expected concrete type, found abstract type
     N3012, // Trait bound not satisfied
@@ -227,7 +227,7 @@ pub enum ErrorCode {
     N3020, // Use after move
     N3021, // Double borrow / multiple mutable borrows
     N3022, // Lifetime mismatch
-    N3023, // Lifetime elision failure — ambiguous
+    N3023, // Lifetime elision failure - ambiguous
     N3024, // Lifetime bound not satisfied
     N3025, // Lifetime constraint violation
     N3026, // Missing lifetime annotation
@@ -264,7 +264,7 @@ pub enum ErrorCode {
     N3057, // Extra return value (returning from void function)
     N3058, // Return not allowed in this context
     N3059, // Missing async annotation on function
-    N3060, // Mismatched await — cannot await non-future
+    N3060, // Mismatched await - cannot await non-future
     N3061, // Incompatible implicit type conversion
     N3062, // Forward declaration type mismatch
     N3063, // Missing forward declaration
@@ -311,8 +311,8 @@ pub enum ErrorCode {
     N4003, // Circular module dependency
     N4004, // Symbol not exported
     N4005, // Import cycle detected
-    N4006, // Ambiguous import — symbol found in multiple modules
-    N4007, // Shadowed import — name conflicts with another import
+    N4006, // Ambiguous import - symbol found in multiple modules
+    N4007, // Shadowed import - name conflicts with another import
     N4008, // Wildcard import naming conflict
     N4009, // Relative import beyond package root
     N4010, // Invalid module name
@@ -517,7 +517,7 @@ pub enum ErrorCode {
     // ║  INTERNAL COMPILER ERRORS  (N9001–N9999)                    ║
     // ╚══════════════════════════════════════════════════════════════╝
     N9001, // Internal compiler error (ICE)
-    N9002, // Internal bug — please report
+    N9002, // Internal bug - please report
     N9003, // Unreachable code path in compiler
     N9004, // Unimplemented compiler feature
     N9005, // Compiler assertion failure
@@ -1997,7 +1997,7 @@ impl ErrorCode {
             Self::N8038 => "Feature flag not recognized",
             Self::N8039 => "Feature flag conflict",
             Self::N9001 => "Internal compiler error",
-            Self::N9002 => "Internal bug — please report",
+            Self::N9002 => "Internal bug - please report",
             Self::N9003 => "Unreachable code path in compiler",
             Self::N9004 => "Unimplemented compiler feature",
             Self::N9005 => "Compiler assertion failure",
@@ -4416,7 +4416,7 @@ impl ErrorCode {
             }
             Self::N9002 => {
                 "\
-\x1b[1;35mN9002\x1b[0m \x1b[1mInternal bug — please report\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mInternal\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe compiler detected a condition that should never occur during correct compilation. This is a bug. Please file a bug report.\
+\x1b[1;35mN9002\x1b[0m \x1b[1mInternal bug - please report\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mInternal\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe compiler detected a condition that should never occur during correct compilation. This is a bug. Please file a bug report.\
 "
             }
             Self::N9003 => {

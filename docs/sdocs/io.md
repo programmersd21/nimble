@@ -1,6 +1,6 @@
 # std.io
 
-Basic input/output operations — console output, file I/O, and type-to-string conversion.
+Basic input/output operations - console output, file I/O, and type-to-string conversion.
 
 All functions are backed by the Rust runtime (ember).
 

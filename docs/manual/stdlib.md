@@ -6,7 +6,7 @@ Nimble provides a standard library under the `std` namespace backed by a Rust ru
 
 | Module | Path | Description |
 |--------|------|-------------|
-| **Root** | `std` | Aggregator — loads every stdlib module |
+| **Root** | `std` | Aggregator - loads every stdlib module |
 | **IO** | `std.io` | Print, read/write/append file, file metadata, type-to-string conversion |
 | **String** | `std.str` | String ops: length, concat, find, trim, case, replace, repeat, split, to_int, to_float |
 | **Math** | `std.math` | 30+ functions: trig, log, pow, rounding, IEEE 754 checks, constants (PI, E, TAU, INF) |
@@ -36,7 +36,7 @@ Nimble provides a standard library under the `std` namespace backed by a Rust ru
 | **Reflection** | `std.reflect` | Reflection utilities (type_name, size_of) |
 | **Builtins** | `std.builtin` | Built-in type definitions |
 
-All modules are backed by the Rust runtime (`src/ember/mod.rs`) and linked as a static library during compilation — no stubs or unimplemented functions.
+All modules are backed by the Rust runtime (`src/ember/mod.rs`) and linked as a static library during compilation - no stubs or unimplemented functions.
 
 ## Root `std` Module
 

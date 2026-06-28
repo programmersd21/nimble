@@ -1,6 +1,6 @@
 # std.hash
 
-Hash function implementations — FNV-1a, SipHash, and xxHash3.
+Hash function implementations - FNV-1a, SipHash, and xxHash3.
 
 All operations are backed by the Rust runtime.
 

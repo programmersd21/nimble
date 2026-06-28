@@ -1,6 +1,6 @@
 # std.cli
 
-Command-line interface utilities — argument parsing, terminal detection, and terminal size queries.
+Command-line interface utilities - argument parsing, terminal detection, and terminal size queries.
 
 All functions are backed by the Rust runtime.
 

@@ -1,6 +1,6 @@
 # std.core
 
-Core utility functions for integer arithmetic — absolute value, min/max, clamping, bit manipulation, and checked/saturating/wrapping operations.
+Core utility functions for integer arithmetic - absolute value, min/max, clamping, bit manipulation, and checked/saturating/wrapping operations.
 
 All functions are backed by the Rust runtime.
 

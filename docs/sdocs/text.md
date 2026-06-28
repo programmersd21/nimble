@@ -1,6 +1,6 @@
 # std.text
 
-Text processing utilities — pattern matching and search operations.
+Text processing utilities - pattern matching and search operations.
 
 All functions are backed by the Rust runtime.
 

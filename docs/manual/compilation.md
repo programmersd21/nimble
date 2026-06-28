@@ -4,7 +4,7 @@
 
 ### 1. Lexing
 
-`Lexer::new(source)` tokenizes the source string into a flat stream of `Token` values with positional `Span` information. Indentation is tracked via an internal stack, producing `Indent` / `Dedent` tokens for blocks. Supports full UTF-8 Unicode identifiers (XID_Start/XID_Continue). Structured `LexError` recovery via `drain_errors()` — the lexer never hard-panics on malformed input.
+`Lexer::new(source)` tokenizes the source string into a flat stream of `Token` values with positional `Span` information. Indentation is tracked via an internal stack, producing `Indent` / `Dedent` tokens for blocks. Supports full UTF-8 Unicode identifiers (XID_Start/XID_Continue). Structured `LexError` recovery via `drain_errors()` - the lexer never hard-panics on malformed input.
 
 ```
 Source chars -> Lexer -> Token stream + Vec<LexError>
@@ -33,9 +33,9 @@ AST -> HIR Lowering -> HirProgram
 - **Pass 2 (resolve_references)**: Rebuilds scope chains and resolves every identifier reference to its `DefId`. Reports `UndefinedVariable` and `DuplicateDefinition` errors.
 
 Returns a `ResolvedProgram` with:
-- `resolved: HashMap<usize, DefId>` — maps byte_index to definition
-- `definitions: Vec<Def>` — all definitions with name, kind, span, mutability
-- `lookup(name)` / `lookup_by_span(span)` / `get_def(id)` — query APIs
+- `resolved: HashMap<usize, DefId>` - maps byte_index to definition
+- `definitions: Vec<Def>` - all definitions with name, kind, span, mutability
+- `lookup(name)` / `lookup_by_span(span)` / `get_def(id)` - query APIs
 
 ```
 AST -> Resolver -> ResolvedProgram + Vec<ResolveError>

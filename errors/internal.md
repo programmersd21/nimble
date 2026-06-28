@@ -20,7 +20,7 @@ The compiler encountered an unexpected internal error. This is a compiler bug. P
 
 ---
 
-### N9002: Internal bug — please report
+### N9002: Internal bug - please report
 
 - **Severity:** Bug
 - **Code:** `N9002`

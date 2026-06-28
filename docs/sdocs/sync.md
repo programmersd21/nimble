@@ -1,6 +1,6 @@
 # std.sync
 
-Synchronization primitives — atomic operations, mutex, and reference counting.
+Synchronization primitives - atomic operations, mutex, and reference counting.
 
 All functions are backed by the Rust runtime.
 

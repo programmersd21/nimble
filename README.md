@@ -6,7 +6,7 @@ A statically typed language with Python-style indentation, LLVM-based code gener
 
 ## Features at a Glance
 
-- **Pythonic syntax** — indentation-based blocks, no curly braces or semicolons
+- **Pythonic syntax** - indentation-based blocks, no curly braces or semicolons
 - **Static type system** with Hindley-Milner type inference, generics, enums, and interfaces
 - **Enums (sum types)** with tagged union representation and pattern matching
 - **Generic functions, structs, and interfaces** with monomorphization
@@ -19,20 +19,20 @@ A statically typed language with Python-style indentation, LLVM-based code gener
 - **Async/concurrency primitives** (future, channel, mutex, thread, atomic)
 - **Option[T] / Result[T, E]** algebraic types in stdlib
 - **LLVM codegen** with optional debug info emission
-- **Cross-platform linker** — auto-discovers `cc`, `clang`, `gcc`, or `link.exe`
-- **Standard library** with 28 modules covering I/O, math, collections, encoding, hashing, strings, networking, filesystem, CLI, threading, synchronization, and more — all backed by a Rust runtime library
-- **Rich runtime library** (`ember`) — 120+ C-ABI functions implementing string ops, math, random, hashing, base64/hex encoding, filesystem, networking, CLI, time, atomics, mutex, channels
-- **C FFI** — `extern fn` for binding native libraries
-- **Rich diagnostics** — ~300 error codes with structured spans, suggestions, and pretty printing via miette
+- **Cross-platform linker** - auto-discovers `cc`, `clang`, `gcc`, or `link.exe`
+- **Standard library** with 28 modules covering I/O, math, collections, encoding, hashing, strings, networking, filesystem, CLI, threading, synchronization, and more - all backed by a Rust runtime library
+- **Rich runtime library** (`ember`) - 120+ C-ABI functions implementing string ops, math, random, hashing, base64/hex encoding, filesystem, networking, CLI, time, atomics, mutex, channels
+- **C FFI** - `extern fn` for binding native libraries
+- **Rich diagnostics** - ~300 error codes with structured spans, suggestions, and pretty printing via miette
 - **Integrated LSP server** with hover info, goto-definition, and autocompletion
-- **Doc generator** — `nimble doc` produces HTML API docs from source
-- **Fuzzer** — `nimble fuzz` stress-tests the compiler with random programs
-- **Formatter** — `nimble fmt` canonical source formatting
-- **Profiler** — `nimble profile` measures compilation and execution timing
-- **Self-hosting support** — `nimble generate-header` produces C runtime API headers
-- **Query-based compilation & caching** — central compiler database with dynamic dependency tracking and persistent disk cache
-- **Registry-less package manager** — Git-native dependency resolution with semver, lockfiles, topological ordering, and parallel fetch
-- **Unified toolchain** — everything integrated into a single `nimble` binary
+- **Doc generator** - `nimble doc` produces HTML API docs from source
+- **Fuzzer** - `nimble fuzz` stress-tests the compiler with random programs
+- **Formatter** - `nimble fmt` canonical source formatting
+- **Profiler** - `nimble profile` measures compilation and execution timing
+- **Self-hosting support** - `nimble generate-header` produces C runtime API headers
+- **Query-based compilation & caching** - central compiler database with dynamic dependency tracking and persistent disk cache
+- **Registry-less package manager** - Git-native dependency resolution with semver, lockfiles, topological ordering, and parallel fetch
+- **Unified toolchain** - everything integrated into a single `nimble` binary
 
 ## Quick Start
 
@@ -125,37 +125,37 @@ let result = await future
 
 ### Standard Library
 
-The standard library lives under `std/` and provides **28 modules** — all backed by the Rust runtime:
+The standard library lives under `std/` and provides **28 modules** - all backed by the Rust runtime:
 
-`load std` — root aggregator (loads all modules)
-- **`std.io`** — print, read/write/append file, file metadata, type-to-string conversion
-- **`std.str`** — string manipulation: length, concat, find, trim, case, replace, repeat, split
-- **`std.math`** — 30+ math functions: trig, log, pow, rounding, IEEE 754 checks, constants (PI, E, TAU, INF)
-- **`std.collections`** — Vec[T], HashMap[K,V] generic data structures
-- **`std.core`** — abs, min, max, clamp, popcount, bit ops, checked/saturating/wrapping arithmetic
-- **`std.testing`** — assert_eq, assert_true, assert_ok, run_test
-- **`std.async`** — Future, Channel, Mutex, async/await primitives
-- **`std.sync`** — AtomicInt (load/store/add/sub/swap/CAS), Mutex, Arc
-- **`std.thread`** — Thread, spawn, join, sleep, available_parallelism
-- **`std.fmt`** — formatting utilities
-- **`std.alloc`** — allocation helpers
-- **`std.log`** — logging helpers (info, warn, error)
-- **`std.fs`** — filesystem: read/write/append/exists/size/delete/rename, directory ops
-- **`std.net`** — TCP connect/send/recv/close, DNS resolution
-- **`std.json`** — JSON parsing and stringification
-- **`std.crypto`** — random number generation
-- **`std.random`** — random int/float/range with Xoshiro256** PRNG
-- **`std.hash`** — FNV-1a, SipHash, xxHash3 hashing
-- **`std.encoding`** — base64 (standard + URL-safe), hex (upper/lower), UTF-8 validation
-- **`std.cli`** — command-line args, terminal detection, terminal size
-- **`std.text`** — text pattern matching (contains, replace_all)
-- **`std.os`** — environment variables (get/set), hostname, OS name, CPU count
-- **`std.process`** — process management (exit, abort)
-- **`std.time`** — epoch seconds, nanoseconds, monotonic clock, sleep, time formatting
-- **`std.mem`** — memory helpers
-- **`std.ffi`** — foreign function interface
-- **`std.reflect`** — reflection utilities
-- **`std.builtin`** — built-in type definitions
+`load std` - root aggregator (loads all modules)
+- **`std.io`** - print, read/write/append file, file metadata, type-to-string conversion
+- **`std.str`** - string manipulation: length, concat, find, trim, case, replace, repeat, split
+- **`std.math`** - 30+ math functions: trig, log, pow, rounding, IEEE 754 checks, constants (PI, E, TAU, INF)
+- **`std.collections`** - Vec[T], HashMap[K,V] generic data structures
+- **`std.core`** - abs, min, max, clamp, popcount, bit ops, checked/saturating/wrapping arithmetic
+- **`std.testing`** - assert_eq, assert_true, assert_ok, run_test
+- **`std.async`** - Future, Channel, Mutex, async/await primitives
+- **`std.sync`** - AtomicInt (load/store/add/sub/swap/CAS), Mutex, Arc
+- **`std.thread`** - Thread, spawn, join, sleep, available_parallelism
+- **`std.fmt`** - formatting utilities
+- **`std.alloc`** - allocation helpers
+- **`std.log`** - logging helpers (info, warn, error)
+- **`std.fs`** - filesystem: read/write/append/exists/size/delete/rename, directory ops
+- **`std.net`** - TCP connect/send/recv/close, DNS resolution
+- **`std.json`** - JSON parsing and stringification
+- **`std.crypto`** - random number generation
+- **`std.random`** - random int/float/range with Xoshiro256** PRNG
+- **`std.hash`** - FNV-1a, SipHash, xxHash3 hashing
+- **`std.encoding`** - base64 (standard + URL-safe), hex (upper/lower), UTF-8 validation
+- **`std.cli`** - command-line args, terminal detection, terminal size
+- **`std.text`** - text pattern matching (contains, replace_all)
+- **`std.os`** - environment variables (get/set), hostname, OS name, CPU count
+- **`std.process`** - process management (exit, abort)
+- **`std.time`** - epoch seconds, nanoseconds, monotonic clock, sleep, time formatting
+- **`std.mem`** - memory helpers
+- **`std.ffi`** - foreign function interface
+- **`std.reflect`** - reflection utilities
+- **`std.builtin`** - built-in type definitions
 
 See [`docs/manual/stdlib.md`](docs/manual/stdlib.md) for the full stdlib overview and API reference.
 
@@ -255,15 +255,15 @@ The package manager (`src/nim/`) is a **registry-less, Git-native** dependency r
 
 - **Unified manifest** (`nimble.toml`) with `[project]`, `[dependencies]`, `[dev-dependencies]`, `[build-dependencies]`, `[features]`, `[profile]`
 - **Git sources** with `tag`, `branch`, `rev` specifiers and path dependencies
-- **Semver resolution** — matches version tags against constraints (caret `^`, tilde `~`, wildcard `*`)
+- **Semver resolution** - matches version tags against constraints (caret `^`, tilde `~`, wildcard `*`)
 - **Lockfile** (`nimble.lock`) with commit hashes and SHA-256 checksums
 - **Cycle detection** via DFS visiting set
 - **Topological ordering** (Kahn's algorithm) for correct build order
-- **Dependency kind separation** — Normal, Dev, Build with independent resolution
-- **Feature propagation** — dependency features tracked through the graph
-- **Parallel fetch** — concurrent cloning/fetching via threads
+- **Dependency kind separation** - Normal, Dev, Build with independent resolution
+- **Feature propagation** - dependency features tracked through the graph
+- **Parallel fetch** - concurrent cloning/fetching via threads
 - **Cache** at `~/.nimble/{bin, cache/repos, cache/pkgs}`
-- **Compiler integration** — `install_binary` compiles via `smelt::driver::compile`
+- **Compiler integration** - `install_binary` compiles via `smelt::driver::compile`
 
 ## Runtime Library (ember)
 

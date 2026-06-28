@@ -1,6 +1,6 @@
 # std.process
 
-Process control and exit handling — backed by the Rust runtime.
+Process control and exit handling - backed by the Rust runtime.
 
 ## Functions
 

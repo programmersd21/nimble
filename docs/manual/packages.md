@@ -1,6 +1,6 @@
 # Package Management
 
-Nimble ships with a registry-less, Git-native package manager. Packages are identified by Git repository URLs with optional version tags, branches, or commit hashes — no central registry required.
+Nimble ships with a registry-less, Git-native package manager. Packages are identified by Git repository URLs with optional version tags, branches, or commit hashes - no central registry required.
 
 ## Global storage layout
 

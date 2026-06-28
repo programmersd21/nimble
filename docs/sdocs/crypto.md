@@ -1,6 +1,6 @@
 # std.crypto
 
-Cryptographic and random number utilities — backed by the Rust runtime.
+Cryptographic and random number utilities - backed by the Rust runtime.
 
 ## Functions
 

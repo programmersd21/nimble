@@ -1,6 +1,6 @@
 # std.str
 
-String manipulation operations — length, concatenation, search, trimming, case conversion, replacement, splitting, and parsing.
+String manipulation operations - length, concatenation, search, trimming, case conversion, replacement, splitting, and parsing.
 
 All operations are backed by the Rust runtime.
 

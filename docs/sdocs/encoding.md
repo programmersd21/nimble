@@ -1,12 +1,12 @@
 # std.encoding
 
-Encoding and decoding utilities — base64, hex, and UTF-8 operations.
+Encoding and decoding utilities - base64, hex, and UTF-8 operations.
 
 The module re-exports three sub-modules:
 
-- `std.encoding.base64` — Base64 encoding/decoding (standard and URL-safe)
-- `std.encoding.hex` — Hexadecimal encoding/decoding (upper and lower case)
-- `std.encoding.utf8` — UTF-8 validation
+- `std.encoding.base64` - Base64 encoding/decoding (standard and URL-safe)
+- `std.encoding.hex` - Hexadecimal encoding/decoding (upper and lower case)
+- `std.encoding.utf8` - UTF-8 validation
 
 All operations are backed by the Rust runtime.
 

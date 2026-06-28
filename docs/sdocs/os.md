@@ -1,6 +1,6 @@
 # std.os
 
-Operating system interaction — environment variables, hostname, OS information, and CPU count.
+Operating system interaction - environment variables, hostname, OS information, and CPU count.
 
 All functions are backed by the Rust runtime.
 

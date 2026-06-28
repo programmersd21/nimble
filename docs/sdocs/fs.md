@@ -1,6 +1,6 @@
 # std.fs
 
-File system operations — file and directory manipulation.
+File system operations - file and directory manipulation.
 
 All functions are backed by the Rust runtime.
 

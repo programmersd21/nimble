@@ -169,7 +169,7 @@ fn try_multi_char_op(source: &str, pos: usize) -> Option<(usize, TokenKind)> {
 /// Python-style indentation-aware tokeniser with delimiter tracking.
 ///
 /// Collects non-fatal errors into an internal buffer for later retrieval.
-/// The lexer never panics — all invalid input produces structured `LexError`
+/// The lexer never panics - all invalid input produces structured `LexError`
 /// values via the `Result` return, or is collected as a recovered warning.
 pub struct Lexer<'a> {
     source: &'a str,

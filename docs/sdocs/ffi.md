@@ -1,6 +1,6 @@
 # std.ffi
 
-Foreign function interface — direct bindings to C standard library functions.
+Foreign function interface - direct bindings to C standard library functions.
 
 ## Functions
 

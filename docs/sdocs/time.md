@@ -1,6 +1,6 @@
 # std.time
 
-Time and clock utilities — epoch timestamps, monotonic clock, nanosecond precision, sleep, and time formatting.
+Time and clock utilities - epoch timestamps, monotonic clock, nanosecond precision, sleep, and time formatting.
 
 All functions are backed by the Rust runtime.
 

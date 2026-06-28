@@ -1,7 +1,7 @@
 use crate::ast::{BinaryOp, Expr, Param, Program, Stmt, Type, UnaryOp};
 use crate::lexer::Span;
 
-/// High-level Intermediate Representation (HIR) — a desugared AST.
+/// High-level Intermediate Representation (HIR) - a desugared AST.
 ///
 /// HIR removes semantically transparent wrappers (e.g. `Grouping`)
 /// and simplifies expression structure while preserving all `Span`
@@ -361,7 +361,7 @@ fn lower_expr(expr: &Expr) -> HirExpr {
             value: Box::new(lower_expr(value)),
             span: *span,
         },
-        // Grouping is a transparent wrapper — strip it in HIR.
+        // Grouping is a transparent wrapper - strip it in HIR.
         Expr::Grouping { expr: inner, .. } => lower_expr(inner),
         Expr::MemberAccess {
             object,

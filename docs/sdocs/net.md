@@ -1,6 +1,6 @@
 # std.net
 
-Networking primitives — TCP socket communication and DNS resolution.
+Networking primitives - TCP socket communication and DNS resolution.
 
 All functions are backed by the Rust runtime with a global connection handle map.
 
