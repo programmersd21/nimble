@@ -31,6 +31,9 @@ for file in sorted(examples_dir.glob("*.nbl")):
     )
     if result.returncode == 0:
         passed.append(file.name)
+        out = result.stdout.strip()
+        if out:
+            print(out)
     else:
         failed.append(file.name)
         print(f"  FAILED: {result.stdout.strip() or result.stderr.strip()}")
