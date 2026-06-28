@@ -1,3 +1,8 @@
+# Hello, World!
+# The traditional first program
+
+extern fn nimble_print_str(s: String) -> Void
+
 fn main() -> Int:
-    print("Hello, Nimble!")
+    nimble_print_str("Hello, Nimble!")
     return 0

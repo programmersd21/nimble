@@ -1,3 +1,6 @@
+# Nimble FFI Demo
+# Calling C functions via extern declarations
+
 extern fn printf(fmt: String) -> Int
 
 fn main() -> Int:

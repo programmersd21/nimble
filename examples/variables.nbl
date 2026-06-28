@@ -1,26 +1,29 @@
-extern fn print_int(x: Int) -> Void
+# Nimble Variables Demo
+# Immutable (let) and mutable (var) bindings, compound assignment
+
+extern fn nimble_print_i64(x: Int) -> Void
 
 fn main() -> Int:
     let x = 42
-    print_int(x)
+    nimble_print_i64(x)
 
     var y = 10
     y = 20
-    print_int(y)
+    nimble_print_i64(y)
 
     y += 5
-    print_int(y)
+    nimble_print_i64(y)
 
     y -= 3
-    print_int(y)
+    nimble_print_i64(y)
 
     y *= 2
-    print_int(y)
+    nimble_print_i64(y)
 
     y /= 4
-    print_int(y)
+    nimble_print_i64(y)
 
     y %= 3
-    print_int(y)
+    nimble_print_i64(y)
 
     return 0

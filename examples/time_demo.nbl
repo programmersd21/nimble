@@ -1,0 +1,19 @@
+# Nimble Time Demo
+# Demonstrates time and sleep functions
+
+extern fn nimble_time_seconds() -> Int
+extern fn nimble_sleep_ms(ms: Int) -> Void
+extern fn nimble_print_str(s: String) -> Void
+extern fn nimble_print_i64(x: Int) -> Void
+extern fn nimble_int_to_string(val: Int) -> String
+
+fn main() -> Int:
+    let t = nimble_time_seconds()
+    nimble_print_str("unix timestamp: ")
+    nimble_print_i64(t)
+
+    nimble_print_str("sleeping for 500ms...")
+    nimble_sleep_ms(500)
+    nimble_print_str("done")
+
+    return 0

@@ -1,15 +1,18 @@
-extern fn print_int(x: Int) -> Void
-extern fn print_str(x: String) -> Void
+# Nimble FizzBuzz
+# Classic programming puzzle with control flow
+
+extern fn nimble_print_str(s: String) -> Void
+extern fn nimble_print_i64(x: Int) -> Void
 
 fn fizzbuzz(n: Int) -> Void:
     if n % 3 == 0 && n % 5 == 0:
-        print_str("FizzBuzz")
+        nimble_print_str("FizzBuzz")
     elif n % 3 == 0:
-        print_str("Fizz")
+        nimble_print_str("Fizz")
     elif n % 5 == 0:
-        print_str("Buzz")
+        nimble_print_str("Buzz")
     else:
-        print_int(n)
+        nimble_print_i64(n)
 
 fn main() -> Int:
     var i = 1

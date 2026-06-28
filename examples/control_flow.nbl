@@ -1,5 +1,8 @@
-extern fn print_int(x: Int) -> Void
-extern fn print_str(x: String) -> Void
+# Nimble Control Flow Demo
+# if/elif/else, while, break, continue
+
+extern fn nimble_print_str(s: String) -> Void
+extern fn nimble_print_i64(x: Int) -> Void
 
 fn classify(n: Int) -> Int:
     if n > 0:
@@ -12,30 +15,28 @@ fn classify(n: Int) -> Int:
 fn countdown(n: Int) -> Void:
     var i = n
     while i >= 0:
-        print_int(i)
+        nimble_print_i64(i)
         i = i - 1
 
 fn main() -> Int:
     let sig = classify(42)
-    print_int(sig)
+    nimble_print_i64(sig)
 
     countdown(5)
 
-    # break: exit loop early
     var i = 0
     while i < 10:
         if i == 4:
             break
-        print_int(i)
+        nimble_print_i64(i)
         i = i + 1
 
-    # continue: skip odd numbers
-    print_str("evens: ")
+    nimble_print_str("evens: ")
     var j = 0
     while j < 8:
         j = j + 1
         if j % 2 != 0:
             continue
-        print_int(j)
+        nimble_print_i64(j)
 
     return 0

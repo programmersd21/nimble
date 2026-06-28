@@ -1,0 +1,74 @@
+# Nimble Standard Library - String operations
+#
+# Provides string manipulation functions: length, concatenation, search, trim, case conversion.
+# All operations are runtime-backed.
+
+extern fn nimble_string_length(s: String) -> Int
+extern fn nimble_string_concat(a: String, b: String) -> String
+extern fn nimble_string_eq(a: String, b: String) -> Int
+extern fn nimble_string_substring(s: String, start: Int, end: Int) -> String
+extern fn nimble_string_find(s: String, needle: String) -> Int
+extern fn nimble_string_trim(s: String) -> String
+extern fn nimble_string_to_upper(s: String) -> String
+extern fn nimble_string_to_lower(s: String) -> String
+extern fn nimble_string_starts_with(s: String, prefix: String) -> Int
+extern fn nimble_string_ends_with(s: String, suffix: String) -> Int
+extern fn nimble_string_replace(s: String, from: String, to: String) -> String
+extern fn nimble_string_repeat(s: String, count: Int) -> String
+extern fn nimble_string_split(s: String, delim: Int) -> Int
+extern fn nimble_string_split_nth(s: String, delim: Int, n: Int) -> String
+extern fn nimble_string_to_int(s: String) -> Int
+extern fn nimble_string_to_float(s: String) -> Float
+
+fn length(s: String) -> Int:
+    return nimble_string_length(s)
+
+fn concat(a: String, b: String) -> String:
+    return nimble_string_concat(a, b)
+
+fn eq(a: String, b: String) -> Bool:
+    if nimble_string_eq(a, b) != 0:
+        return true
+    return false
+
+fn substring(s: String, start: Int, end: Int) -> String:
+    return nimble_string_substring(s, start, end)
+
+fn find(s: String, needle: String) -> Int:
+    return nimble_string_find(s, needle)
+
+fn trim(s: String) -> String:
+    return nimble_string_trim(s)
+
+fn to_upper(s: String) -> String:
+    return nimble_string_to_upper(s)
+
+fn to_lower(s: String) -> String:
+    return nimble_string_to_lower(s)
+
+fn starts_with(s: String, prefix: String) -> Bool:
+    if nimble_string_starts_with(s, prefix) != 0:
+        return true
+    return false
+
+fn ends_with(s: String, suffix: String) -> Bool:
+    if nimble_string_ends_with(s, suffix) != 0:
+        return true
+    return false
+
+fn replace(s: String, from: String, to: String) -> String:
+    return nimble_string_replace(s, from, to)
+
+fn repeat(s: String, count: Int) -> String:
+    return nimble_string_repeat(s, count)
+
+fn to_int(s: String) -> Int:
+    return nimble_string_to_int(s)
+
+fn to_float(s: String) -> Float:
+    return nimble_string_to_float(s)
+
+fn is_empty(s: String) -> Bool:
+    if nimble_string_length(s) == 0:
+        return true
+    return false

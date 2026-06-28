@@ -1,0 +1,18 @@
+# Nimble Standard Library - Hashing utilities
+#
+# Provides various hash function implementations: FNV-1a, SipHash, xxHash.
+# All operations are runtime-backed.
+
+extern fn nimble_hash_fnv1a(data: String, len: Int) -> Int
+extern fn nimble_hash_sip(data: String, len: Int) -> Int
+extern fn nimble_hash_xxhash3(data: String, len: Int) -> Int
+extern fn nimble_string_length(s: String) -> Int
+
+fn fnv1a(data: String) -> Int:
+    return nimble_hash_fnv1a(data, nimble_string_length(data))
+
+fn sip(data: String) -> Int:
+    return nimble_hash_sip(data, nimble_string_length(data))
+
+fn xxhash3(data: String) -> Int:
+    return nimble_hash_xxhash3(data, nimble_string_length(data))

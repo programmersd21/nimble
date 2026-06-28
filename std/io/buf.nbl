@@ -1,0 +1,27 @@
+# Nimble Standard Library - Buffered I/O
+#
+# Provides buffered readers and writers for efficient I/O.
+
+struct BufReader:
+    let data: String = ""
+    let pos: Int = 0
+    let len: Int = 0
+
+fn new_buf_reader(data: String) -> BufReader:
+    return BufReader{data: data, pos: 0, len: nimble_string_length(data)}
+
+extern fn nimble_string_length(s: String) -> Int
+
+fn read_line_buf(self: BufReader) -> BufReader:
+    var new_pos = self.pos
+    while new_pos < self.len:
+        let ch = self.data as Int
+        new_pos = new_pos + 1
+        if ch == 10:
+            break
+    return BufReader{data: self.data, pos: new_pos, len: self.len}
+
+fn remaining(self: BufReader) -> String:
+    return nimble_string_substring(self.data, self.pos, self.len)
+
+extern fn nimble_string_substring(s: String, start: Int, end: Int) -> String

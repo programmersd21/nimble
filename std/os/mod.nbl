@@ -1,10 +1,26 @@
-# Nimble Standard Library - OS helpers
+# Nimble Standard Library - Operating system interaction
+#
+# Provides environment variable access and system command execution.
 
-extern fn getenv(name: String) -> String
-extern fn system(command: String) -> Int
+extern fn nimble_getenv(name: String) -> String
+extern fn nimble_setenv(name: String, value: String) -> Int
+extern fn nimble_hostname() -> String
+extern fn nimble_os_name() -> String
+extern fn nimble_cpu_count() -> Int
 
 fn get_env(name: String) -> String:
-    return getenv(name)
+    return nimble_getenv(name)
 
-fn execute(command: String) -> Int:
-    return system(command)
+fn set_env(name: String, value: String) -> Bool:
+    if nimble_setenv(name, value) == 0:
+        return true
+    return false
+
+fn hostname() -> String:
+    return nimble_hostname()
+
+fn os_name() -> String:
+    return nimble_os_name()
+
+fn cpu_count() -> Int:
+    return nimble_cpu_count()

@@ -1,15 +1,18 @@
-extern fn print_int(x: Int) -> Void
-extern fn print_str(x: String) -> Void
+# Nimble Operators Demo
+# Arithmetic, comparison, and logical operators
+
+extern fn nimble_print_i64(x: Int) -> Void
+extern fn nimble_print_str(s: String) -> Void
 
 fn main() -> Int:
     let a = 10
     let b = 3
 
-    print_int(a + b)
-    print_int(a - b)
-    print_int(a * b)
-    print_int(a / b)
-    print_int(a % b)
+    nimble_print_i64(a + b)
+    nimble_print_i64(a - b)
+    nimble_print_i64(a * b)
+    nimble_print_i64(a / b)
+    nimble_print_i64(a % b)
 
     let eq = a == b
     let ne = a != b

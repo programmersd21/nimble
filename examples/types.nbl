@@ -1,5 +1,8 @@
-extern fn print_int(x: Int) -> Void
-extern fn print_str(x: String) -> Void
+# Nimble Types Demo
+# Primitive types: Int, Float, Bool, String
+
+extern fn nimble_print_str(s: String) -> Void
+extern fn nimble_print_i64(x: Int) -> Void
 
 fn main() -> Int:
     let a: Int = 42
@@ -7,11 +10,11 @@ fn main() -> Int:
     let c: Bool = true
     let d: String = "hello"
 
-    print_int(a)
-    print_str(d)
+    nimble_print_i64(a)
+    nimble_print_str(d)
 
     var inferred = 99
     inferred = 100
-    print_int(inferred)
+    nimble_print_i64(inferred)
 
     return 0

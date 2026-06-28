@@ -1,5 +1,8 @@
-extern fn print_int(x: Int) -> Void
-extern fn print_str(x: String) -> Void
+# Nimble Interfaces Demo
+# Structural typing via interface conformance
+
+extern fn nimble_print_str(s: String) -> Void
+extern fn nimble_print_i64(x: Int) -> Void
 
 interface Shape:
     fn area(self: Shape) -> Int
@@ -21,10 +24,10 @@ fn main() -> Int:
     let sq = Square{side: 6}
     let r = Rect{width: 4, height: 7}
 
-    print_str("square area: ")
-    print_int(square_area(sq))
+    nimble_print_str("square area: ")
+    nimble_print_i64(square_area(sq))
 
-    print_str("rect area: ")
-    print_int(rect_area(r))
+    nimble_print_str("rect area: ")
+    nimble_print_i64(rect_area(r))
 
     return 0

@@ -1,10 +1,62 @@
-# Nimble Standard Library - File system helpers
+# Nimble Standard Library - File system operations
+#
+# Provides file and directory manipulation backed by the runtime.
 
-extern fn fopen(path: String, mode: String) -> String
-extern fn fclose(file: String) -> Int
+extern fn nimble_read_file(path: String) -> String
+extern fn nimble_write_file(path: String, content: String) -> Int
+extern fn nimble_append_file(path: String, content: String) -> Int
+extern fn nimble_file_exists(path: String) -> Int
+extern fn nimble_file_size(path: String) -> Int
+extern fn nimble_delete_file(path: String) -> Int
+extern fn nimble_rename_file(old: String, new: String) -> Int
+extern fn nimble_create_dir(path: String) -> Int
+extern fn nimble_remove_dir(path: String) -> Int
+extern fn nimble_list_dir(path: String) -> String
+extern fn nimble_current_dir() -> String
 
-fn open(path: String, mode: String) -> String:
-    return fopen(path, mode)
+fn read(path: String) -> String:
+    return nimble_read_file(path)
 
-fn close(file: String) -> Int:
-    return fclose(file)
+fn write(path: String, content: String) -> Bool:
+    if nimble_write_file(path, content) == 0:
+        return true
+    return false
+
+fn append(path: String, content: String) -> Bool:
+    if nimble_append_file(path, content) == 0:
+        return true
+    return false
+
+fn exists(path: String) -> Bool:
+    if nimble_file_exists(path) != 0:
+        return true
+    return false
+
+fn size(path: String) -> Int:
+    return nimble_file_size(path)
+
+fn delete(path: String) -> Bool:
+    if nimble_delete_file(path) == 0:
+        return true
+    return false
+
+fn rename(old: String, new: String) -> Bool:
+    if nimble_rename_file(old, new) == 0:
+        return true
+    return false
+
+fn create_dir(path: String) -> Bool:
+    if nimble_create_dir(path) == 0:
+        return true
+    return false
+
+fn remove_dir(path: String) -> Bool:
+    if nimble_remove_dir(path) == 0:
+        return true
+    return false
+
+fn list_dir(path: String) -> String:
+    return nimble_list_dir(path)
+
+fn current_dir() -> String:
+    return nimble_current_dir()

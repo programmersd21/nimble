@@ -1,37 +1,37 @@
-# Nimble Standard Library - Testing helpers
+# Nimble Standard Library - Testing framework
+#
+# Provides assertion helpers and test runner for unit testing.
 
-load std.io::{print_str, print_int, print}
-load std.core.panic
+load std.io::{print_no_newline, print_int, print}
 
-fn assert_eq[T](expected: T, actual: T) -> Void:
+extern fn nimble_panic(msg: String) -> Void
+
+fn assert_eq_int(expected: Int, actual: Int) -> Void:
     if expected != actual:
-        print_str("[FAIL] assert_eq: expected ")
-        print_int(expected as Int)
-        print_str(" but got ")
-        print_int(actual as Int)
-        print("")
-        panic("assertion failed")
-    print_str(".")
+        print("[FAIL] assert_eq: expected ")
+        print_int(expected)
+        print_no_newline(" but got ")
+        print_int(actual)
+        nimble_panic("assertion failed")
+    print_no_newline(".")
 
 fn assert_true(condition: Bool, message: String) -> Void:
     if !condition:
-        print_str("[FAIL] ")
+        print("[FAIL] ")
         print(message)
-        panic("assertion failed")
-    print_str(".")
+        nimble_panic("assertion failed")
+    print_no_newline(".")
 
-fn assert_ok[T, E](result: Result[T, E]) -> T:
-    match result:
-        Ok(val):
-            print_str(".")
-            return val
-        Err(e):
-            print_str("[FAIL] expected Ok, got Err")
-            panic("assertion failed")
+fn assert_false(condition: Bool, message: String) -> Void:
+    if condition:
+        print("[FAIL] ")
+        print(message)
+        nimble_panic("assertion failed")
+    print_no_newline(".")
 
 fn run_test(name: String, test_fn: fn() -> Void) -> Void:
-    print_str("Testing ")
-    print(name)
-    print_str(": ")
+    print_no_newline("test ")
+    print_no_newline(name)
+    print_no_newline(": ")
     test_fn()
     print(" OK")

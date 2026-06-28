@@ -1,0 +1,14 @@
+# Nimble Standard Library - UTF-8 encoding utilities
+#
+# Provides UTF-8 validation and Unicode character operations.
+
+extern fn nimble_utf8_validate(data: String, len: Int) -> Int
+extern fn nimble_string_length(s: String) -> Int
+
+fn validate(data: String) -> Bool:
+    if nimble_utf8_validate(data, nimble_string_length(data)) != 0:
+        return true
+    return false
+
+fn len(s: String) -> Int:
+    return nimble_string_length(s)

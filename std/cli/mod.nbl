@@ -1,0 +1,26 @@
+# Nimble Standard Library - Command line interface utilities
+#
+# Provides terminal detection, argument parsing, and ANSI escape code support.
+
+extern fn nimble_args_count() -> Int
+extern fn nimble_args_get(index: Int) -> String
+extern fn nimble_is_terminal() -> Int
+extern fn nimble_terminal_width() -> Int
+extern fn nimble_terminal_height() -> Int
+
+fn arg_count() -> Int:
+    return nimble_args_count()
+
+fn arg_get(index: Int) -> String:
+    return nimble_args_get(index)
+
+fn is_terminal() -> Bool:
+    if nimble_is_terminal() != 0:
+        return true
+    return false
+
+fn terminal_width() -> Int:
+    return nimble_terminal_width()
+
+fn terminal_height() -> Int:
+    return nimble_terminal_height()

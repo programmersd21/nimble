@@ -1,5 +1,8 @@
-extern fn print_int(x: Int) -> Void
-extern fn print_str(x: String) -> Void
+# Nimble Structs Demo
+# Structs with named fields, field access, and functions
+
+extern fn nimble_print_str(s: String) -> Void
+extern fn nimble_print_i64(x: Int) -> Void
 
 struct Point:
     let x: Int = 0
@@ -17,15 +20,15 @@ fn perimeter(r: Rectangle) -> Int:
 
 fn main() -> Int:
     let p = Point{x: 3, y: 4}
-    print_str("x: ")
-    print_int(p.x)
-    print_str("y: ")
-    print_int(p.y)
+    nimble_print_str("x: ")
+    nimble_print_i64(p.x)
+    nimble_print_str("y: ")
+    nimble_print_i64(p.y)
 
     let rect = Rectangle{width: 10, height: 5}
-    print_str("area: ")
-    print_int(area(rect))
-    print_str("perimeter: ")
-    print_int(perimeter(rect))
+    nimble_print_str("area: ")
+    nimble_print_i64(area(rect))
+    nimble_print_str("perimeter: ")
+    nimble_print_i64(perimeter(rect))
 
     return 0

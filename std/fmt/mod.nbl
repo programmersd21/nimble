@@ -1,10 +1,27 @@
-# Nimble Standard Library - Formatting helpers
+# Nimble Standard Library - Formatting
+#
+# Provides string formatting utilities for various types.
 
-load std.io::{print_str, print_int}
-
-fn print_label(label: String, value: Int) -> Void:
-    print_str(label)
-    print_int(value)
+extern fn nimble_int_to_string(val: Int) -> String
+extern fn nimble_float_to_string(val: Float) -> String
+extern fn nimble_bool_to_string(val: Bool) -> String
+extern fn nimble_string_concat(a: String, b: String) -> String
+extern fn nimble_string_length(s: String) -> Int
 
 fn format_int(value: Int) -> String:
-    return ""
+    return nimble_int_to_string(value)
+
+fn format_float(value: Float) -> String:
+    return nimble_float_to_string(value)
+
+fn format_bool(value: Bool) -> String:
+    return nimble_bool_to_string(value)
+
+fn concat(a: String, b: String) -> String:
+    return nimble_string_concat(a, b)
+
+fn format(format_str: String, args: String) -> String:
+    return nimble_string_concat(format_str, args)
+
+fn join(parts: String, separator: String) -> String:
+    return parts

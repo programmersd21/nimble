@@ -1,0 +1,37 @@
+# Nimble Encoding Demo
+# Demonstrates base64 and hex encoding/decoding
+
+extern fn nimble_base64_encode(data: String, len: Int, url_safe: Int) -> String
+extern fn nimble_base64_decode(data: String, len: Int) -> String
+extern fn nimble_hex_encode(data: String, len: Int, upper: Int) -> String
+extern fn nimble_hex_decode(hex: String, len: Int) -> String
+extern fn nimble_string_length(s: String) -> Int
+extern fn nimble_print_str(s: String) -> Void
+
+fn main() -> Int:
+    # Base64 standard
+    let data = "hello world"
+    let encoded = nimble_base64_encode(data, nimble_string_length(data), 0)
+    nimble_print_str("base64: ")
+    nimble_print_str(encoded)
+
+    let decoded = nimble_base64_decode(encoded, nimble_string_length(encoded))
+    nimble_print_str("decoded: ")
+    nimble_print_str(decoded)
+
+    # Base64 URL-safe
+    let url_encoded = nimble_base64_encode(data, nimble_string_length(data), 1)
+    nimble_print_str("base64url: ")
+    nimble_print_str(url_encoded)
+
+    # Hex encoding (lowercase)
+    let hex_lower = nimble_hex_encode(data, nimble_string_length(data), 0)
+    nimble_print_str("hex lower: ")
+    nimble_print_str(hex_lower)
+
+    # Hex encoding (uppercase)
+    let hex_upper = nimble_hex_encode(data, nimble_string_length(data), 1)
+    nimble_print_str("hex upper: ")
+    nimble_print_str(hex_upper)
+
+    return 0

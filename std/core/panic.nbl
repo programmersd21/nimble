@@ -1,34 +1,10 @@
-# Panic and unwrap functions
+# Nimble Standard Library - Panic and assertion primitives
 
 extern fn nimble_panic(msg: String) -> Void
 
 fn panic(msg: String) -> Void:
     nimble_panic(msg)
 
-fn expect[T](option: Option[T], msg: String) -> T:
-    match option:
-        Some(val):
-            return val
-        None:
-            panic(msg)
-
-fn unwrap[T](option: Option[T]) -> T:
-    match option:
-        Some(val):
-            return val
-        None:
-            panic("unwrap on None")
-
-fn expect_result[T, E](result: Result[T, E], msg: String) -> T:
-    match result:
-        Ok(val):
-            return val
-        Err(_):
-            panic(msg)
-
-fn unwrap_result[T, E](result: Result[T, E]) -> T:
-    match result:
-        Ok(val):
-            return val
-        Err(_):
-            panic("unwrap on Err")
+fn assert(condition: Bool, msg: String) -> Void:
+    if !condition:
+        nimble_panic(msg)

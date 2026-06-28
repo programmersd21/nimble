@@ -1,4 +1,7 @@
-extern fn print_int(x: Int) -> Void
+# Nimble Booleans Demo
+# Boolean logic with and, or, not
+
+extern fn nimble_print_i64(x: Int) -> Void
 
 fn test_and(a: Bool, b: Bool) -> Bool:
     return a && b
@@ -18,9 +21,9 @@ fn main() -> Int:
     let r3 = test_not(f)
 
     if t && !f:
-        print_int(1)
+        nimble_print_i64(1)
 
     if f || t:
-        print_int(2)
+        nimble_print_i64(2)
 
     return 0

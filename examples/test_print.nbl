@@ -1,5 +1,8 @@
-extern fn print_int(x: Int) -> Void
+# Nimble Test Print
+# Minimal test to verify I/O works
+
+extern fn nimble_print_i64(x: Int) -> Void
 
 fn main() -> Int:
-    print_int(42)
+    nimble_print_i64(42)
     return 0

@@ -1,10 +1,16 @@
-# Nimble Standard Library - JSON support
+# Nimble Standard Library - JSON parsing and serialization
+#
+# Provides JSON parsing and stringification backed by the runtime.
 
 extern fn nimble_json_parse(json: String) -> String
 extern fn nimble_json_stringify(value: String) -> String
+extern fn nimble_json_get_field(json: String, field: String) -> String
 
 fn parse(json: String) -> String:
     return nimble_json_parse(json)
 
 fn stringify(value: String) -> String:
     return nimble_json_stringify(value)
+
+fn get_field(json: String, field: String) -> String:
+    return nimble_json_get_field(json, field)

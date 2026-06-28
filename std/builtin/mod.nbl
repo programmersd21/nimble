@@ -1,12 +1,14 @@
-# Nimble Standard Library - Builtins
+# Nimble Standard Library - Built-in type helpers
+#
+# Provides utility functions for primitive types.
 
-load std.io::{print, print_str}
+load std.io::{print_no_newline, print}
 
 fn assert(condition: Bool, message: String) -> Void:
     if !condition:
-        print_str("[ASSERT] ")
+        print_no_newline("[ASSERT] ")
         print(message)
 
 fn debug(message: String) -> Void:
-    print_str("[DEBUG] ")
+    print_no_newline("[DEBUG] ")
     print(message)

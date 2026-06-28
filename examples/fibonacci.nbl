@@ -1,3 +1,9 @@
+# Nimble Fibonacci
+# Recursive fibonacci with tail-call-like structure
+
+extern fn nimble_print_str(s: String) -> Void
+extern fn nimble_print_i64(x: Int) -> Void
+
 fn fib(n: Int) -> Int:
     if n <= 1:
         return n
@@ -5,10 +11,9 @@ fn fib(n: Int) -> Int:
         return fib(n - 1) + fib(n - 2)
 
 fn main() -> Int:
-    var n = 40
-    print_str("fibonacci(")
-    print_int(n)
-    print_str(") = ")
-    print_int(fib(n))
-    print_str("\n")
+    let n = 40
+    nimble_print_str("fibonacci(")
+    nimble_print_i64(n)
+    nimble_print_str(") = ")
+    nimble_print_i64(fib(n))
     return 0

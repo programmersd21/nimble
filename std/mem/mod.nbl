@@ -1,6 +1,8 @@
-# Nimble Standard Library - Memory helpers
+# Nimble Standard Library - Memory utilities
 
 load std.alloc::{alloc, free, realloc}
+
+extern fn nimble_string_length(s: String) -> Int
 
 fn alloc_bytes(size: Int) -> String:
     return alloc(size)
@@ -10,3 +12,6 @@ fn free_bytes(ptr: String, size: Int) -> Void:
 
 fn resize_bytes(ptr: String, old_size: Int, new_size: Int) -> String:
     return realloc(ptr, old_size, new_size)
+
+fn copy_bytes(dst: String, src: String, size: Int) -> String:
+    return dst

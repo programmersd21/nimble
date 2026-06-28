@@ -1,31 +1,71 @@
-extern fn print_int(x: Int) -> Void
-extern fn print_str(x: String) -> Void
+# Nimble Standard Library Demo
+# Demonstrates runtime-backed operations (core math, string, encoding, hash)
 
-fn max_i(a: Int, b: Int) -> Int:
-    if a > b:
-        return a
-    return b
-
-fn min_i(a: Int, b: Int) -> Int:
-    if a < b:
-        return a
-    return b
-
-fn clamp(x: Int, lo: Int, hi: Int) -> Int:
-    if x < lo:
-        return lo
-    if x > hi:
-        return hi
-    return x
+extern fn nimble_abs_i64(x: Int) -> Int
+extern fn nimble_min_i64(a: Int, b: Int) -> Int
+extern fn nimble_max_i64(a: Int, b: Int) -> Int
+extern fn nimble_clamp_i64(v: Int, lo: Int, hi: Int) -> Int
+extern fn nimble_popcount(x: Int) -> Int
+extern fn nimble_string_length(s: String) -> Int
+extern fn nimble_string_concat(a: String, b: String) -> String
+extern fn nimble_string_to_upper(s: String) -> String
+extern fn nimble_string_trim(s: String) -> String
+extern fn nimble_hash_sip(data: String, len: Int) -> Int
+extern fn nimble_hash_fnv1a(data: String, len: Int) -> Int
+extern fn nimble_rand_i64() -> Int
+extern fn nimble_rand_range(lo: Int, hi: Int) -> Int
+extern fn nimble_int_to_string(val: Int) -> String
+extern fn nimble_base64_encode(data: String, len: Int, url_safe: Int) -> String
+extern fn nimble_print_str(s: String) -> Void
 
 fn main() -> Int:
-    print_str("max(3,7): ")
-    print_int(max_i(3, 7))
+    # Core math backed by runtime
+    nimble_print_str("abs(-5): ")
+    print_int(nimble_abs_i64(-5))
 
-    print_str("min(3,7): ")
-    print_int(min_i(3, 7))
+    nimble_print_str("max(3,7): ")
+    print_int(nimble_max_i64(3, 7))
 
-    print_str("clamp(10,0,5): ")
-    print_int(clamp(10, 0, 5))
+    nimble_print_str("min(3,7): ")
+    print_int(nimble_min_i64(3, 7))
+
+    nimble_print_str("clamp(10,0,5): ")
+    print_int(nimble_clamp_i64(10, 0, 5))
+
+    nimble_print_str("popcount(42): ")
+    print_int(nimble_popcount(42))
+
+    # String operations
+    let msg = "  hello world  "
+    let len = nimble_string_length(msg)
+    nimble_print_str("length: ")
+    print_int(len)
+
+    let upper = nimble_string_to_upper(msg)
+    nimble_print_str("upper: ")
+    nimble_print_str(upper)
+
+    let trimmed = nimble_string_trim(msg)
+    nimble_print_str("trimmed: ")
+    nimble_print_str(trimmed)
+
+    # Hashing
+    let data = "nimble"
+    let h1 = nimble_hash_fnv1a(data, nimble_string_length(data))
+    let h2 = nimble_hash_sip(data, nimble_string_length(data))
+    nimble_print_str("fnv1a hash: ")
+    print_int(h1)
+    nimble_print_str("sip hash: ")
+    print_int(h2)
+
+    # Random numbers
+    let r = nimble_rand_range(1, 100)
+    nimble_print_str("random 1-100: ")
+    print_int(r)
+
+    # Base64 encoding
+    let encoded = nimble_base64_encode("hello", 5, 0)
+    nimble_print_str("base64: ")
+    nimble_print_str(encoded)
 
     return 0

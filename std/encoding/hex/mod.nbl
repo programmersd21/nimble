@@ -1,0 +1,15 @@
+# Nimble Standard Library - Hex encoding
+#
+# Provides hexadecimal encoding and decoding with upper and lower case variants.
+
+extern fn nimble_hex_encode(data: String, len: Int, upper: Int) -> String
+extern fn nimble_hex_decode(hex: String, len: Int) -> String
+
+fn encode(data: String) -> String:
+    return nimble_hex_encode(data, 0, 0)
+
+fn encode_upper(data: String) -> String:
+    return nimble_hex_encode(data, 0, 1)
+
+fn decode(hex: String) -> String:
+    return nimble_hex_decode(hex, 0)

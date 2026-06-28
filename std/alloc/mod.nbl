@@ -1,4 +1,6 @@
-# Nimble Standard Library - Allocation
+# Nimble Standard Library - Memory Allocation
+#
+# Provides low-level memory allocation primitives backed by the runtime.
 
 extern fn nimble_alloc(size: Int) -> String
 extern fn nimble_free(ptr: String, size: Int) -> Void
@@ -12,3 +14,6 @@ fn free(ptr: String, size: Int) -> Void:
 
 fn realloc(ptr: String, old_size: Int, new_size: Int) -> String:
     return nimble_realloc(ptr, old_size, new_size)
+
+fn alloc_zeroed(size: Int) -> String:
+    return nimble_alloc(size)

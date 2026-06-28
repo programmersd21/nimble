@@ -1,9 +1,9 @@
-# Built-in Result and Option enum types
+# Nimble Standard Library - Error handling types
+#
+# Note: Enum/match support is not yet implemented in the compiler.
+# Option and Result types will be available when enum support lands.
+# For now, use runtime-backed functions for fallible operations.
 
-enum Option[T]:
-    Some(T)
-    None
-
-enum Result[T, E]:
-    Ok(T)
-    Err(E)
+# The following types are defined here for documentation purposes:
+# enum Option[T]: Some(T), None
+# enum Result[T, E]: Ok(T), Err(E)

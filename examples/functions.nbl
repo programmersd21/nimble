@@ -1,4 +1,7 @@
-extern fn print_int(x: Int) -> Void
+# Nimble Functions Demo
+# Functions, recursion, and composition
+
+extern fn nimble_print_i64(x: Int) -> Void
 
 fn double(x: Int) -> Int:
     return x * 2
@@ -14,12 +17,12 @@ fn recursive(n: Int) -> Int:
 
 fn main() -> Int:
     let r1 = double(21)
-    print_int(r1)
+    nimble_print_i64(r1)
 
     let r2 = apply(3, 4)
-    print_int(r2)
+    nimble_print_i64(r2)
 
     let r3 = recursive(5)
-    print_int(r3)
+    nimble_print_i64(r3)
 
     return 0

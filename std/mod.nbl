@@ -1,3 +1,7 @@
+# Nimble Standard Library - Root aggregator module
+#
+# Loads all standard library modules. Import with: load std
+
 load std.io
 load std.math
 load std.alloc
@@ -21,3 +25,8 @@ load std.sync
 load std.testing
 load std.thread
 load std.time
+load std.encoding
+load std.hash
+load std.str
+load std.cli
+load std.text

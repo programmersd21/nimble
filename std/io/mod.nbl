@@ -1,37 +1,78 @@
-# Nimble Standard Library - I/O
+# Nimble Standard Library - I/O operations
+#
+# Provides file, console, and string I/O backed by the runtime.
 
-# Low-level I/O primitives provided by the ember runtime.
-extern fn print(s: String) -> Void
-extern fn print_str(s: String) -> Void
-extern fn print_int(i: Int) -> Void
-extern fn print_float(f: Float) -> Void
+extern fn nimble_print(ptr: String) -> Void
+extern fn nimble_print_str(ptr: String) -> Void
+extern fn nimble_print_i64(i: Int) -> Void
+extern fn nimble_print_f64(f: Float) -> Void
+extern fn nimble_print_bool(b: Bool) -> Void
+extern fn nimble_read_line() -> String
 extern fn nimble_read_file(path: String) -> String
 extern fn nimble_write_file(path: String, content: String) -> Int
-extern fn nimble_read_line() -> String
+extern fn nimble_append_file(path: String, content: String) -> Int
+extern fn nimble_file_exists(path: String) -> Int
+extern fn nimble_file_size(path: String) -> Int
+extern fn nimble_delete_file(path: String) -> Int
+extern fn nimble_rename_file(old: String, new: String) -> Int
+extern fn nimble_flush() -> Void
+extern fn nimble_int_to_string(val: Int) -> String
+extern fn nimble_float_to_string(val: Float) -> String
+extern fn nimble_bool_to_string(val: Bool) -> String
 
-fn println(s: String) -> Void:
-    print(s)
+fn print(s: String) -> Void:
+    nimble_print(s)
 
 fn print_no_newline(s: String) -> Void:
-    print_str(s)
+    nimble_print_str(s)
 
-fn print_int_val(i: Int) -> Void:
-    print_int(i)
+fn print_int(i: Int) -> Void:
+    nimble_print_i64(i)
 
-fn read_file(path: String) -> Result[String, String]:
-    let content = nimble_read_file(path)
-    if content == "":
-        return Err("file not found or empty")
-    return Ok(content)
+fn print_float(f: Float) -> Void:
+    nimble_print_f64(f)
 
-fn write_file(path: String, content: String) -> Result[Int, String]:
-    let result = nimble_write_file(path, content)
-    if result != 0:
-        return Err("failed to write file")
-    return Ok(result)
+fn print_bool(b: Bool) -> Void:
+    nimble_print_bool(b)
 
-fn read_line() -> Result[String, String]:
-    let line = nimble_read_line()
-    if line == "":
-        return Err("no input")
-    return Ok(line)
+fn flush() -> Void:
+    nimble_flush()
+
+fn read_line() -> String:
+    return nimble_read_line()
+
+fn read_file(path: String) -> String:
+    return nimble_read_file(path)
+
+fn write_file(path: String, content: String) -> Int:
+    return nimble_write_file(path, content)
+
+fn append_file(path: String, content: String) -> Int:
+    return nimble_append_file(path, content)
+
+fn file_exists(path: String) -> Bool:
+    if nimble_file_exists(path) != 0:
+        return true
+    return false
+
+fn file_size(path: String) -> Int:
+    return nimble_file_size(path)
+
+fn delete_file(path: String) -> Bool:
+    if nimble_delete_file(path) == 0:
+        return true
+    return false
+
+fn rename_file(old: String, new: String) -> Bool:
+    if nimble_rename_file(old, new) == 0:
+        return true
+    return false
+
+fn to_string(val: Int) -> String:
+    return nimble_int_to_string(val)
+
+fn float_to_string(val: Float) -> String:
+    return nimble_float_to_string(val)
+
+fn bool_to_string(val: Bool) -> String:
+    return nimble_bool_to_string(val)

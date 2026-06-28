@@ -1,52 +1,52 @@
-# Nimble Standard Library — Async runtime and concurrency primitives
+# Nimble Standard Library - Async primitives and concurrency
+#
+# Provides channels, futures, and async operations.
 
-extern fn nimble_thread_spawn(fn_ptr: String, arg: String) -> Int
-extern fn nimble_thread_join(thread: Int) -> Void
-extern fn nimble_sleep_ms(ms: Int) -> Void
 extern fn nimble_channel_create() -> Int
 extern fn nimble_channel_send(chan: Int, value: Int) -> Void
 extern fn nimble_channel_recv(chan: Int) -> Int
-extern fn nimble_mutex_create() -> Int
-extern fn nimble_mutex_lock(mtx: Int) -> Void
-extern fn nimble_mutex_unlock(mtx: Int) -> Void
+extern fn nimble_mutex_create() -> String
+extern fn nimble_mutex_lock(mtx: String) -> Void
+extern fn nimble_mutex_unlock(mtx: String) -> Void
+extern fn nimble_thread_spawn(fn_ptr: String, arg: String) -> Int
+extern fn nimble_sleep_ms(ms: Int) -> Void
 
-# Simple thread spawn
-fn spawn[T](f: fn() -> T) -> Int:
-    return nimble_thread_spawn(f as String, "")
+# ── Channel ───────────────────────────────────────────────────────
 
-fn join(thread_id: Int) -> Void:
-    nimble_thread_join(thread_id)
-
-fn sleep(ms: Int) -> Void:
-    nimble_sleep_ms(ms)
-
-# Future type for async
-enum Future[T]:
-    Pending
-    Ready(T)
-
-# Channel
 struct Channel:
     let handle: Int = 0
 
 fn channel() -> Channel:
     return Channel{handle: nimble_channel_create()}
 
-fn send[T](self: Channel, value: T) -> Void:
-    nimble_channel_send(self.handle, value as Int)
+fn send(self: Channel, value: Int) -> Void:
+    nimble_channel_send(self.handle, value)
 
-fn recv[T](self: Channel) -> T:
-    return nimble_channel_recv(self.handle) as T
+fn recv(self: Channel) -> Int:
+    return nimble_channel_recv(self.handle)
 
-# Mutex
-struct Mutex:
-    let handle: Int = 0
+# ── Future ────────────────────────────────────────────────────────
 
-fn mutex() -> Mutex:
-    return Mutex{handle: nimble_mutex_create()}
+struct Future:
+    let value: Int = 0
+    let ready: Bool = false
 
-fn lock[T](self: Mutex) -> Void:
-    nimble_mutex_lock(self.handle)
+fn future_pending() -> Future:
+    return Future{value: 0, ready: false}
 
-fn unlock[T](self: Mutex) -> Void:
-    nimble_mutex_unlock(self.handle)
+fn future_ready(val: Int) -> Future:
+    return Future{value: val, ready: true}
+
+fn is_ready(self: Future) -> Bool:
+    return self.ready
+
+fn get_value(self: Future) -> Int:
+    return self.value
+
+# ── Simple async spawn ────────────────────────────────────────────
+
+fn async_spawn(f: fn() -> Void) -> Int:
+    return nimble_thread_spawn(f as String, "")
+
+fn sleep_ms(ms: Int) -> Void:
+    nimble_sleep_ms(ms)

@@ -1,0 +1,16 @@
+# Nimble Standard Library - Text processing
+#
+# Provides text matching and pattern utilities.
+
+extern fn nimble_string_find(s: String, needle: String) -> Int
+extern fn nimble_string_starts_with(s: String, prefix: String) -> Int
+extern fn nimble_string_ends_with(s: String, suffix: String) -> Int
+extern fn nimble_string_replace(s: String, from: String, to: String) -> String
+
+fn contains(s: String, pattern: String) -> Bool:
+    if nimble_string_find(s, pattern) >= 0:
+        return true
+    return false
+
+fn replace_all(s: String, from: String, to: String) -> String:
+    return nimble_string_replace(s, from, to)

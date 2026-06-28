@@ -1,23 +1,83 @@
 # Nimble Standard Library - Core utilities
+#
+# Provides fundamental operations: numeric helpers, panics, and basic error handling.
+# Core functions are runtime-backed for correctness and performance.
 
-fn abs_i(x: Int) -> Int:
-    if x < 0:
-        return -x
-    return x
+# ── Numeric helpers ──────────────────────────────────────────────────
 
-fn max_i(a: Int, b: Int) -> Int:
-    if a >= b:
-        return a
-    return b
+extern fn nimble_abs_i64(x: Int) -> Int
+extern fn nimble_min_i64(a: Int, b: Int) -> Int
+extern fn nimble_max_i64(a: Int, b: Int) -> Int
+extern fn nimble_clamp_i64(v: Int, lo: Int, hi: Int) -> Int
+extern fn nimble_popcount(x: Int) -> Int
+extern fn nimble_clz(x: Int) -> Int
+extern fn nimble_ctz(x: Int) -> Int
+extern fn nimble_byte_swap(x: Int) -> Int
+extern fn nimble_rotl(x: Int, n: Int) -> Int
+extern fn nimble_rotr(x: Int, n: Int) -> Int
+extern fn nimble_checked_add(a: Int, b: Int) -> Int
+extern fn nimble_checked_sub(a: Int, b: Int) -> Int
+extern fn nimble_checked_mul(a: Int, b: Int) -> Int
+extern fn nimble_checked_div(a: Int, b: Int) -> Int
+extern fn nimble_saturating_add(a: Int, b: Int) -> Int
+extern fn nimble_saturating_sub(a: Int, b: Int) -> Int
+extern fn nimble_wrapping_add(a: Int, b: Int) -> Int
+extern fn nimble_wrapping_sub(a: Int, b: Int) -> Int
+extern fn nimble_wrapping_mul(a: Int, b: Int) -> Int
 
-fn min_i(a: Int, b: Int) -> Int:
-    if a <= b:
-        return a
-    return b
+fn abs(x: Int) -> Int:
+    return nimble_abs_i64(x)
+
+fn max(a: Int, b: Int) -> Int:
+    return nimble_max_i64(a, b)
+
+fn min(a: Int, b: Int) -> Int:
+    return nimble_min_i64(a, b)
 
 fn clamp(value: Int, low: Int, high: Int) -> Int:
-    if value < low:
-        return low
-    elif value > high:
-        return high
-    return value
+    return nimble_clamp_i64(value, low, high)
+
+fn count_ones(x: Int) -> Int:
+    return nimble_popcount(x)
+
+fn leading_zeros(x: Int) -> Int:
+    return nimble_clz(x)
+
+fn trailing_zeros(x: Int) -> Int:
+    return nimble_ctz(x)
+
+fn byteswap(x: Int) -> Int:
+    return nimble_byte_swap(x)
+
+fn rotate_left(x: Int, n: Int) -> Int:
+    return nimble_rotl(x, n)
+
+fn rotate_right(x: Int, n: Int) -> Int:
+    return nimble_rotr(x, n)
+
+fn checked_add(a: Int, b: Int) -> Int:
+    return nimble_checked_add(a, b)
+
+fn checked_sub(a: Int, b: Int) -> Int:
+    return nimble_checked_sub(a, b)
+
+fn checked_mul(a: Int, b: Int) -> Int:
+    return nimble_checked_mul(a, b)
+
+fn checked_div(a: Int, b: Int) -> Int:
+    return nimble_checked_div(a, b)
+
+fn saturating_add(a: Int, b: Int) -> Int:
+    return nimble_saturating_add(a, b)
+
+fn saturating_sub(a: Int, b: Int) -> Int:
+    return nimble_saturating_sub(a, b)
+
+fn wrapping_add(a: Int, b: Int) -> Int:
+    return nimble_wrapping_add(a, b)
+
+fn wrapping_sub(a: Int, b: Int) -> Int:
+    return nimble_wrapping_sub(a, b)
+
+fn wrapping_mul(a: Int, b: Int) -> Int:
+    return nimble_wrapping_mul(a, b)

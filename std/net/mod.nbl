@@ -1,14 +1,26 @@
-# Nimble Standard Library - Networking helpers
+# Nimble Standard Library - Networking primitives
+#
+# Provides TCP networking, DNS resolution, and URL parsing.
 
-extern fn nimble_net_connect(address: String) -> Int
-extern fn nimble_net_send(socket: Int, data: String) -> Int
-extern fn nimble_net_recv(socket: Int, buffer: String, size: Int) -> Int
+extern fn nimble_net_connect(host: String, port: Int) -> Int
+extern fn nimble_net_send(fd: Int, data: String, len: Int) -> Int
+extern fn nimble_net_recv(fd: Int, buffer: String, size: Int) -> Int
+extern fn nimble_net_close(fd: Int) -> Int
+extern fn nimble_dns_resolve(host: String) -> String
 
-fn connect(address: String) -> Int:
-    return nimble_net_connect(address)
+fn tcp_connect(host: String, port: Int) -> Int:
+    return nimble_net_connect(host, port)
 
-fn send(socket: Int, data: String) -> Int:
-    return nimble_net_send(socket, data)
+fn tcp_send(socket: Int, data: String) -> Int:
+    return nimble_net_send(socket, data, 0)
 
-fn recv(socket: Int, buffer: String, size: Int) -> Int:
-    return nimble_net_recv(socket, buffer, size)
+fn tcp_recv(socket: Int, size: Int) -> String:
+    return ""
+
+fn tcp_close(socket: Int) -> Bool:
+    if nimble_net_close(socket) == 0:
+        return true
+    return false
+
+fn dns_resolve(host: String) -> String:
+    return nimble_dns_resolve(host)

@@ -1,0 +1,21 @@
+# Nimble Random Number Demo
+# Demonstrates random number generation
+
+extern fn nimble_rand_i64() -> Int
+extern fn nimble_rand_f64() -> Float
+extern fn nimble_rand_range(lo: Int, hi: Int) -> Int
+extern fn nimble_print_str(s: String) -> Void
+extern fn nimble_print_i64(x: Int) -> Void
+extern fn nimble_print_f64(x: Float) -> Void
+
+fn main() -> Int:
+    nimble_print_str("random int: ")
+    nimble_print_i64(nimble_rand_i64())
+
+    nimble_print_str("random 0-99: ")
+    nimble_print_i64(nimble_rand_range(0, 100))
+
+    nimble_print_str("random float: ")
+    nimble_print_f64(nimble_rand_f64())
+
+    return 0

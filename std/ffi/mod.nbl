@@ -1,10 +1,8 @@
-# Nimble Standard Library - Foreign function interface
+# Nimble Standard Library - Foreign Function Interface
+#
+# Provides C library bindings for common system calls.
 
-extern fn printf(fmt: String) -> Int
-extern fn puts(s: String) -> Int
+extern fn nimble_exit(code: Int) -> Void
 
-fn print_format(fmt: String) -> Int:
-    return printf(fmt)
-
-fn write_line(s: String) -> Int:
-    return puts(s)
+fn system_exit(code: Int) -> Void:
+    nimble_exit(code)

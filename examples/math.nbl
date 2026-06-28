@@ -1,29 +1,49 @@
-extern fn print_int(x: Int) -> Void
-extern fn print_str(x: String) -> Void
+# Nimble Math Demo
+# Demonstrates runtime-backed math functions
 
-fn abs(x: Int) -> Int:
-    if x < 0:
-        return -x
-    return x
-
-fn max(a: Int, b: Int) -> Int:
-    if a > b:
-        return a
-    return b
-
-fn min(a: Int, b: Int) -> Int:
-    if a < b:
-        return a
-    return b
+extern fn nimble_sin(x: Float) -> Float
+extern fn nimble_cos(x: Float) -> Float
+extern fn nimble_sqrt(x: Float) -> Float
+extern fn nimble_pow(b: Float, e: Float) -> Float
+extern fn nimble_floor(x: Float) -> Float
+extern fn nimble_ceil(x: Float) -> Float
+extern fn nimble_abs_i64(x: Int) -> Int
+extern fn nimble_min_i64(a: Int, b: Int) -> Int
+extern fn nimble_max_i64(a: Int, b: Int) -> Int
+extern fn nimble_print_str(s: String) -> Void
+extern fn nimble_print_i64(x: Int) -> Void
+extern fn nimble_print_f64(x: Float) -> Void
 
 fn main() -> Int:
-    print_str("abs(-5): ")
-    print_int(abs(-5))
+    # Trigonometry
+    nimble_print_str("sin(0): ")
+    nimble_print_f64(nimble_sin(0.0))
 
-    print_str("max(3, 7): ")
-    print_int(max(3, 7))
+    nimble_print_str("cos(0): ")
+    nimble_print_f64(nimble_cos(0.0))
 
-    print_str("min(3, 7): ")
-    print_int(min(3, 7))
+    # Power and roots
+    nimble_print_str("sqrt(16): ")
+    nimble_print_f64(nimble_sqrt(16.0))
+
+    nimble_print_str("pow(2, 10): ")
+    nimble_print_f64(nimble_pow(2.0, 10.0))
+
+    # Rounding
+    nimble_print_str("floor(3.7): ")
+    nimble_print_f64(nimble_floor(3.7))
+
+    nimble_print_str("ceil(3.2): ")
+    nimble_print_f64(nimble_ceil(3.2))
+
+    # Integer math
+    nimble_print_str("abs(-5): ")
+    nimble_print_i64(nimble_abs_i64(-5))
+
+    nimble_print_str("min(3,7): ")
+    nimble_print_i64(nimble_min_i64(3, 7))
+
+    nimble_print_str("max(3,7): ")
+    nimble_print_i64(nimble_max_i64(3, 7))
 
     return 0

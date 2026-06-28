@@ -1,0 +1,15 @@
+# Nimble Standard Library - Base64 encoding
+#
+# Provides base64 encoding and decoding with standard and URL-safe variants.
+
+extern fn nimble_base64_encode(data: String, len: Int, url_safe: Int) -> String
+extern fn nimble_base64_decode(data: String, len: Int) -> String
+
+fn encode(data: String) -> String:
+    return nimble_base64_encode(data, 0, 0)
+
+fn encode_url_safe(data: String) -> String:
+    return nimble_base64_encode(data, 0, 1)
+
+fn decode(data: String) -> String:
+    return nimble_base64_decode(data, 0)

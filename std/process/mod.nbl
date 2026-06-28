@@ -1,12 +1,18 @@
 # Nimble Standard Library - Process control
+#
+# Provides process exit and abort operations.
 
-extern fn exit(code: Int) -> Void
+extern fn nimble_exit(code: Int) -> Void
+extern fn nimble_abort() -> Void
 
-fn terminate(code: Int) -> Void:
-    exit(code)
+fn exit(code: Int) -> Void:
+    nimble_exit(code)
+
+fn abort() -> Void:
+    nimble_abort()
 
 fn exit_success() -> Void:
-    exit(0)
+    nimble_exit(0)
 
 fn exit_failure() -> Void:
-    exit(1)
+    nimble_exit(1)

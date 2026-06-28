@@ -1,15 +1,25 @@
 # Nimble Standard Library - Logging
+#
+# Provides structured logging with severity levels.
 
-load std.io::{print, print_str}
+load std.io::{print_no_newline, print}
 
 fn info(message: String) -> Void:
-    print_str("[INFO] ")
+    print_no_newline("[INFO] ")
     print(message)
 
 fn warn(message: String) -> Void:
-    print_str("[WARN] ")
+    print_no_newline("[WARN] ")
     print(message)
 
 fn error(message: String) -> Void:
-    print_str("[ERROR] ")
+    print_no_newline("[ERROR] ")
+    print(message)
+
+fn debug(message: String) -> Void:
+    print_no_newline("[DEBUG] ")
+    print(message)
+
+fn trace(message: String) -> Void:
+    print_no_newline("[TRACE] ")
     print(message)

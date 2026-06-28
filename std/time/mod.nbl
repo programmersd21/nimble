@@ -1,6 +1,24 @@
-# Nimble Standard Library - Time helpers
+# Nimble Standard Library - Time and date utilities
+#
+# Provides monotonic clock, system time, and sleep operations.
 
-extern fn clock() -> Int
+extern fn nimble_clock_monotonic() -> Float
+extern fn nimble_time_nanos() -> Int
+extern fn nimble_time_seconds() -> Int
+extern fn nimble_time_format(fmt: String) -> String
+extern fn nimble_sleep_ms(ms: Int) -> Void
 
 fn now() -> Int:
-    return clock()
+    return nimble_time_seconds()
+
+fn now_nanos() -> Int:
+    return nimble_time_nanos()
+
+fn monotonic() -> Float:
+    return nimble_clock_monotonic()
+
+fn sleep(ms: Int) -> Void:
+    nimble_sleep_ms(ms)
+
+fn format(fmt: String) -> String:
+    return nimble_time_format(fmt)

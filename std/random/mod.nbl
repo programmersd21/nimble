@@ -1,10 +1,20 @@
-# Nimble Standard Library - Random numbers
+# Nimble Standard Library - Random number generation
+#
+# Provides deterministic random number generation with the Xoshiro256** algorithm.
 
-extern fn rand() -> Int
-extern fn srand(seed: Int) -> Void
+extern fn nimble_rand_i64() -> Int
+extern fn nimble_rand_f64() -> Float
+extern fn nimble_rand_range(lo: Int, hi: Int) -> Int
+extern fn nimble_srand(seed: Int) -> Void
 
 fn random_int() -> Int:
-    return rand()
+    return nimble_rand_i64()
 
-fn seed(seed: Int) -> Void:
-    srand(seed)
+fn random_float() -> Float:
+    return nimble_rand_f64()
+
+fn random_range(lo: Int, hi: Int) -> Int:
+    return nimble_rand_range(lo, hi)
+
+fn seed(seed_val: Int) -> Void:
+    nimble_srand(seed_val)

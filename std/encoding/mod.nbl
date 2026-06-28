@@ -1,0 +1,8 @@
+# Nimble Standard Library - Encoding utilities
+#
+# Provides base64, hex, and UTF-8 encoding/decoding.
+# All operations are runtime-backed for correctness and performance.
+
+load std.encoding.base64
+load std.encoding.hex
+load std.encoding.utf8

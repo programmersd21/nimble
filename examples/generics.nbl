@@ -1,7 +1,9 @@
-extern fn print_int(x: Int) -> Void
-extern fn print_str(x: String) -> Void
+# Nimble Generics Demo
+# Generic struct annotations and type parameter usage
 
-# Generic wrapper struct - type parameter in annotation
+extern fn nimble_print_str(s: String) -> Void
+extern fn nimble_print_i64(x: Int) -> Void
+
 struct Box:
     let value: Int = 0
 
@@ -16,16 +18,15 @@ fn swap(p: Pair) -> Pair:
     return Pair{first: p.second, second: p.first}
 
 fn main() -> Int:
-    # Box[Int] - generic instance annotation
     let b: Box[Int] = Box{value: 42}
-    print_str("unwrapped: ")
-    print_int(unwrap(b))
+    nimble_print_str("unwrapped: ")
+    nimble_print_i64(unwrap(b))
 
     let p = Pair{first: 1, second: 2}
     let q = swap(p)
-    print_str("first: ")
-    print_int(q.first)
-    print_str("second: ")
-    print_int(q.second)
+    nimble_print_str("first: ")
+    nimble_print_i64(q.first)
+    nimble_print_str("second: ")
+    nimble_print_i64(q.second)
 
     return 0
