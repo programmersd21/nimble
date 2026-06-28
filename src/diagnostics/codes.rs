@@ -2061,30 +2061,36 @@ impl ErrorCode {
     pub fn severity(&self) -> &'static str {
         let n = self.number();
         // Lint codes are all warnings
-        if n >= 5001 && n <= 5061 {
+        if (5001..=5061).contains(&n) {
             return "Warning";
         }
         // Runtime: N7012 is a note, rest are bugs
-        if n >= 7001 && n <= 7029 {
+        if (7001..=7029).contains(&n) {
             if n == 7012 {
                 return "Note";
             }
             return "Bug";
         }
         // Codegen: N6006, N6007 are errors, rest are bugs
-        if n >= 6001 && n <= 6034 {
+        if (6001..=6034).contains(&n) {
             if n == 6006 || n == 6007 {
                 return "Error";
             }
             return "Bug";
         }
         // Internal codes are all bugs
-        if n >= 9001 && n <= 9025 {
+        if (9001..=9025).contains(&n) {
             return "Bug";
         }
         // Name resolution warning overrides
-        if n == 2017 || n == 2018 || n == 2019 || n == 2031
-            || n == 2032 || n == 2033 || n == 2034 || n == 2049
+        if n == 2017
+            || n == 2018
+            || n == 2019
+            || n == 2031
+            || n == 2032
+            || n == 2033
+            || n == 2034
+            || n == 2049
         {
             return "Warning";
         }
