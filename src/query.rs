@@ -306,11 +306,11 @@ impl Database {
 
         let source = Self::query_read_file(db.clone(), path)?;
 
-        let mut parser =
-            crate::parser::Parser::new(&source).map_err(|e| format!("lexer error: {:?}", e))?;
+        let mut parser = crate::parser::Parser::new(&source)
+            .map_err(|e| format!("{:?}", miette::Report::from(e)))?;
         let prog = parser
             .parse()
-            .map_err(|e| format!("parse error: {:?}", e))?;
+            .map_err(|e| format!("{:?}", miette::Report::from(e)))?;
 
         let fp = compute_hash(&prog);
 
@@ -376,7 +376,7 @@ impl Database {
 
         let env = checker
             .check_program(&prog)
-            .map_err(|e| format!("typechecker error: {:?}", e))?;
+            .map_err(|e| format!("{:?}", miette::Report::from(e)))?;
 
         let res = TypecheckResult {
             env,

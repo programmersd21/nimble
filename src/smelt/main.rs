@@ -57,7 +57,7 @@ fn main() {
     };
 
     if let Err(e) = driver::compile(&source, &opts) {
-        eprintln!("smelt: error: {}", e);
+        eprintln!("{:?}", e);
         std::process::exit(1);
     }
 

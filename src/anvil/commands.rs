@@ -11,10 +11,10 @@ use crate::nim::manifest::ProjectManifest;
 /// Creates:
 ///   nimble.toml
 ///   src/main.nbl
-pub fn init_project(dir: &Path, name: &str) -> Result<(), String> {
+pub fn init_project(dir: &Path, name: &str) -> miette::Result<()> {
     if dir.exists() {
         if dir.join("nimble.toml").exists() {
-            return Err(format!(
+            return Err(miette::miette!(
                 "a nimble project already exists at {}",
                 dir.display()
             ));
@@ -23,14 +23,13 @@ pub fn init_project(dir: &Path, name: &str) -> Result<(), String> {
         fs_create_dir_all(dir)?;
     }
 
-    // Source directory
     let src_dir = dir.join("src");
     fs_create_dir_all(&src_dir)?;
 
     let manifest = crate::anvil::config::default_manifest(name);
-    crate::anvil::config::write_init_manifest(dir, &manifest)?;
+    crate::anvil::config::write_init_manifest(dir, &manifest)
+        .map_err(|e| miette::miette!("{}", e))?;
 
-    // src/main.nbl
     let main_content = "fn main() -> Int:\n    print(\"hello, world\")\n    return 0\n";
     let main_path = src_dir.join("main.nbl");
     fs_write(&main_path, main_content.as_bytes())?;
@@ -49,8 +48,8 @@ pub fn init_project(dir: &Path, name: &str) -> Result<(), String> {
 ///   1. Load `nimble.toml`
 ///   2. Read entry source file
 ///   3. Invoke `smelt` to compile and link
-pub fn build_project(project_dir: &Path, run_after: bool, clean_after: bool) -> Result<(), String> {
-    let manifest = ProjectManifest::load(project_dir).map_err(|e| e.to_string())?;
+pub fn build_project(project_dir: &Path, run_after: bool, clean_after: bool) -> miette::Result<()> {
+    let manifest = ProjectManifest::load(project_dir).map_err(|e| miette::miette!("{}", e))?;
     let entry_path = project_dir.join(&manifest.project.entry_point);
 
     let source = fs_read_to_string(&entry_path)?;
@@ -58,7 +57,6 @@ pub fn build_project(project_dir: &Path, run_after: bool, clean_after: bool) -> 
     let output_name = format!("{}.exe", manifest.project.name);
     let output_path = project_dir.join("target").join(&output_name);
 
-    // Ensure target directory exists
     let target_dir = project_dir.join("target");
     fs_create_dir_all(&target_dir)?;
 
@@ -86,7 +84,7 @@ pub fn build_project(project_dir: &Path, run_after: bool, clean_after: bool) -> 
         eprintln!("anvil: running `{}`", manifest.project.name);
         let status = Command::new(&output_path)
             .status()
-            .map_err(|e| format!("failed to run executable: {}", e))?;
+            .map_err(|e| miette::miette!("failed to run executable: {}", e))?;
 
         if clean_after {
             let _ = std::fs::remove_file(&output_path);
@@ -103,13 +101,13 @@ pub fn build_project(project_dir: &Path, run_after: bool, clean_after: bool) -> 
 }
 
 /// Run a previously built project executable.
-pub fn run_project(project_dir: &Path) -> Result<(), String> {
-    let manifest = ProjectManifest::load(project_dir).map_err(|e| e.to_string())?;
+pub fn run_project(project_dir: &Path) -> miette::Result<()> {
+    let manifest = ProjectManifest::load(project_dir).map_err(|e| miette::miette!("{}", e))?;
     let exe_name = format!("{}.exe", manifest.project.name);
     let exe_path = project_dir.join("target").join(&exe_name);
 
     if !exe_path.exists() {
-        return Err(format!(
+        return Err(miette::miette!(
             "executable not found at {}. Run `anvil build` first.",
             exe_path.display()
         ));
@@ -119,29 +117,33 @@ pub fn run_project(project_dir: &Path) -> Result<(), String> {
 
     let status = Command::new(&exe_path)
         .status()
-        .map_err(|e| format!("failed to run executable: {}", e))?;
+        .map_err(|e| miette::miette!("failed to run executable: {}", e))?;
 
     if !status.success() {
-        return Err(format!("executable exited with: {:?}", status.code()));
+        return Err(miette::miette!(
+            "executable exited with: {:?}",
+            status.code()
+        ));
     }
 
     Ok(())
 }
 
-fn fs_create_dir_all(dir: &Path) -> Result<(), String> {
+fn fs_create_dir_all(dir: &Path) -> miette::Result<()> {
     std::fs::create_dir_all(dir)
-        .map_err(|e| format!("failed to create directory {}: {}", dir.display(), e))
+        .map_err(|e| miette::miette!("failed to create directory {}: {}", dir.display(), e))
 }
 
-fn fs_write(path: &Path, data: &[u8]) -> Result<(), String> {
+fn fs_write(path: &Path, data: &[u8]) -> miette::Result<()> {
     let mut f = std::fs::File::create(path)
-        .map_err(|e| format!("failed to create {}: {}", path.display(), e))?;
+        .map_err(|e| miette::miette!("failed to create {}: {}", path.display(), e))?;
     f.write_all(data)
-        .map_err(|e| format!("failed to write {}: {}", path.display(), e))
+        .map_err(|e| miette::miette!("failed to write {}: {}", path.display(), e))
 }
 
-fn fs_read_to_string(path: &Path) -> Result<String, String> {
-    std::fs::read_to_string(path).map_err(|e| format!("cannot read {}: {}", path.display(), e))
+fn fs_read_to_string(path: &Path) -> miette::Result<String> {
+    std::fs::read_to_string(path)
+        .map_err(|e| miette::miette!("cannot read {}: {}", path.display(), e))
 }
 
 fn display_path(path: &Path) -> String {
@@ -179,7 +181,7 @@ mod tests {
 
         init_project(&dir, "test").unwrap();
         let err = init_project(&dir, "test2").unwrap_err();
-        assert!(err.contains("already exists"));
+        assert!(err.to_string().contains("already exists"));
 
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -190,7 +192,7 @@ mod tests {
             std::env::temp_dir().join(format!("anvil_test_build_missing_{}", std::process::id()));
         let _ = std::fs::create_dir_all(&dir);
         let err = build_project(&dir, false, false).unwrap_err();
-        assert!(err.contains("cannot read"));
+        assert!(err.to_string().contains("cannot read"));
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

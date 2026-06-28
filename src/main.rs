@@ -158,15 +158,13 @@ async fn main() -> Result<()> {
                     .to_string_lossy()
                     .to_string()
             });
-            nimble::anvil::commands::init_project(&path, &project_name)
-                .map_err(|e| miette::miette!(e))?;
+            nimble::anvil::commands::init_project(&path, &project_name)?;
         }
         Commands::Build { path, run, clean } => {
-            nimble::anvil::commands::build_project(&path, run, clean)
-                .map_err(|e| miette::miette!(e))?;
+            nimble::anvil::commands::build_project(&path, run, clean)?;
         }
         Commands::Run { path } => {
-            nimble::anvil::commands::run_project(&path).map_err(|e| miette::miette!(e))?;
+            nimble::anvil::commands::run_project(&path)?;
         }
         Commands::Compile {
             file,
@@ -191,7 +189,7 @@ async fn main() -> Result<()> {
                 ..Default::default()
             };
 
-            nimble::smelt::driver::compile(&source, &opts).map_err(|e| miette::miette!(e))?;
+            nimble::smelt::driver::compile(&source, &opts)?;
 
             if clean && run {
                 let _ = std::fs::remove_file(&out_path);
@@ -312,7 +310,7 @@ async fn main() -> Result<()> {
                 run_after: true,
                 ..Default::default()
             };
-            nimble::smelt::driver::compile(&source, &opts).map_err(|e| miette::miette!(e))?;
+            nimble::smelt::driver::compile(&source, &opts)?;
             profiler.end("compile");
             profiler.write_report();
         }

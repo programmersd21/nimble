@@ -164,7 +164,7 @@ pub fn install_binary(url: &str, version: &str) -> NimResult<()> {
     let source = std::fs::read_to_string(&entry_path)
         .map_err(|e| NimError::file_read(&entry_path, e.to_string()))?;
     crate::smelt::driver::compile(&source, &opts)
-        .map_err(|e| NimError::compile(manifest.project.name.clone(), e))?;
+        .map_err(|e| NimError::compile(manifest.project.name.clone(), e.to_string()))?;
 
     eprintln!(
         "  \x1b[1mFinished\x1b[0m {} installed at {}",

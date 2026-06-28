@@ -5,7 +5,6 @@ use std::process::Command;
 use crate::{
     codegen::Codegen, driver, module_loader::ModuleLoader, parser::Parser, typechecker::TypeChecker,
 };
-use miette::Report;
 
 #[derive(Debug, Clone)]
 pub struct CompileOptions {
@@ -233,19 +232,17 @@ fn build_ember(workspace_root: &Path) -> Result<PathBuf, String> {
     Ok(lib_path)
 }
 
-pub fn compile(source: &str, options: &CompileOptions) -> Result<(), String> {
+pub fn compile(source: &str, options: &CompileOptions) -> miette::Result<()> {
     let ir = if let Some(ref src_path) = options.source_path {
         let db = std::rc::Rc::new(std::cell::RefCell::new(crate::query::Database::new(
             Path::new("."),
         )));
-        let res = crate::query::Database::query_codegen(db.clone(), Path::new(src_path))?;
+        let res = crate::query::Database::query_codegen(db.clone(), Path::new(src_path))
+            .map_err(|e| miette::miette!("{}", e))?;
         let _ = db.borrow().save_manifest();
         res
     } else {
-        let prog = Parser::new(source)
-            .map_err(|e| format!("{:?}", Report::new(e)))?
-            .parse()
-            .map_err(|e| format!("{:?}", Report::new(e)))?;
+        let prog = Parser::new(source)?.parse()?;
 
         let stdlib_dirs = find_stdlib_dirs();
         let loader = ModuleLoader::new(stdlib_dirs, None);
@@ -259,13 +256,11 @@ pub fn compile(source: &str, options: &CompileOptions) -> Result<(), String> {
         )
         .with_loader(loader);
 
-        let env = checker
-            .check_program(&prog)
-            .map_err(|e| format!("{:?}", Report::new(e)))?;
+        let env = checker.check_program(&prog)?;
 
         let mut cg = Codegen::new();
         cg.generate_with_externs_and_module_fns(&prog, &env, &externs_rc, &module_fns_rc)
-            .map_err(|e| format!("codegen error: {}", e))?;
+            .map_err(|e| miette::miette!("codegen error: {}", e))?;
         cg.into_ir()
     };
 
@@ -277,24 +272,25 @@ pub fn compile(source: &str, options: &CompileOptions) -> Result<(), String> {
             out_path.with_extension("ll")
         };
         let mut f = std::fs::File::create(&ll_path)
-            .map_err(|e| format!("failed to create {}: {}", ll_path.display(), e))?;
+            .map_err(|e| miette::miette!("failed to create {}: {}", ll_path.display(), e))?;
         f.write_all(ir.as_bytes())
-            .map_err(|e| format!("failed to write IR: {}", e))?;
+            .map_err(|e| miette::miette!("failed to write IR: {}", e))?;
         eprintln!("smelt: wrote LLVM IR to {}", ll_path.display());
         return Ok(());
     }
 
     let tmp_dir = std::env::temp_dir().join(format!("smelt_{}", std::process::id()));
-    std::fs::create_dir_all(&tmp_dir).map_err(|e| format!("failed to create temp dir: {}", e))?;
+    std::fs::create_dir_all(&tmp_dir)
+        .map_err(|e| miette::miette!("failed to create temp dir: {}", e))?;
 
     let ir_path = tmp_dir.join("program.ll");
     let obj_path = tmp_dir.join("program.obj");
 
     {
         let mut f = std::fs::File::create(&ir_path)
-            .map_err(|e| format!("failed to create {}: {}", ir_path.display(), e))?;
+            .map_err(|e| miette::miette!("failed to create {}: {}", ir_path.display(), e))?;
         f.write_all(ir.as_bytes())
-            .map_err(|e| format!("failed to write IR: {}", e))?;
+            .map_err(|e| miette::miette!("failed to write IR: {}", e))?;
     }
 
     let mut clang_cmd = Command::new("clang");
@@ -315,17 +311,18 @@ pub fn compile(source: &str, options: &CompileOptions) -> Result<(), String> {
 
     let clang_status = clang_cmd
         .status()
-        .map_err(|e| format!("failed to invoke clang: {} (is LLVM/clang installed?)", e))?;
+        .map_err(|e| miette::miette!("failed to invoke clang: {} (is LLVM/clang installed?)", e))?;
 
     if !clang_status.success() {
-        return Err("clang assembly failed".to_string());
+        return Err(miette::miette!("clang assembly failed"));
     }
 
     let linker = options
         .linker
         .clone()
         .unwrap_or_else(|| find_linker().unwrap_or_else(|_| "cc".to_string()));
-    let runtime_lib = build_runtime_lib(options.runtime_dir.as_ref())?;
+    let runtime_lib =
+        build_runtime_lib(options.runtime_dir.as_ref()).map_err(|e| miette::miette!("{}", e))?;
     let out_path = Path::new(&options.output_path);
 
     eprintln!("smelt: linking with `{}` → {}", linker, out_path.display());
@@ -333,19 +330,16 @@ pub fn compile(source: &str, options: &CompileOptions) -> Result<(), String> {
     let mut cmd = Command::new(&linker);
 
     if linker == "link.exe" || linker == "cl.exe" {
-        // MSVC-style linker
         cmd.arg(&obj_path)
             .arg(&runtime_lib)
             .args(["/OUT:", &options.output_path])
             .arg("/NOLOGO");
     } else {
-        // Unix-style linker (cc, gcc, clang, etc.)
         cmd.arg(&obj_path)
             .arg(&runtime_lib)
             .arg("-o")
             .arg(&options.output_path);
 
-        // On Windows, link against system libs required by the ember runtime.
         if cfg!(windows) {
             cmd.args([
                 "-luser32",
@@ -362,7 +356,6 @@ pub fn compile(source: &str, options: &CompileOptions) -> Result<(), String> {
                 "-lcfgmgr32",
             ]);
         }
-        // On Unix, link pthread and dl (commonly needed)
         if !cfg!(windows) {
             cmd.args(["-lpthread", "-ldl", "-lm"]);
         }
@@ -370,10 +363,10 @@ pub fn compile(source: &str, options: &CompileOptions) -> Result<(), String> {
 
     let link_status = cmd
         .status()
-        .map_err(|e| format!("linker invocation failed: {}", e))?;
+        .map_err(|e| miette::miette!("linker invocation failed: {}", e))?;
 
     if !link_status.success() {
-        return Err("linking failed".to_string());
+        return Err(miette::miette!("linking failed"));
     }
 
     if !options.keep_temps {
@@ -387,7 +380,7 @@ pub fn compile(source: &str, options: &CompileOptions) -> Result<(), String> {
         let run_path = std::fs::canonicalize(out_path).unwrap_or_else(|_| out_path.to_path_buf());
         let status = Command::new(&run_path)
             .status()
-            .map_err(|e| format!("failed to run executable: {}", e))?;
+            .map_err(|e| miette::miette!("failed to run executable: {}", e))?;
         if !status.success()
             && let Some(code) = status.code()
         {
