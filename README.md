@@ -1,6 +1,6 @@
 # Nimble
 
-![logo](logo.jpeg)
+![logo](logo.png)
 
 A statically typed language with Python-style indentation, LLVM-based code generation, and an integrated toolchain.
 
