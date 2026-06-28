@@ -457,3 +457,28 @@ nimble/
 | Linux (x86_64, aarch64) | ✅ Primary target |
 | macOS (x86_64, arm64) | ✅ Tested |
 | Windows (x86_64) | ✅ Tested (MSVC/MinGW) |
+
+## Error Code Reference
+
+Nimble uses a comprehensive error code taxonomy grouped by subsystem. Each error has a unique code (`N0001`…) for stable identification.
+
+| Range       | Subsystem                    | Count |
+|-------------|------------------------------|-------|
+| N0001-N0039 | Lexer                        | 39    |
+| N1001-N1084 | Parser                       | 84    |
+| N2001-N2049 | Name Resolution / Imports    | 49    |
+| N3001-N3097 | Type System / Type Checking  | 97    |
+| N4001-N4027 | Module / Import System       | 27    |
+| N5001-N5061 | Lint / Warnings              | 61    |
+| N6001-N6034 | Code Generation / Backend    | 34    |
+| N7001-N7029 | Runtime / Panic              | 29    |
+| N8001-N8039 | Configuration / Build System | 39    |
+| N9001-N9025 | Internal Compiler Errors     | 25    |
+
+**Viewing explanations:**
+
+```sh
+nimble explain <CODE>          # CLI with color
+```
+
+Detailed references are also available in the [`errors/`](errors/) directory as Markdown files.

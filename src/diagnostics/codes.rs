@@ -2024,30 +2024,2508 @@ impl ErrorCode {
         }
     }
 
-    /// Full markdown explanation for this error code.
-    /// Used by `nimble explain <code>`.
+    /// Numeric code (e.g., 1 for N0001, 1001 for N1001).
+    pub fn number(&self) -> u16 {
+        // "N0001"[1..] => "0001" => 1
+        let s = self.as_str();
+        s[1..].parse().unwrap_or(0)
+    }
+
+    /// Category name for grouping this error code.
+    pub fn category(&self) -> &'static str {
+        let n = self.number();
+        if n < 100 {
+            "Lexer"
+        } else if n < 2000 {
+            "Parser"
+        } else if n < 3000 {
+            "Name Resolution"
+        } else if n < 4000 {
+            "Type System"
+        } else if n < 5000 {
+            "Module System"
+        } else if n < 6000 {
+            "Lint"
+        } else if n < 7000 {
+            "Codegen"
+        } else if n < 8000 {
+            "Runtime"
+        } else if n < 9000 {
+            "Build System"
+        } else {
+            "Internal"
+        }
+    }
+
+    /// Severity level: Error, Warning, Note, or Bug.
+    pub fn severity(&self) -> &'static str {
+        let n = self.number();
+        // Lint codes are all warnings
+        if n >= 5001 && n <= 5061 {
+            return "Warning";
+        }
+        // Runtime: N7012 is a note, rest are bugs
+        if n >= 7001 && n <= 7029 {
+            if n == 7012 {
+                return "Note";
+            }
+            return "Bug";
+        }
+        // Codegen: N6006, N6007 are errors, rest are bugs
+        if n >= 6001 && n <= 6034 {
+            if n == 6006 || n == 6007 {
+                return "Error";
+            }
+            return "Bug";
+        }
+        // Internal codes are all bugs
+        if n >= 9001 && n <= 9025 {
+            return "Bug";
+        }
+        // Name resolution warning overrides
+        if n == 2017 || n == 2018 || n == 2019 || n == 2031
+            || n == 2032 || n == 2033 || n == 2034 || n == 2049
+        {
+            return "Warning";
+        }
+        // Type system warning overrides
+        if n == 3046 || n == 3061 {
+            return "Warning";
+        }
+        // Module system warning overrides
+        if n == 4008 {
+            return "Warning";
+        }
+        // Build system warning overrides
+        if n == 8034 || n == 8035 || n == 8036 || n == 8038 {
+            return "Warning";
+        }
+        // Everything else is an error
+        "Error"
+    }
+
+    /// Colorized ANSI explanation for this error code.
+    /// Used by `nimble explain <code>` in the CLI (no markdown).
     pub fn explanation(&self) -> &'static str {
         match self {
             Self::N0001 => {
                 "\
-### Error N0001: Illegal Tab Character\n\
-\n\
-**What happened?** A tab character (`\\t`) was found in the source code. \
-Nimble requires spaces for indentation.\n\
-\n\
-**Why it happened?** Your editor likely inserted a raw tab instead of spaces.\n\
-\n\
-**How to fix?** Configure your editor to expand tabs to spaces \
-(usually 4 spaces per indent level).\n\
+\x1b[1;31mN0001\x1b[0m \x1b[1mIllegal tab character\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLexer\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nNimble uses spaces for indentation and does not allow tab characters (\\t) anywhere in the source code. A tab was encountered while scanning the input. This is a hard error to enforce consistent indentation across all editors and platforms. Configure your editor to insert spaces when you press the Tab key, typically with an indent width of 2 or 4 spaces.\
 "
             }
-            _ => {
+            Self::N0002 => {
                 "\
-### Error Explanation\n\
-\n\
-**What happened?** See the error title for a summary.\n\
-\n\
-**How to fix?** Refer to the diagnostic message for specific guidance.\n\
+\x1b[1;31mN0002\x1b[0m \x1b[1mUnexpected character\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLexer\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe lexer encountered a character that is not part of the Nimble language grammar. This typically happens when a non-ASCII, control character, or unsymbolic glyph appears outside of a string or comment context. Check for stray characters, typos, or copy-paste artifacts in your source file.\
+"
+            }
+            Self::N0003 => {
+                "\
+\x1b[1;31mN0003\x1b[0m \x1b[1mUnmatched closing delimiter\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLexer\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA closing bracket, parenthesis, or brace was found without a matching opening counterpart. Common causes include deleting an opening delimiter, having too many closing delimiters due to a typo, or incorrect nesting of brackets. Check the surrounding context for mismatched parentheses, braces, or brackets.\
+"
+            }
+            Self::N0004 => {
+                "\
+\x1b[1;31mN0004\x1b[0m \x1b[1mInvalid float literal\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLexer\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA floating-point number literal is malformed. Nimble requires floats to have digits on both sides of the decimal point (e.g. 3.14), a single decimal point without surrounding digits is not allowed. Scientific notation must follow the form <digits>e<exponent> or <digits>E<exponent>.\
+"
+            }
+            Self::N0005 => {
+                "\
+\x1b[1;31mN0005\x1b[0m \x1b[1mInteger literal out of range\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLexer\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn integer literal exceeds the maximum representable value for the target type. Nimble integers are 64-bit signed by default, with a range of -2^63 to 2^63-1. If you need larger values, consider using a Float or a big integer library.\
+"
+            }
+            Self::N0006 => {
+                "\
+\x1b[1;31mN0006\x1b[0m \x1b[1mUnterminated string literal\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLexer\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA string literal was started with a double-quote (\") but the end of file or end of line was reached before the closing double-quote. In Nimble, string literals cannot span multiple lines unless escaped. Add a closing double-quote or escape the newline if you intend a multi-line string.\
+"
+            }
+            Self::N0007 => {
+                "\
+\x1b[1;31mN0007\x1b[0m \x1b[1mInvalid escape sequence\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLexer\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA backslash followed by an unrecognized character was found inside a string literal. Valid escape sequences in Nimble include \\n, \\t, \\r, \\0, \\\\, \\\", and \\'. Use only these recognized escape sequences.\
+"
+            }
+            Self::N0008 => {
+                "\
+\x1b[1;31mN0008\x1b[0m \x1b[1mNewline inside string literal\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLexer\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn unescaped newline character was detected inside a string literal. Nimble requires all string content to be on a single line unless the newline is explicitly escaped with a backslash at the end of the line.\
+"
+            }
+            Self::N0009 => {
+                "\
+\x1b[1;31mN0009\x1b[0m \x1b[1mIndentation error\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLexer\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe indentation level of a line does not match any enclosing block's indent level. Nimble uses Python-style indentation, so every indented block must align consistently. Ensure all lines in the same block have exactly the same indentation.\
+"
+            }
+            Self::N0010 => {
+                "\
+\x1b[1;31mN0010\x1b[0m \x1b[1mEmpty character literal\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLexer\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA character literal ('') was found with zero characters between the single quotes. Character literals must contain exactly one character. If you need an empty value, use a string literal (\"\") instead.\
+"
+            }
+            Self::N0011 => {
+                "\
+\x1b[1;31mN0011\x1b[0m \x1b[1mMulti-byte character literal\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLexer\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA character literal contains more than one byte. Nimble char literals (inside single quotes) must contain exactly one ASCII character or one Unicode codepoint. Use a string literal if you need multiple characters.\
+"
+            }
+            Self::N0012 => {
+                "\
+\x1b[1;31mN0012\x1b[0m \x1b[1mUnicode escape in non-unicode context\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLexer\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA \\u or \\U unicode escape sequence was used in a context that does not support unicode escapes. Unicode escapes are only valid inside string literals.\
+"
+            }
+            Self::N0013 => {
+                "\
+\x1b[1;31mN0013\x1b[0m \x1b[1mInvalid numeric suffix\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLexer\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA literal number has an unrecognized suffix. Nimble uses type suffixes like `i32`, `u64`, or `f32` to specify the type of a numeric literal. Only recognized suffixes are allowed.\
+"
+            }
+            Self::N0014 => {
+                "\
+\x1b[1;31mN0014\x1b[0m \x1b[1mLeading zeros in decimal integer\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLexer\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA decimal integer literal starts with one or more leading zeros. Decimal numbers must not have leading zeros. If you intend an octal literal, use the 0o prefix; otherwise remove the leading zeros.\
+"
+            }
+            Self::N0015 => {
+                "\
+\x1b[1;31mN0015\x1b[0m \x1b[1mBinary literal overflow\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLexer\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA binary literal (0b prefix) contains a value that exceeds the maximum representable value for the target integer type. The number of bits in the binary representation must fit within the type's width.\
+"
+            }
+            Self::N0016 => {
+                "\
+\x1b[1;31mN0016\x1b[0m \x1b[1mHex literal overflow\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLexer\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA hexadecimal literal (0x prefix) contains a value that exceeds the maximum representable value for the target integer type.\
+"
+            }
+            Self::N0017 => {
+                "\
+\x1b[1;31mN0017\x1b[0m \x1b[1mOctal literal overflow\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLexer\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn octal literal (0o prefix) contains a value that exceeds the maximum representable value for the target integer type.\
+"
+            }
+            Self::N0018 => {
+                "\
+\x1b[1;31mN0018\x1b[0m \x1b[1mInvalid binary literal format\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLexer\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA binary literal (0b prefix) contains digits other than 0 and 1. Binary literals may only contain the digits 0 and 1, optionally separated by underscores.\
+"
+            }
+            Self::N0019 => {
+                "\
+\x1b[1;31mN0019\x1b[0m \x1b[1mInvalid hex literal format\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLexer\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA hexadecimal literal (0x prefix) contains invalid characters. Hex digits include 0-9, a-f, A-F, and optionally underscores.\
+"
+            }
+            Self::N0020 => {
+                "\
+\x1b[1;31mN0020\x1b[0m \x1b[1mInvalid octal literal format\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLexer\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn octal literal (0o prefix) contains digits other than 0-7. Octal digits range from 0 to 7 only.\
+"
+            }
+            Self::N0021 => {
+                "\
+\x1b[1;31mN0021\x1b[0m \x1b[1mUnterminated block comment\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLexer\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA block comment (/* ... */) was started but never closed before end of file. Add the closing */ delimiter.\
+"
+            }
+            Self::N0022 => {
+                "\
+\x1b[1;31mN0022\x1b[0m \x1b[1mUnrecognized token in string interpolation\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLexer\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA string interpolation expression contains an invalid token. String interpolation allows only expressions and identifiers.\
+"
+            }
+            Self::N0023 => {
+                "\
+\x1b[1;31mN0023\x1b[0m \x1b[1mInvalid unicode identifier start\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLexer\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn identifier begins with a unicode character that is not a valid identifier start per Nimble's rules. Identifiers must start with a letter or underscore.\
+"
+            }
+            Self::N0024 => {
+                "\
+\x1b[1;31mN0024\x1b[0m \x1b[1mNon-printable character in source\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLexer\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA non-printable control character (outside the printable ASCII range) was found in the source code. Remove or replace the character.\
+"
+            }
+            Self::N0025 => {
+                "\
+\x1b[1;31mN0025\x1b[0m \x1b[1mByte order mark detected\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLexer\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA UTF-8 BOM (byte order mark, U+FEFF) was found at the start of the file. Save the file without a BOM.\
+"
+            }
+            Self::N0026 => {
+                "\
+\x1b[1;31mN0026\x1b[0m \x1b[1mNull character in source\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLexer\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA null byte (\\0) was found in the source code. Null bytes are not allowed outside of string literals.\
+"
+            }
+            Self::N0027 => {
+                "\
+\x1b[1;31mN0027\x1b[0m \x1b[1mString literal exceeds maximum length\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLexer\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA string literal contains more than the maximum allowed number of characters. Break the string into smaller parts and concatenate.\
+"
+            }
+            Self::N0028 => {
+                "\
+\x1b[1;31mN0028\x1b[0m \x1b[1mEmpty unicode escape sequence\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLexer\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA unicode escape sequence (\\u, \\U) has no hex digits. Provide at least one hex digit after the \\u or \\U marker.\
+"
+            }
+            Self::N0029 => {
+                "\
+\x1b[1;31mN0029\x1b[0m \x1b[1mMalformed unicode escape sequence\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLexer\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA unicode escape sequence contains invalid hex digits or is incorrectly structured. Use the form \\uXXXX or \\UXXXXXXXX.\
+"
+            }
+            Self::N0030 => {
+                "\
+\x1b[1;31mN0030\x1b[0m \x1b[1mUnicode codepoint out of range\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLexer\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA unicode escape sequence specifies a codepoint value outside the valid Unicode range (0x0000-0x10FFFF). Use a value within range.\
+"
+            }
+            Self::N0031 => {
+                "\
+\x1b[1;31mN0031\x1b[0m \x1b[1mReserved keyword used as identifier\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLexer\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA reserved keyword is being used as an identifier name. Keywords like fn, let, var, if, else, while, return, etc. cannot be used as variable or function names.\
+"
+            }
+            Self::N0032 => {
+                "\
+\x1b[1;31mN0032\x1b[0m \x1b[1mNon-standard line ending\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLexer\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA non-standard line ending (CR, CR+LF, or other) was detected. Use standard LF line endings for consistency.\
+"
+            }
+            Self::N0033 => {
+                "\
+\x1b[1;31mN0033\x1b[0m \x1b[1mMixed tabs and spaces\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLexer\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nBoth tabs and spaces are used for indentation in the same file. Pick one style (spaces recommended) and use it consistently.\
+"
+            }
+            Self::N0034 => {
+                "\
+\x1b[1;31mN0034\x1b[0m \x1b[1mDigit separator at wrong position\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLexer\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn underscore digit separator appears in an invalid position in a numeric literal. Underscores must be placed between digits, not at the start, end, or adjacent to a radix prefix.\
+"
+            }
+            Self::N0035 => {
+                "\
+\x1b[1;31mN0035\x1b[0m \x1b[1mConsecutive digit separators\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLexer\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nTwo or more consecutive underscore digit separators appear in a numeric literal. Use at most one underscore between digits.\
+"
+            }
+            Self::N0036 => {
+                "\
+\x1b[1;31mN0036\x1b[0m \x1b[1mTrailing digit separator\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLexer\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA numeric literal ends with an underscore digit separator. Remove the trailing underscore.\
+"
+            }
+            Self::N0037 => {
+                "\
+\x1b[1;31mN0037\x1b[0m \x1b[1mLeading digit separator\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLexer\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA numeric literal begins with an underscore digit separator. Remove the leading underscore.\
+"
+            }
+            Self::N0038 => {
+                "\
+\x1b[1;31mN0038\x1b[0m \x1b[1mInvalid digit for radix\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLexer\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA numeric literal contains a digit that is not valid for its specified radix (e.g. 0b1020 has a 2 in binary). Use only digits valid for the radix.\
+"
+            }
+            Self::N0039 => {
+                "\
+\x1b[1;31mN0039\x1b[0m \x1b[1mUnterminated raw string literal\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLexer\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA raw string literal (r\"...\") was started but not closed before end of file or line. Add a closing double-quote.\
+"
+            }
+            Self::N1001 => {
+                "\
+\x1b[1;31mN1001\x1b[0m \x1b[1mExpected specific token\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe parser expected a specific token (e.g. ';', ':', '=') at the current position but found something else. This usually means a syntax error, missing punctuation, or a misplaced construct near the indicated location.\
+"
+            }
+            Self::N1002 => {
+                "\
+\x1b[1;31mN1002\x1b[0m \x1b[1mUnexpected token\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe parser encountered a token that does not make sense at the current position in the grammar. This is a generic syntax error that indicates a structural problem with the code around the indicated location.\
+"
+            }
+            Self::N1003 => {
+                "\
+\x1b[1;31mN1003\x1b[0m \x1b[1mExpected expression\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe parser expected an expression (a value-producing construct) but found something else. This can happen after operators, after `=`, after `return`, or in other expression contexts.\
+"
+            }
+            Self::N1004 => {
+                "\
+\x1b[1;31mN1004\x1b[0m \x1b[1mUnclosed delimiter\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA grouping delimiter (parenthesis, bracket, or brace) was opened but not closed by the expected token. Check the matching delimiter at the reported location.\
+"
+            }
+            Self::N1005 => {
+                "\
+\x1b[1;31mN1005\x1b[0m \x1b[1mExpected indented block\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA colon (`:`) was followed by an end-of-line without an indented block on the next line. Nimble requires an indented body after function definitions, if/else, while, for, and other colon-terminated constructs.\
+"
+            }
+            Self::N1006 => {
+                "\
+\x1b[1;31mN1006\x1b[0m \x1b[1mUnexpected indentation\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn indentation change occurs at an unexpected location, typically because a line is indented more than expected relative to surrounding blocks.\
+"
+            }
+            Self::N1007 => {
+                "\
+\x1b[1;31mN1007\x1b[0m \x1b[1mExpected identifier\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe parser expected an identifier (a name) but found something else. Identifiers are required for variable names, function names, type names, and field access.\
+"
+            }
+            Self::N1008 => {
+                "\
+\x1b[1;31mN1008\x1b[0m \x1b[1mExpected type name\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA type annotation requires a type name but found something else. Type names come after colons in variable declarations and function signatures.\
+"
+            }
+            Self::N1009 => {
+                "\
+\x1b[1;31mN1009\x1b[0m \x1b[1mExpected parameter name\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA function or method parameter list contains a construct that is not a valid parameter name.\
+"
+            }
+            Self::N1010 => {
+                "\
+\x1b[1;31mN1010\x1b[0m \x1b[1mExpected colon\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA colon (`:`) was expected in a type annotation, label, or block-introducing construct but was not found.\
+"
+            }
+            Self::N1011 => {
+                "\
+\x1b[1;31mN1011\x1b[0m \x1b[1mExpected semicolon\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA semicolon (`;`) was expected but not found. In Nimble, semicolons are optional line separators but required in certain contexts like separating statements on the same line.\
+"
+            }
+            Self::N1012 => {
+                "\
+\x1b[1;31mN1012\x1b[0m \x1b[1mExpected equals sign\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn equals sign (`=`) was expected in an assignment, variable initializer, or default value but was not found.\
+"
+            }
+            Self::N1013 => {
+                "\
+\x1b[1;31mN1013\x1b[0m \x1b[1mExpected arrow\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA function arrow (`->`) was expected in a return type annotation or lambda expression but was not found.\
+"
+            }
+            Self::N1014 => {
+                "\
+\x1b[1;31mN1014\x1b[0m \x1b[1mExpected comma\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA comma (`,`) was expected in a list (parameters, arguments, struct fields) but was not found.\
+"
+            }
+            Self::N1015 => {
+                "\
+\x1b[1;31mN1015\x1b[0m \x1b[1mExpected dot\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA dot (`.`) was expected for member access or qualified path access but was not found.\
+"
+            }
+            Self::N1016 => {
+                "\
+\x1b[1;31mN1016\x1b[0m \x1b[1mMissing function body\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA function declaration is missing its body. Functions must have either a body block or be declared as extern.\
+"
+            }
+            Self::N1017 => {
+                "\
+\x1b[1;31mN1017\x1b[0m \x1b[1mMissing return type or return expression\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA function with a declared return type is missing a return expression in its body, or a non-void function is missing its return type annotation.\
+"
+            }
+            Self::N1018 => {
+                "\
+\x1b[1;31mN1018\x1b[0m \x1b[1mInvalid function parameter\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA function parameter list contains an invalid parameter. Parameters must have the form `name: Type` or `name`.\
+"
+            }
+            Self::N1019 => {
+                "\
+\x1b[1;31mN1019\x1b[0m \x1b[1mToo many function parameters\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA function declaration exceeds the maximum number of allowed parameters defined by the compiler limit.\
+"
+            }
+            Self::N1020 => {
+                "\
+\x1b[1;31mN1020\x1b[0m \x1b[1mToo few arguments in call\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA function call provides fewer arguments than the function signature expects.\
+"
+            }
+            Self::N1021 => {
+                "\
+\x1b[1;31mN1021\x1b[0m \x1b[1mExpected statement\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe parser expected a statement (declaration, assignment, expression statement, etc.) at the current position.\
+"
+            }
+            Self::N1022 => {
+                "\
+\x1b[1;31mN1022\x1b[0m \x1b[1mExpected binding\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nExpected a `let` or `var` binding declaration at this position. In Nimble, variables must be explicitly declared with `let` (immutable) or `var` (mutable).\
+"
+            }
+            Self::N1023 => {
+                "\
+\x1b[1;31mN1023\x1b[0m \x1b[1mExpected keyword\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA specific keyword (`if`, `else`, `while`, `for`, `return`, `fn`, etc.) was expected at this position.\
+"
+            }
+            Self::N1024 => {
+                "\
+\x1b[1;31mN1024\x1b[0m \x1b[1mInvalid left-hand side of assignment\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe left-hand side of an assignment operator (`=`, `+=`, etc.) is not a valid assignment target. Only variables, mutable fields, and indexed expressions can be assigned to.\
+"
+            }
+            Self::N1025 => {
+                "\
+\x1b[1;31mN1025\x1b[0m \x1b[1mNested function without closure context\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA function is nested inside another function but the context does not support closures. Nested functions require closure support.\
+"
+            }
+            Self::N1026 => {
+                "\
+\x1b[1;31mN1026\x1b[0m \x1b[1mDuplicate parameter name\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA function has two parameters with the same name. Parameter names must be unique within a function signature.\
+"
+            }
+            Self::N1027 => {
+                "\
+\x1b[1;31mN1027\x1b[0m \x1b[1mDefault value before non-default parameter\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA parameter with a default value appears before a parameter without one. All parameters with defaults must come after parameters without defaults.\
+"
+            }
+            Self::N1028 => {
+                "\
+\x1b[1;31mN1028\x1b[0m \x1b[1mExpected module path\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn import or use statement expects a module path (a sequence of identifiers separated by `::` or dots) but found something else.\
+"
+            }
+            Self::N1029 => {
+                "\
+\x1b[1;31mN1029\x1b[0m \x1b[1mExpected import symbol\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn import statement expects a symbol name to import from a module.\
+"
+            }
+            Self::N1030 => {
+                "\
+\x1b[1;31mN1030\x1b[0m \x1b[1mCircular import\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nTwo or more modules directly or indirectly import each other, creating a cycle. Nimble does not allow circular imports.\
+"
+            }
+            Self::N1031 => {
+                "\
+\x1b[1;31mN1031\x1b[0m \x1b[1mBreak outside of loop\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA `break` statement appears outside of any enclosing loop (while, for). break is only valid within loop bodies.\
+"
+            }
+            Self::N1032 => {
+                "\
+\x1b[1;31mN1032\x1b[0m \x1b[1mContinue outside of loop\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA `continue` statement appears outside of any enclosing loop. continue is only valid within loop bodies.\
+"
+            }
+            Self::N1033 => {
+                "\
+\x1b[1;31mN1033\x1b[0m \x1b[1mReturn outside of function\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA `return` statement appears outside of any function body. return is only valid inside functions.\
+"
+            }
+            Self::N1034 => {
+                "\
+\x1b[1;31mN1034\x1b[0m \x1b[1mYield outside of generator\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA `yield` expression appears outside of a generator function. yield is only valid inside generators.\
+"
+            }
+            Self::N1035 => {
+                "\
+\x1b[1;31mN1035\x1b[0m \x1b[1mInvalid for-loop binding\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe binding pattern in a for-loop is invalid. For-loops require an identifier or destructuring pattern followed by `in` and an iterable expression.\
+"
+            }
+            Self::N1036 => {
+                "\
+\x1b[1;31mN1036\x1b[0m \x1b[1mExpected `in` in for-loop\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA for-loop is missing the `in` keyword between the binding and the iterable expression.\
+"
+            }
+            Self::N1037 => {
+                "\
+\x1b[1;31mN1037\x1b[0m \x1b[1mEmpty struct body\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA struct declaration has no fields. Structs must have at least one field.\
+"
+            }
+            Self::N1038 => {
+                "\
+\x1b[1;31mN1038\x1b[0m \x1b[1mEmpty interface body\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn interface declaration has no methods. Interfaces must have at least one method signature.\
+"
+            }
+            Self::N1039 => {
+                "\
+\x1b[1;31mN1039\x1b[0m \x1b[1mMethod declaration outside of interface\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA method-like declaration appears outside of an interface or struct body.\
+"
+            }
+            Self::N1040 => {
+                "\
+\x1b[1;31mN1040\x1b[0m \x1b[1mDuplicate field name in struct\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA struct has two or more fields with the same name. Field names must be unique within a struct.\
+"
+            }
+            Self::N1041 => {
+                "\
+\x1b[1;31mN1041\x1b[0m \x1b[1mUnnamed field in struct literal\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA struct literal uses a positional (unnamed) value but the struct expects named fields. Use `field: value` syntax.\
+"
+            }
+            Self::N1042 => {
+                "\
+\x1b[1;31mN1042\x1b[0m \x1b[1mExpected struct expression\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA struct literal expression is expected but something else was found. Struct literals use `Name { field: value, ... }` syntax.\
+"
+            }
+            Self::N1043 => {
+                "\
+\x1b[1;31mN1043\x1b[0m \x1b[1mMissing colon in type annotation\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA type annotation is missing the colon separator between the name and its type. Use `name: Type` syntax.\
+"
+            }
+            Self::N1044 => {
+                "\
+\x1b[1;31mN1044\x1b[0m \x1b[1mUnexpected trailing comma\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA trailing comma appears where it is not syntactically allowed.\
+"
+            }
+            Self::N1045 => {
+                "\
+\x1b[1;31mN1045\x1b[0m \x1b[1mMalformed string interpolation expression\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA string interpolation expression within a string has invalid syntax. Interpolation expressions must be valid expressions enclosed in the proper delimiters.\
+"
+            }
+            Self::N1046 => {
+                "\
+\x1b[1;31mN1046\x1b[0m \x1b[1mUnterminated block comment\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA block comment (/*) was started but the closing (*/) was not found before end of file.\
+"
+            }
+            Self::N1047 => {
+                "\
+\x1b[1;31mN1047\x1b[0m \x1b[1mExpected attribute\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn attribute annotation is expected at this position. Attributes use `#[name]` syntax.\
+"
+            }
+            Self::N1048 => {
+                "\
+\x1b[1;31mN1048\x1b[0m \x1b[1mInvalid attribute target\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn attribute is applied to a construct that does not support attributes.\
+"
+            }
+            Self::N1049 => {
+                "\
+\x1b[1;31mN1049\x1b[0m \x1b[1mDuplicate attribute\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe same attribute is applied more than once to the same construct.\
+"
+            }
+            Self::N1050 => {
+                "\
+\x1b[1;31mN1050\x1b[0m \x1b[1mUnknown attribute\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn unrecognized attribute name was used. Check the spelling of the attribute.\
+"
+            }
+            Self::N1051 => {
+                "\
+\x1b[1;31mN1051\x1b[0m \x1b[1mExpected type arguments\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA generic type is missing its type argument list. Use `Type<T, U>` syntax.\
+"
+            }
+            Self::N1052 => {
+                "\
+\x1b[1;31mN1052\x1b[0m \x1b[1mUnclosed type argument list\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA type argument list (`<`) was opened but not closed (`>`) before the expected position.\
+"
+            }
+            Self::N1053 => {
+                "\
+\x1b[1;31mN1053\x1b[0m \x1b[1mType argument count mismatch\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe number of type arguments provided does not match the number of type parameters defined by the generic.\
+"
+            }
+            Self::N1054 => {
+                "\
+\x1b[1;31mN1054\x1b[0m \x1b[1mExpected `<` for generics\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA `<` token was expected to open a generic or type argument list.\
+"
+            }
+            Self::N1055 => {
+                "\
+\x1b[1;31mN1055\x1b[0m \x1b[1mExpected `>` for generics\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA `>` token was expected to close a generic or type argument list.\
+"
+            }
+            Self::N1056 => {
+                "\
+\x1b[1;31mN1056\x1b[0m \x1b[1mUnterminated lambda body\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA lambda expression has no body or the body is incomplete. Lambdas use `|params| expr` syntax.\
+"
+            }
+            Self::N1057 => {
+                "\
+\x1b[1;31mN1057\x1b[0m \x1b[1mExpected binding in for-loop\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA for-loop is missing its binding variable. Use `for var in iter: body`.\
+"
+            }
+            Self::N1058 => {
+                "\
+\x1b[1;31mN1058\x1b[0m \x1b[1mExpected path expression\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA qualified path expression was expected. Paths use `module::name` or `object.field` syntax.\
+"
+            }
+            Self::N1059 => {
+                "\
+\x1b[1;31mN1059\x1b[0m \x1b[1mExpected literal\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA literal value was expected but something else was found.\
+"
+            }
+            Self::N1060 => {
+                "\
+\x1b[1;31mN1060\x1b[0m \x1b[1mExpected pattern\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA pattern (used in match arms, destructuring, or binding) was expected but something else was found.\
+"
+            }
+            Self::N1061 => {
+                "\
+\x1b[1;31mN1061\x1b[0m \x1b[1mExpected guard expression\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA match arm with a guard (`if` clause) is missing the guard expression after `if`.\
+"
+            }
+            Self::N1062 => {
+                "\
+\x1b[1;31mN1062\x1b[0m \x1b[1mExpected where clause\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nExpected a `where` clause for specifying trait bounds or constraints.\
+"
+            }
+            Self::N1063 => {
+                "\
+\x1b[1;31mN1063\x1b[0m \x1b[1mExpected semicolon or newline after statement\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA statement must be terminated by either a semicolon or a newline. Two statements cannot appear on the same line without a separator.\
+"
+            }
+            Self::N1064 => {
+                "\
+\x1b[1;31mN1064\x1b[0m \x1b[1mExpected operator\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn operator (such as `+`, `-`, `*`, `/`, `==`, etc.) was expected at this position, typically in an expression context.\
+"
+            }
+            Self::N1065 => {
+                "\
+\x1b[1;31mN1065\x1b[0m \x1b[1mInvalid prefix operator\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe prefix operator used is not valid for the type of expression it precedes.\
+"
+            }
+            Self::N1066 => {
+                "\
+\x1b[1;31mN1066\x1b[0m \x1b[1mInvalid postfix operator\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe postfix operator used is not valid for the type of expression it follows.\
+"
+            }
+            Self::N1067 => {
+                "\
+\x1b[1;31mN1067\x1b[0m \x1b[1mOperator precedence ambiguity\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe combination of operators in an expression is ambiguous and requires explicit grouping with parentheses.\
+"
+            }
+            Self::N1068 => {
+                "\
+\x1b[1;31mN1068\x1b[0m \x1b[1mIncompatible comparison chaining\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nComparisons of different types or incompatible operators cannot be chained together. Use parentheses to group comparisons explicitly.\
+"
+            }
+            Self::N1069 => {
+                "\
+\x1b[1;31mN1069\x1b[0m \x1b[1mExpected tuple element\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA tuple expression or type is missing an element. Use `(a, b, c)` syntax with commas between elements.\
+"
+            }
+            Self::N1070 => {
+                "\
+\x1b[1;31mN1070\x1b[0m \x1b[1mExpected array element\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn array literal is missing an element. Use `[a, b, c]` syntax with commas between elements.\
+"
+            }
+            Self::N1071 => {
+                "\
+\x1b[1;31mN1071\x1b[0m \x1b[1mExpected struct field\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA struct literal is missing a field. Use `Struct { field: value }` syntax.\
+"
+            }
+            Self::N1072 => {
+                "\
+\x1b[1;31mN1072\x1b[0m \x1b[1mExpected enum variant\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn enum variant pattern or constructor was expected but something else was found.\
+"
+            }
+            Self::N1073 => {
+                "\
+\x1b[1;31mN1073\x1b[0m \x1b[1mExpected match arm\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA match expression must have at least one arm (pattern => expression). Add at least one match arm.\
+"
+            }
+            Self::N1074 => {
+                "\
+\x1b[1;31mN1074\x1b[0m \x1b[1mExpected `=>` in match arm\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA match arm pattern is not followed by `=>`. Use `pattern => expression` syntax.\
+"
+            }
+            Self::N1075 => {
+                "\
+\x1b[1;31mN1075\x1b[0m \x1b[1mExpected pattern guard\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA match arm guard (if clause) is missing its condition expression.\
+"
+            }
+            Self::N1076 => {
+                "\
+\x1b[1;31mN1076\x1b[0m \x1b[1mInvalid doc comment placement\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA doc comment (`///` or `//!`) appears in a position where documentation is not allowed.\
+"
+            }
+            Self::N1077 => {
+                "\
+\x1b[1;31mN1077\x1b[0m \x1b[1mExpected doc comment\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA documentation comment was expected, typically before a public API item.\
+"
+            }
+            Self::N1078 => {
+                "\
+\x1b[1;31mN1078\x1b[0m \x1b[1mInvalid visibility modifier\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA visibility modifier (pub, pub(crate), etc.) is being used in an invalid position or with an incorrect syntax.\
+"
+            }
+            Self::N1079 => {
+                "\
+\x1b[1;31mN1079\x1b[0m \x1b[1mExpected item\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA top-level or nested item (function, struct, interface, constant, etc.) was expected at this position.\
+"
+            }
+            Self::N1080 => {
+                "\
+\x1b[1;31mN1080\x1b[0m \x1b[1mNested function without body\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA nested function declaration has no body. Nested functions must have an inline body.\
+"
+            }
+            Self::N1081 => {
+                "\
+\x1b[1;31mN1081\x1b[0m \x1b[1mUnterminated generic list\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA generic parameter list (`<`) was started but not closed (`>`) before a structural end was reached.\
+"
+            }
+            Self::N1082 => {
+                "\
+\x1b[1;31mN1082\x1b[0m \x1b[1mExpected lifetime parameter\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA lifetime parameter (using `'a` syntax) was expected but not found.\
+"
+            }
+            Self::N1083 => {
+                "\
+\x1b[1;31mN1083\x1b[0m \x1b[1mExpected const parameter\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA const generic parameter was expected but not found. Const parameters use `const NAME: Type` syntax.\
+"
+            }
+            Self::N1084 => {
+                "\
+\x1b[1;31mN1084\x1b[0m \x1b[1mAmbiguous literal suffix\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mParser\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA numeric literal has a suffix that could refer to multiple types or is not a recognized suffix. Add an explicit type annotation or use a standard suffix.\
+"
+            }
+            Self::N2001 => {
+                "\
+\x1b[1;31mN2001\x1b[0m \x1b[1mUndefined variable\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA variable name is used that has not been defined in the current scope. Check the spelling and ensure the variable is declared with `let` or `var` before use.\
+"
+            }
+            Self::N2002 => {
+                "\
+\x1b[1;31mN2002\x1b[0m \x1b[1mDuplicate definition\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA name is defined more than once in the same scope. Every variable, function, type, and module name must be unique within its scope.\
+"
+            }
+            Self::N2003 => {
+                "\
+\x1b[1;31mN2003\x1b[0m \x1b[1mUndefined function\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA function call references a function name that has not been defined in any accessible scope.\
+"
+            }
+            Self::N2004 => {
+                "\
+\x1b[1;31mN2004\x1b[0m \x1b[1mUndefined struct\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA struct type name is used but no matching struct definition is found.\
+"
+            }
+            Self::N2005 => {
+                "\
+\x1b[1;31mN2005\x1b[0m \x1b[1mUndefined interface\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn interface name is used but no matching interface definition is found.\
+"
+            }
+            Self::N2006 => {
+                "\
+\x1b[1;31mN2006\x1b[0m \x1b[1mUndefined module\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA module name in an import path cannot be found in the module search path.\
+"
+            }
+            Self::N2007 => {
+                "\
+\x1b[1;31mN2007\x1b[0m \x1b[1mUndefined type\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA type name is used that has not been defined. This includes built-in types and user-defined types.\
+"
+            }
+            Self::N2008 => {
+                "\
+\x1b[1;31mN2008\x1b[0m \x1b[1mUndefined macro\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA macro invocation references a macro name that has not been defined.\
+"
+            }
+            Self::N2009 => {
+                "\
+\x1b[1;31mN2009\x1b[0m \x1b[1mAccess to private item\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA private item (function, type, field) from another module is being accessed outside of its defining module.\
+"
+            }
+            Self::N2010 => {
+                "\
+\x1b[1;31mN2010\x1b[0m \x1b[1mCyclic module dependency\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nTwo or more modules depend on each other directly or indirectly, forming a cycle. Nimble does not support circular dependencies.\
+"
+            }
+            Self::N2011 => {
+                "\
+\x1b[1;31mN2011\x1b[0m \x1b[1mCyclic type definition\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA type definition refers to itself directly or indirectly in a way that creates an infinite type.\
+"
+            }
+            Self::N2012 => {
+                "\
+\x1b[1;31mN2012\x1b[0m \x1b[1mAmbiguous name\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA name resolves to more than one definition in the current scope. Use a qualified path to disambiguate.\
+"
+            }
+            Self::N2013 => {
+                "\
+\x1b[1;31mN2013\x1b[0m \x1b[1mInvalid visibility qualifier\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA visibility qualifier is used in an invalid context or has incorrect syntax.\
+"
+            }
+            Self::N2014 => {
+                "\
+\x1b[1;31mN2014\x1b[0m \x1b[1mModule not found\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe module specified in an import statement cannot be found in any of the configured module search paths.\
+"
+            }
+            Self::N2015 => {
+                "\
+\x1b[1;31mN2015\x1b[0m \x1b[1mSymbol not exported\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn import statement tries to import a symbol that exists in the target module but is not publicly exported.\
+"
+            }
+            Self::N2016 => {
+                "\
+\x1b[1;31mN2016\x1b[0m \x1b[1mName conflicts with builtin\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA user-defined name conflicts with a built-in name. Choose a different name.\
+"
+            }
+            Self::N2017 => {
+                "\
+\x1b[1;33mN2017\x1b[0m \x1b[1mName shadows builtin\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA user-defined name shadows a built-in name. This is allowed but can lead to confusion.\
+"
+            }
+            Self::N2018 => {
+                "\
+\x1b[1;33mN2018\x1b[0m \x1b[1mUnused import\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn import statement introduces a name that is never used in the current file.\
+"
+            }
+            Self::N2019 => {
+                "\
+\x1b[1;33mN2019\x1b[0m \x1b[1mWildcard import leaks names\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA wildcard import (`use module::*`) brings names into scope that may conflict with other imports.\
+"
+            }
+            Self::N2020 => {
+                "\
+\x1b[1;31mN2020\x1b[0m \x1b[1m`self` used outside of method\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe `self` keyword is used outside of a method body. `self` is only valid as a method parameter or within method bodies.\
+"
+            }
+            Self::N2021 => {
+                "\
+\x1b[1;31mN2021\x1b[0m \x1b[1m`super` used outside of class context\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe `super` keyword is used outside of a class or type context. super is only valid for accessing parent type members.\
+"
+            }
+            Self::N2022 => {
+                "\
+\x1b[1;31mN2022\x1b[0m \x1b[1mInvalid self parameter\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA method's self parameter has an invalid type or position. Self must be the first parameter.\
+"
+            }
+            Self::N2023 => {
+                "\
+\x1b[1;31mN2023\x1b[0m \x1b[1mMethod without self parameter\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA method in an implementation block has no self parameter. Methods must take `self` (or `&self`, `mut self`) as the first parameter.\
+"
+            }
+            Self::N2024 => {
+                "\
+\x1b[1;31mN2024\x1b[0m \x1b[1mReturn type mismatch in method impl\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA method implementation's return type does not match the return type declared in the interface or parent definition.\
+"
+            }
+            Self::N2025 => {
+                "\
+\x1b[1;31mN2025\x1b[0m \x1b[1mMissing required interface method\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA type that claims to implement an interface does not provide an implementation for all required methods.\
+"
+            }
+            Self::N2026 => {
+                "\
+\x1b[1;31mN2026\x1b[0m \x1b[1mExtra method not in interface\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA type implementing an interface defines additional methods that are not part of the interface. This is not allowed.\
+"
+            }
+            Self::N2027 => {
+                "\
+\x1b[1;31mN2027\x1b[0m \x1b[1mInvalid method override\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA method override does not match the signature of the method it is overriding. Parameter types and return types must match.\
+"
+            }
+            Self::N2028 => {
+                "\
+\x1b[1;31mN2028\x1b[0m \x1b[1mOverride without base definition\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA method is marked as override but no matching method exists in any parent type or interface.\
+"
+            }
+            Self::N2029 => {
+                "\
+\x1b[1;31mN2029\x1b[0m \x1b[1mInconsistent associated type binding\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn associated type in a trait or interface implementation is bound to a type that conflicts with other constraints.\
+"
+            }
+            Self::N2030 => {
+                "\
+\x1b[1;31mN2030\x1b[0m \x1b[1mCircular trait bound\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nTrait bounds form a cycle (e.g. A: B and B: A). Circular bounds are not allowed.\
+"
+            }
+            Self::N2031 => {
+                "\
+\x1b[1;33mN2031\x1b[0m \x1b[1mUnused variable\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA variable is declared but never used. Consider removing it or prefixing with an underscore.\
+"
+            }
+            Self::N2032 => {
+                "\
+\x1b[1;33mN2032\x1b[0m \x1b[1mUnused assignment\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA value is assigned to a variable but the variable is never read afterward.\
+"
+            }
+            Self::N2033 => {
+                "\
+\x1b[1;33mN2033\x1b[0m \x1b[1mVariable shadows outer variable\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA variable declaration shadows a variable from an outer scope. Consider renaming to avoid confusion.\
+"
+            }
+            Self::N2034 => {
+                "\
+\x1b[1;33mN2034\x1b[0m \x1b[1mUnreachable pattern\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA pattern in a match expression can never be reached because a previous pattern already covers all matching values.\
+"
+            }
+            Self::N2035 => {
+                "\
+\x1b[1;31mN2035\x1b[0m \x1b[1mNon-exhaustive patterns\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA match expression does not cover all possible values of the matched type. Add a catch-all pattern (`_ => ...`) or handle all variants.\
+"
+            }
+            Self::N2036 => {
+                "\
+\x1b[1;31mN2036\x1b[0m \x1b[1mPattern binding conflict\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA pattern binds the same name more than once. Each binding in a pattern must have a unique name.\
+"
+            }
+            Self::N2037 => {
+                "\
+\x1b[1;31mN2037\x1b[0m \x1b[1mIllegal binding mode in pattern\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA pattern uses an unsupported binding mode (e.g., ref, mut) in a context where it is not allowed.\
+"
+            }
+            Self::N2038 => {
+                "\
+\x1b[1;31mN2038\x1b[0m \x1b[1mInvalid pattern syntax\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe pattern syntax is invalid. Patterns must follow the allowed grammar (literals, identifiers, destructuring, etc.).\
+"
+            }
+            Self::N2039 => {
+                "\
+\x1b[1;31mN2039\x1b[0m \x1b[1mUnresolved import\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn import path or symbol cannot be resolved. Check the module path and symbol name for typos.\
+"
+            }
+            Self::N2040 => {
+                "\
+\x1b[1;31mN2040\x1b[0m \x1b[1mUnresolved re-export\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA re-export (`pub use`) refers to a symbol that cannot be found.\
+"
+            }
+            Self::N2041 => {
+                "\
+\x1b[1;31mN2041\x1b[0m \x1b[1mPrivate re-export\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA re-export attempts to publicly expose a private symbol from another module.\
+"
+            }
+            Self::N2042 => {
+                "\
+\x1b[1;31mN2042\x1b[0m \x1b[1mConflicting re-export\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nTwo or more re-exports attempt to expose different items with the same name.\
+"
+            }
+            Self::N2043 => {
+                "\
+\x1b[1;31mN2043\x1b[0m \x1b[1mRe-export of non-existent symbol\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA re-export refers to a symbol that does not exist in the source module.\
+"
+            }
+            Self::N2044 => {
+                "\
+\x1b[1;31mN2044\x1b[0m \x1b[1mSelf-import\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA module attempts to import itself. Remove the self-import.\
+"
+            }
+            Self::N2045 => {
+                "\
+\x1b[1;31mN2045\x1b[0m \x1b[1mInvalid use of `Self` type alias\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe `Self` type alias is used in an invalid context. `Self` is only valid inside trait or interface definitions.\
+"
+            }
+            Self::N2046 => {
+                "\
+\x1b[1;31mN2046\x1b[0m \x1b[1mExternal crate not found\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn external crate dependency specified in an import cannot be found. Ensure the crate is listed in the manifest and installed.\
+"
+            }
+            Self::N2047 => {
+                "\
+\x1b[1;31mN2047\x1b[0m \x1b[1mExternal crate version conflict\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nTwo dependencies require different versions of the same external crate, creating a conflict.\
+"
+            }
+            Self::N2048 => {
+                "\
+\x1b[1;31mN2048\x1b[0m \x1b[1mExternal crate feature not found\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA feature of an external crate requested in an import or config does not exist.\
+"
+            }
+            Self::N2049 => {
+                "\
+\x1b[1;33mN2049\x1b[0m \x1b[1mUnused extern crate\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mName Resolution\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn external crate is declared as a dependency but never imported or used.\
+"
+            }
+            Self::N3001 => {
+                "\
+\x1b[1;31mN3001\x1b[0m \x1b[1mType mismatch\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn expression has a type that does not match the expected type in this context. This can happen in assignments, function arguments, return statements, and binary operations. Ensure the expression produces the correct type.\
+"
+            }
+            Self::N3002 => {
+                "\
+\x1b[1;31mN3002\x1b[0m \x1b[1mAssign to immutable variable\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn attempt is made to assign a new value to a variable declared with `let`. Use `var` instead of `let` if the variable needs to be reassigned.\
+"
+            }
+            Self::N3003 => {
+                "\
+\x1b[1;31mN3003\x1b[0m \x1b[1mUndefined type\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA type name used in an annotation or expression is not defined in any accessible scope. Check for typos and ensure the type is imported.\
+"
+            }
+            Self::N3004 => {
+                "\
+\x1b[1;31mN3004\x1b[0m \x1b[1mCall of non-function value\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA call expression attempts to invoke a value that is not a function. Only functions, closures, and callable objects can be called.\
+"
+            }
+            Self::N3005 => {
+                "\
+\x1b[1;31mN3005\x1b[0m \x1b[1mArgument count mismatch\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA function call provides a different number of arguments than the function signature expects. Check both the count and the presence of default arguments.\
+"
+            }
+            Self::N3006 => {
+                "\
+\x1b[1;31mN3006\x1b[0m \x1b[1mMissing required method\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA type is used where an interface or trait is expected, but the type does not implement all required methods.\
+"
+            }
+            Self::N3007 => {
+                "\
+\x1b[1;31mN3007\x1b[0m \x1b[1mRecursive type without indirection\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA type definition is recursive without using indirection (e.g., Box, reference). Direct recursion in value types leads to infinite size.\
+"
+            }
+            Self::N3008 => {
+                "\
+\x1b[1;31mN3008\x1b[0m \x1b[1mInfinite type\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nType inference produces an infinitely recursive type. This usually happens when a variable is used in a way that creates a cycle in its type.\
+"
+            }
+            Self::N3009 => {
+                "\
+\x1b[1;31mN3009\x1b[0m \x1b[1mCannot infer type\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe type of an expression cannot be inferred from context. Add an explicit type annotation.\
+"
+            }
+            Self::N3010 => {
+                "\
+\x1b[1;31mN3010\x1b[0m \x1b[1mType annotation required\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA construct requires an explicit type annotation but none was provided. This is often needed for function parameters and certain variable definitions where inference is ambiguous.\
+"
+            }
+            Self::N3011 => {
+                "\
+\x1b[1;31mN3011\x1b[0m \x1b[1mExpected concrete type, found abstract\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA concrete type was expected but an abstract type (trait, interface, or type variable) was provided. Use a specific concrete type.\
+"
+            }
+            Self::N3012 => {
+                "\
+\x1b[1;31mN3012\x1b[0m \x1b[1mTrait bound not satisfied\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA type is used in a context that requires it to implement a specific trait or interface, but the type does not satisfy the bound.\
+"
+            }
+            Self::N3013 => {
+                "\
+\x1b[1;31mN3013\x1b[0m \x1b[1mAssociated type not specified\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA trait or interface has an associated type that must be specified but has not been provided. Use the `type Assoc = ConcreteType;` syntax.\
+"
+            }
+            Self::N3014 => {
+                "\
+\x1b[1;31mN3014\x1b[0m \x1b[1mWrong number of type arguments\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA generic type or function is provided with a different number of type arguments than it expects.\
+"
+            }
+            Self::N3015 => {
+                "\
+\x1b[1;31mN3015\x1b[0m \x1b[1mType argument out of bounds\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA type argument does not satisfy the bounds declared for the corresponding type parameter.\
+"
+            }
+            Self::N3016 => {
+                "\
+\x1b[1;31mN3016\x1b[0m \x1b[1mConflicting type arguments\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nTwo type arguments to the same generic are in conflict with each other.\
+"
+            }
+            Self::N3017 => {
+                "\
+\x1b[1;31mN3017\x1b[0m \x1b[1mCross-module type violation\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA type from one module is used in a way that violates the type's invariants across module boundaries.\
+"
+            }
+            Self::N3018 => {
+                "\
+\x1b[1;31mN3018\x1b[0m \x1b[1mBorrow of immutable as mutable\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn immutable reference is used where a mutable reference is required. Use `mut` on the binding or pass a mutable reference explicitly.\
+"
+            }
+            Self::N3019 => {
+                "\
+\x1b[1;31mN3019\x1b[0m \x1b[1mBorrow of moved value\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA value that has been moved to another owner is being used. Use a reference instead of moving, or reorder operations.\
+"
+            }
+            Self::N3020 => {
+                "\
+\x1b[1;31mN3020\x1b[0m \x1b[1mUse after move\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA value is used after it has been moved. The ownership was transferred and the original binding is no longer valid.\
+"
+            }
+            Self::N3021 => {
+                "\
+\x1b[1;31mN3021\x1b[0m \x1b[1mMultiple mutable borrows\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA value is mutably borrowed more than once at the same time. Only one mutable borrow is allowed at a time.\
+"
+            }
+            Self::N3022 => {
+                "\
+\x1b[1;31mN3022\x1b[0m \x1b[1mLifetime mismatch\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe lifetimes of two references are incompatible. The borrowed value does not live long enough to satisfy the lifetime constraint.\
+"
+            }
+            Self::N3023 => {
+                "\
+\x1b[1;31mN3023\x1b[0m \x1b[1mLifetime elision failure\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe compiler cannot infer the lifetime of a reference using the default elision rules. Add explicit lifetime annotations.\
+"
+            }
+            Self::N3024 => {
+                "\
+\x1b[1;31mN3024\x1b[0m \x1b[1mLifetime bound not satisfied\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA reference's lifetime does not satisfy the bounds required by the context. The data must live at least as long as the constraint requires.\
+"
+            }
+            Self::N3025 => {
+                "\
+\x1b[1;31mN3025\x1b[0m \x1b[1mLifetime constraint violation\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA lifetime constraint specified in the code is violated by the actual usage. Ensure all borrows respect the declared lifetimes.\
+"
+            }
+            Self::N3026 => {
+                "\
+\x1b[1;31mN3026\x1b[0m \x1b[1mMissing lifetime annotation\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA function or type signature uses references but is missing required lifetime annotations. Add lifetime parameters like `'a`.\
+"
+            }
+            Self::N3027 => {
+                "\
+\x1b[1;31mN3027\x1b[0m \x1b[1mInvalid lifetime name\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA lifetime name is not valid. Lifetime names must start with a tick (`'`) followed by an identifier.\
+"
+            }
+            Self::N3028 => {
+                "\
+\x1b[1;31mN3028\x1b[0m \x1b[1mMismatched mutability in reference\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe mutability of a reference does not match what is required. An immutable reference cannot be used where a mutable reference is needed, and vice versa.\
+"
+            }
+            Self::N3029 => {
+                "\
+\x1b[1;31mN3029\x1b[0m \x1b[1mDangling reference\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA reference outlives the data it points to. The referenced value has been dropped while the reference still exists.\
+"
+            }
+            Self::N3030 => {
+                "\
+\x1b[1;31mN3030\x1b[0m \x1b[1mDrop of type with move semantics\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn attempt is made to drop a value that has move semantics in a context that does not support it.\
+"
+            }
+            Self::N3031 => {
+                "\
+\x1b[1;31mN3031\x1b[0m \x1b[1mBorrow of constant value\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA constant value is being borrowed mutably. Constants are immutable and cannot be borrowed as mutable.\
+"
+            }
+            Self::N3032 => {
+                "\
+\x1b[1;31mN3032\x1b[0m \x1b[1mNumeric overflow in constant expression\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA constant expression produces a numeric value that overflows the target type. Use a smaller value or a larger type.\
+"
+            }
+            Self::N3033 => {
+                "\
+\x1b[1;31mN3033\x1b[0m \x1b[1mDivision by zero in constant expression\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA constant expression contains a division by zero. Ensure all divisors are non-zero at compile time.\
+"
+            }
+            Self::N3034 => {
+                "\
+\x1b[1;31mN3034\x1b[0m \x1b[1mRemainder by zero in constant expression\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA constant expression contains a remainder operation with a zero divisor.\
+"
+            }
+            Self::N3035 => {
+                "\
+\x1b[1;31mN3035\x1b[0m \x1b[1mNegation of unsigned integer\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe unary negation operator (`-`) is applied to an unsigned integer type. Unsigned types cannot represent negative values.\
+"
+            }
+            Self::N3036 => {
+                "\
+\x1b[1;31mN3036\x1b[0m \x1b[1mShift exceeds bit width\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA bit shift operation uses a shift amount that is greater than or equal to the bit width of the type.\
+"
+            }
+            Self::N3037 => {
+                "\
+\x1b[1;31mN3037\x1b[0m \x1b[1mOperator not applicable to types\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn operator is used with operand types that do not support that operation. Check the operator and types are compatible.\
+"
+            }
+            Self::N3038 => {
+                "\
+\x1b[1;31mN3038\x1b[0m \x1b[1mComparison of unordered values\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA comparison operator is applied to values that cannot be ordered (e.g., floats with NaN, or types that do not implement comparison traits).\
+"
+            }
+            Self::N3039 => {
+                "\
+\x1b[1;31mN3039\x1b[0m \x1b[1mInvalid unary operator for type\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA unary operator (like `-`, `!`, `~`) is applied to a type that does not support it.\
+"
+            }
+            Self::N3040 => {
+                "\
+\x1b[1;31mN3040\x1b[0m \x1b[1mInvalid binary operator for types\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA binary operator (like `+`, `-`, `*`, `/`, `==`) is applied to types that do not support it. Check the operand types.\
+"
+            }
+            Self::N3041 => {
+                "\
+\x1b[1;31mN3041\x1b[0m \x1b[1mNo common operator overload\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe operator overload resolution cannot find a suitable implementation for the given operand types.\
+"
+            }
+            Self::N3042 => {
+                "\
+\x1b[1;31mN3042\x1b[0m \x1b[1mAmbiguous operator application\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nMore than one operator overload matches the operand types. Use an explicit method call to disambiguate.\
+"
+            }
+            Self::N3043 => {
+                "\
+\x1b[1;31mN3043\x1b[0m \x1b[1mWrong number of generic type parameters\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA generic type or function is instantiated with the wrong number of type parameters.\
+"
+            }
+            Self::N3044 => {
+                "\
+\x1b[1;31mN3044\x1b[0m \x1b[1mGeneric bound not satisfied\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA type argument does not satisfy the bounds declared on the generic parameter.\
+"
+            }
+            Self::N3045 => {
+                "\
+\x1b[1;31mN3045\x1b[0m \x1b[1mMissing generic type annotation\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA generic construct requires a type annotation that cannot be inferred. Provide the type parameters explicitly.\
+"
+            }
+            Self::N3046 => {
+                "\
+\x1b[1;33mN3046\x1b[0m \x1b[1mGeneric parameter not used\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA generic type parameter is declared but never used in the function signature or body. Consider removing it.\
+"
+            }
+            Self::N3047 => {
+                "\
+\x1b[1;31mN3047\x1b[0m \x1b[1mConcrete type in abstract context\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA concrete type is used where an abstract type (interface/trait) was expected. The concrete type does not implement the required abstraction.\
+"
+            }
+            Self::N3048 => {
+                "\
+\x1b[1;31mN3048\x1b[0m \x1b[1mAbstract type in concrete context\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn abstract type is used where a concrete type is required. Abstract types cannot be instantiated or used in value contexts.\
+"
+            }
+            Self::N3049 => {
+                "\
+\x1b[1;31mN3049\x1b[0m \x1b[1mNon-constant in const context\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA non-constant expression is used where a compile-time constant is required. Only literal values and const functions can be used in const contexts.\
+"
+            }
+            Self::N3050 => {
+                "\
+\x1b[1;31mN3050\x1b[0m \x1b[1mNon-const call in const context\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA function that is not declared as `const` is called in a const context. Only const functions can be called at compile time.\
+"
+            }
+            Self::N3051 => {
+                "\
+\x1b[1;31mN3051\x1b[0m \x1b[1mMutable reference in const context\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA mutable reference is used in a const context. Const contexts do not allow mutation.\
+"
+            }
+            Self::N3052 => {
+                "\
+\x1b[1;31mN3052\x1b[0m \x1b[1mIf condition must be boolean\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe condition in an `if` expression must be of type Bool. The provided expression has a non-boolean type.\
+"
+            }
+            Self::N3053 => {
+                "\
+\x1b[1;31mN3053\x1b[0m \x1b[1mWhile condition must be boolean\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe condition in a `while` loop must be of type Bool. The provided expression has a non-boolean type.\
+"
+            }
+            Self::N3054 => {
+                "\
+\x1b[1;31mN3054\x1b[0m \x1b[1mFor-each binding type mismatch\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe binding variable type in a for loop does not match the element type of the iterable expression.\
+"
+            }
+            Self::N3055 => {
+                "\
+\x1b[1;31mN3055\x1b[0m \x1b[1mReturn type mismatch\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA return expression's type does not match the declared return type of the function. Ensure the returned value has the correct type.\
+"
+            }
+            Self::N3056 => {
+                "\
+\x1b[1;31mN3056\x1b[0m \x1b[1mMissing return value\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA function with a non-void return type has a code path that does not return a value. Add a return statement to all code paths.\
+"
+            }
+            Self::N3057 => {
+                "\
+\x1b[1;31mN3057\x1b[0m \x1b[1mExtra return value from void function\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA function declared as returning Void contains a return expression with a value. Remove the value or change the return type.\
+"
+            }
+            Self::N3058 => {
+                "\
+\x1b[1;31mN3058\x1b[0m \x1b[1mReturn not allowed here\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA return statement appears in a context where it is not valid, such as inside a closure that does not capture the function's return path.\
+"
+            }
+            Self::N3059 => {
+                "\
+\x1b[1;31mN3059\x1b[0m \x1b[1mMissing async annotation\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA function that uses `await` is not marked as `async`. Add the async keyword to the function signature.\
+"
+            }
+            Self::N3060 => {
+                "\
+\x1b[1;31mN3060\x1b[0m \x1b[1mCannot await non-future\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe `await` expression is used on a value that is not a Future. Only values of type Future can be awaited.\
+"
+            }
+            Self::N3061 => {
+                "\
+\x1b[1;33mN3061\x1b[0m \x1b[1mIncompatible implicit conversion\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn implicit type conversion might lose information or is not allowed. Consider an explicit cast.\
+"
+            }
+            Self::N3062 => {
+                "\
+\x1b[1;31mN3062\x1b[0m \x1b[1mForward declaration type mismatch\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe type of a forward-declared item does not match the full definition. The types must be consistent.\
+"
+            }
+            Self::N3063 => {
+                "\
+\x1b[1;31mN3063\x1b[0m \x1b[1mMissing forward declaration\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn item that requires a forward declaration (e.g., mutually recursive functions) does not have one.\
+"
+            }
+            Self::N3064 => {
+                "\
+\x1b[1;31mN3064\x1b[0m \x1b[1mField type mismatch in struct literal\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe type of a value in a struct literal does not match the declared field type.\
+"
+            }
+            Self::N3065 => {
+                "\
+\x1b[1;31mN3065\x1b[0m \x1b[1mMissing field in struct literal\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA struct literal does not provide a value for all required fields.\
+"
+            }
+            Self::N3066 => {
+                "\
+\x1b[1;31mN3066\x1b[0m \x1b[1mExtra field in struct literal\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA struct literal contains a field name that does not exist in the struct definition.\
+"
+            }
+            Self::N3067 => {
+                "\
+\x1b[1;31mN3067\x1b[0m \x1b[1mAmbiguous field in struct literal\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA field name in a struct literal could refer to multiple fields (e.g., due to inheritance or mixins).\
+"
+            }
+            Self::N3068 => {
+                "\
+\x1b[1;31mN3068\x1b[0m \x1b[1mCyclic struct definition\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA struct definition refers to itself in a way that creates an infinite-sized type. Use a pointer or Box for recursive references.\
+"
+            }
+            Self::N3069 => {
+                "\
+\x1b[1;31mN3069\x1b[0m \x1b[1mTuple index out of bounds\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA tuple index accesses an element that does not exist. Tuple indices start at 0 and must be less than the tuple's arity.\
+"
+            }
+            Self::N3070 => {
+                "\
+\x1b[1;31mN3070\x1b[0m \x1b[1mArray index out of bounds\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA constant array index expression has a value outside the array's defined bounds.\
+"
+            }
+            Self::N3071 => {
+                "\
+\x1b[1;31mN3071\x1b[0m \x1b[1mNon-comptime array index\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn array index must be a compile-time constant expression but a variable expression was used.\
+"
+            }
+            Self::N3072 => {
+                "\
+\x1b[1;31mN3072\x1b[0m \x1b[1mMismatched array length in type\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn array type annotation specifies a length that does not match the actual array literal.\
+"
+            }
+            Self::N3073 => {
+                "\
+\x1b[1;31mN3073\x1b[0m \x1b[1mType alias cycle\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA type alias directly or indirectly refers to itself, creating a cycle.\
+"
+            }
+            Self::N3074 => {
+                "\
+\x1b[1;31mN3074\x1b[0m \x1b[1mType alias uses non-existent type\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA type alias refers to a type that does not exist or is not in scope.\
+"
+            }
+            Self::N3075 => {
+                "\
+\x1b[1;31mN3075\x1b[0m \x1b[1mUnsized type in field\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn unsized type (type whose size is unknown at compile time) is used as a struct field. Use a pointer or Box.\
+"
+            }
+            Self::N3076 => {
+                "\
+\x1b[1;31mN3076\x1b[0m \x1b[1mUnsized type in local variable\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn unsized type is used as a local variable. Local variables must have a known size at compile time.\
+"
+            }
+            Self::N3077 => {
+                "\
+\x1b[1;31mN3077\x1b[0m \x1b[1mUnsized type in parameter\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn unsized type is used as a function parameter. Use a reference or pointer parameter instead.\
+"
+            }
+            Self::N3078 => {
+                "\
+\x1b[1;31mN3078\x1b[0m \x1b[1mUnsized type in return position\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn unsized type is used as a return type. Return types must have a known size.\
+"
+            }
+            Self::N3079 => {
+                "\
+\x1b[1;31mN3079\x1b[0m \x1b[1mUnsized type in struct field\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn unsized type appears as a struct field. Wrap it in a pointer type like `Box<T>`.\
+"
+            }
+            Self::N3080 => {
+                "\
+\x1b[1;31mN3080\x1b[0m \x1b[1mUnexpected type parameter\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA type parameter is provided in a context that does not expect one.\
+"
+            }
+            Self::N3081 => {
+                "\
+\x1b[1;31mN3081\x1b[0m \x1b[1mExpected type parameter\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA generic type or function expects a type parameter but none was supplied.\
+"
+            }
+            Self::N3082 => {
+                "\
+\x1b[1;31mN3082\x1b[0m \x1b[1mInvalid enum discriminant type\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe underlying type specified for an enum's discriminant is not valid. Only integer types can be used as discriminant types.\
+"
+            }
+            Self::N3083 => {
+                "\
+\x1b[1;31mN3083\x1b[0m \x1b[1mDuplicate enum discriminant value\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nTwo or more enum variants have the same discriminant value. Discriminant values must be unique within an enum.\
+"
+            }
+            Self::N3084 => {
+                "\
+\x1b[1;31mN3084\x1b[0m \x1b[1mEnum discriminant overflow\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn enum discriminant value exceeds the range of the underlying integer type.\
+"
+            }
+            Self::N3085 => {
+                "\
+\x1b[1;31mN3085\x1b[0m \x1b[1mNon-exhaustive enum match\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA match on an enum does not cover all variants. Add arms for missing variants or a catch-all pattern.\
+"
+            }
+            Self::N3086 => {
+                "\
+\x1b[1;33mN3086\x1b[0m \x1b[1mUnreachable match arm\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA match arm can never execute because a previous arm already matches all values it would match.\
+"
+            }
+            Self::N3087 => {
+                "\
+\x1b[1;33mN3087\x1b[0m \x1b[1mOverlapping match patterns\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nTwo or more patterns in a match can match the same value. Reorder or refine the patterns.\
+"
+            }
+            Self::N3088 => {
+                "\
+\x1b[1;31mN3088\x1b[0m \x1b[1mInvalid ref pattern\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA `ref` pattern modifier is used in an invalid position or on a type that does not support it.\
+"
+            }
+            Self::N3089 => {
+                "\
+\x1b[1;31mN3089\x1b[0m \x1b[1mInvalid mut pattern\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA `mut` pattern modifier is used in an invalid position or on a type that is not mutable.\
+"
+            }
+            Self::N3090 => {
+                "\
+\x1b[1;31mN3090\x1b[0m \x1b[1mPattern requires unit type\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA pattern that expects a unit type (empty tuple) is used with a non-unit value.\
+"
+            }
+            Self::N3091 => {
+                "\
+\x1b[1;31mN3091\x1b[0m \x1b[1mClosure without closure context\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA closure is defined in a context that does not support closures. Closures require the ability to capture variables from the enclosing scope.\
+"
+            }
+            Self::N3092 => {
+                "\
+\x1b[1;31mN3092\x1b[0m \x1b[1mClosure captures disjoint variables\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA closure captures variables that have disjoint lifetimes, making it impossible to infer a single combined lifetime.\
+"
+            }
+            Self::N3093 => {
+                "\
+\x1b[1;31mN3093\x1b[0m \x1b[1mNon-copy type in closure by copy\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA closure attempts to capture a non-Copy type by value (copy) in a `Fn` closure context. The type must implement Copy.\
+"
+            }
+            Self::N3094 => {
+                "\
+\x1b[1;31mN3094\x1b[0m \x1b[1mMismatched async closure\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn async closure is used in a context that expects a sync closure, or vice versa.\
+"
+            }
+            Self::N3095 => {
+                "\
+\x1b[1;31mN3095\x1b[0m \x1b[1mGenerator resume type mismatch\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA generator's resume argument type does not match what the generator expects.\
+"
+            }
+            Self::N3096 => {
+                "\
+\x1b[1;31mN3096\x1b[0m \x1b[1mGenerator yield type mismatch\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA generator's yielded value type does not match the expected yield type.\
+"
+            }
+            Self::N3097 => {
+                "\
+\x1b[1;31mN3097\x1b[0m \x1b[1mGenerator return type mismatch\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mType System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA generator's return type does not match the declared or inferred return type.\
+"
+            }
+            Self::N4001 => {
+                "\
+\x1b[1;31mN4001\x1b[0m \x1b[1mModule not found\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mModule System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA module referenced in a use/import declaration does not exist in the module search paths. Check the module name and ensure it is properly installed.\
+"
+            }
+            Self::N4002 => {
+                "\
+\x1b[1;31mN4002\x1b[0m \x1b[1mFile not found\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mModule System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA file referenced in a module path does not exist at the expected location.\
+"
+            }
+            Self::N4003 => {
+                "\
+\x1b[1;31mN4003\x1b[0m \x1b[1mCircular module dependency\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mModule System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nModules form a circular dependency chain. Nimble requires acyclic module dependencies.\
+"
+            }
+            Self::N4004 => {
+                "\
+\x1b[1;31mN4004\x1b[0m \x1b[1mSymbol not exported\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mModule System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA symbol imported from a module is not publicly exported by that module. Check the module's public API.\
+"
+            }
+            Self::N4005 => {
+                "\
+\x1b[1;31mN4005\x1b[0m \x1b[1mImport cycle detected\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mModule System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn import graph cycle was detected. Modules must form a directed acyclic graph.\
+"
+            }
+            Self::N4006 => {
+                "\
+\x1b[1;31mN4006\x1b[0m \x1b[1mAmbiguous import\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mModule System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn imported symbol resolves to multiple definitions across different imported modules. Use a qualified path to disambiguate.\
+"
+            }
+            Self::N4007 => {
+                "\
+\x1b[1;31mN4007\x1b[0m \x1b[1mShadowed import\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mModule System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn imported name conflicts with another import. Use an alias or rename one of the imports.\
+"
+            }
+            Self::N4008 => {
+                "\
+\x1b[1;33mN4008\x1b[0m \x1b[1mWildcard import naming conflict\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mModule System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA wildcard import introduces names that conflict with existing definitions or other imports.\
+"
+            }
+            Self::N4009 => {
+                "\
+\x1b[1;31mN4009\x1b[0m \x1b[1mRelative import beyond root\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mModule System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA relative import (using `super` or `../`) goes beyond the package root. Relative imports cannot escape the package boundary.\
+"
+            }
+            Self::N4010 => {
+                "\
+\x1b[1;31mN4010\x1b[0m \x1b[1mInvalid module name\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mModule System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA module name contains invalid characters or does not follow naming conventions. Module names must be valid identifiers.\
+"
+            }
+            Self::N4011 => {
+                "\
+\x1b[1;31mN4011\x1b[0m \x1b[1mModule not in search path\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mModule System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA module file could not be found in any of the configured import search paths.\
+"
+            }
+            Self::N4012 => {
+                "\
+\x1b[1;31mN4012\x1b[0m \x1b[1mModule parse error\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mModule System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA module file could not be parsed due to syntax errors. The module must contain valid Nimble source code.\
+"
+            }
+            Self::N4013 => {
+                "\
+\x1b[1;31mN4013\x1b[0m \x1b[1mModule type error\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mModule System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA module file contains type errors. The module must be type-correct before it can be imported.\
+"
+            }
+            Self::N4014 => {
+                "\
+\x1b[1;31mN4014\x1b[0m \x1b[1mDependency not found\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mModule System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA package dependency specified in the manifest cannot be resolved. Check that the dependency exists and is accessible.\
+"
+            }
+            Self::N4015 => {
+                "\
+\x1b[1;31mN4015\x1b[0m \x1b[1mDependency cycle\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mModule System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nTwo or more packages depend on each other, creating a cycle. All dependency graphs must be acyclic.\
+"
+            }
+            Self::N4016 => {
+                "\
+\x1b[1;31mN4016\x1b[0m \x1b[1mDependency version conflict\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mModule System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nMultiple packages require different incompatible versions of the same dependency.\
+"
+            }
+            Self::N4017 => {
+                "\
+\x1b[1;31mN4017\x1b[0m \x1b[1mBroken package structure\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mModule System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe package directory structure does not follow the expected convention.\
+"
+            }
+            Self::N4018 => {
+                "\
+\x1b[1;31mN4018\x1b[0m \x1b[1mMissing manifest\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mModule System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe expected manifest file (e.g., nimble.toml) is missing from the package root.\
+"
+            }
+            Self::N4019 => {
+                "\
+\x1b[1;31mN4019\x1b[0m \x1b[1mInvalid manifest format\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mModule System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe manifest file has an invalid format or structure and cannot be parsed.\
+"
+            }
+            Self::N4020 => {
+                "\
+\x1b[1;31mN4020\x1b[0m \x1b[1mManifest syntax error\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mModule System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe manifest file contains a syntax error. Check the manifest syntax.\
+"
+            }
+            Self::N4021 => {
+                "\
+\x1b[1;31mN4021\x1b[0m \x1b[1mManifest missing required field\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mModule System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe manifest file is missing a required field. Add the required field.\
+"
+            }
+            Self::N4022 => {
+                "\
+\x1b[1;31mN4022\x1b[0m \x1b[1mManifest duplicate entry\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mModule System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe manifest file contains duplicate entries for the same field or dependency.\
+"
+            }
+            Self::N4023 => {
+                "\
+\x1b[1;31mN4023\x1b[0m \x1b[1mModule compiled with different version\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mModule System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA pre-compiled module was compiled with a different version of the compiler and is incompatible.\
+"
+            }
+            Self::N4024 => {
+                "\
+\x1b[1;31mN4024\x1b[0m \x1b[1mModule compiled with incompatible flags\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mModule System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA pre-compiled module was compiled with different compiler flags that affect ABI compatibility.\
+"
+            }
+            Self::N4025 => {
+                "\
+\x1b[1;31mN4025\x1b[0m \x1b[1mModule interface mismatch\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mModule System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe public interface of a compiled module does not match what is expected from its source.\
+"
+            }
+            Self::N4026 => {
+                "\
+\x1b[1;31mN4026\x1b[0m \x1b[1mRecursive module loading\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mModule System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA module directly or indirectly triggers loading itself, creating infinite recursion.\
+"
+            }
+            Self::N4027 => {
+                "\
+\x1b[1;31mN4027\x1b[0m \x1b[1mModule path too deep\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mModule System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA module path exceeds the maximum allowed nesting depth. Flatten your module hierarchy.\
+"
+            }
+            Self::N5001 => {
+                "\
+\x1b[1;33mN5001\x1b[0m \x1b[1mUnused variable\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA variable is declared but never used. Consider removing it or prefixing the name with an underscore to suppress this warning.\
+"
+            }
+            Self::N5002 => {
+                "\
+\x1b[1;33mN5002\x1b[0m \x1b[1mUnused import\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn import is not used anywhere in the file. Remove the unused import to keep the code clean.\
+"
+            }
+            Self::N5003 => {
+                "\
+\x1b[1;33mN5003\x1b[0m \x1b[1mUnused assignment\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA value is assigned to a variable but the variable is never read after the assignment.\
+"
+            }
+            Self::N5004 => {
+                "\
+\x1b[1;33mN5004\x1b[0m \x1b[1mUnused function\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA function is defined but never called anywhere in the program.\
+"
+            }
+            Self::N5005 => {
+                "\
+\x1b[1;33mN5005\x1b[0m \x1b[1mUnused struct\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA struct type is defined but never used.\
+"
+            }
+            Self::N5006 => {
+                "\
+\x1b[1;33mN5006\x1b[0m \x1b[1mUnused type\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA type alias or enum is defined but never used.\
+"
+            }
+            Self::N5007 => {
+                "\
+\x1b[1;33mN5007\x1b[0m \x1b[1mDead code\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nCode exists that will never execute due to control flow guarantees. Remove it.\
+"
+            }
+            Self::N5008 => {
+                "\
+\x1b[1;33mN5008\x1b[0m \x1b[1mUnreachable code\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nCode after a return, break, continue, or infinite loop will never execute.\
+"
+            }
+            Self::N5009 => {
+                "\
+\x1b[1;33mN5009\x1b[0m \x1b[1mEmpty loop body\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA loop has an empty body. Either add code to the body or remove the loop.\
+"
+            }
+            Self::N5010 => {
+                "\
+\x1b[1;33mN5010\x1b[0m \x1b[1mSuspicious assignment in conditional\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn assignment expression is used in a conditional context. It may be a typo for equality comparison (`==`).\
+"
+            }
+            Self::N5011 => {
+                "\
+\x1b[1;33mN5011\x1b[0m \x1b[1mLossy implicit conversion\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn implicit type conversion that may lose precision or information. Use an explicit cast to make the conversion clear.\
+"
+            }
+            Self::N5012 => {
+                "\
+\x1b[1;33mN5012\x1b[0m \x1b[1mDeprecated item\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe code uses a deprecated function, type, or construct. Check the documentation for the recommended replacement.\
+"
+            }
+            Self::N5013 => {
+                "\
+\x1b[1;33mN5013\x1b[0m \x1b[1mMissing documentation\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA public API item is missing documentation. Add a doc comment (`///`) to describe it.\
+"
+            }
+            Self::N5014 => {
+                "\
+\x1b[1;33mN5014\x1b[0m \x1b[1mNon-standard naming\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn identifier does not follow Nimble naming conventions. Use snake_case for variables and functions, PascalCase for types.\
+"
+            }
+            Self::N5015 => {
+                "\
+\x1b[1;33mN5015\x1b[0m \x1b[1mName shadows outer\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA local name shadows a name from an outer scope, which can cause confusion.\
+"
+            }
+            Self::N5016 => {
+                "\
+\x1b[1;33mN5016\x1b[0m \x1b[1mUnnecessary closure\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA closure that simply wraps another function call can be replaced with a direct reference to the function.\
+"
+            }
+            Self::N5017 => {
+                "\
+\x1b[1;33mN5017\x1b[0m \x1b[1mRedundant pattern\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA pattern in a match or let binding is unnecessarily complex. Simplify it.\
+"
+            }
+            Self::N5018 => {
+                "\
+\x1b[1;33mN5018\x1b[0m \x1b[1mMissing else branch\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn if expression without an else branch may not return a value. Add an else branch if needed.\
+"
+            }
+            Self::N5019 => {
+                "\
+\x1b[1;33mN5019\x1b[0m \x1b[1mDeep nesting\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nCode is nested more than the recommended depth. Refactor to reduce nesting.\
+"
+            }
+            Self::N5020 => {
+                "\
+\x1b[1;33mN5020\x1b[0m \x1b[1mComplex expression\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn expression is overly complex. Break it into simpler sub-expressions with intermediate variables.\
+"
+            }
+            Self::N5021 => {
+                "\
+\x1b[1;33mN5021\x1b[0m \x1b[1mHigh cognitive complexity\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe cognitive complexity of a function exceeds the recommended limit. Consider breaking the function into smaller pieces.\
+"
+            }
+            Self::N5022 => {
+                "\
+\x1b[1;33mN5022\x1b[0m \x1b[1mHigh cyclomatic complexity\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe cyclomatic complexity of a function is too high. Refactor to reduce the number of independent paths.\
+"
+            }
+            Self::N5023 => {
+                "\
+\x1b[1;33mN5023\x1b[0m \x1b[1mToo many parameters\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA function has more parameters than the recommended maximum. Consider using a struct to group related parameters.\
+"
+            }
+            Self::N5024 => {
+                "\
+\x1b[1;33mN5024\x1b[0m \x1b[1mToo many return types\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA type has more return type variants than recommended. Simplify the type hierarchy.\
+"
+            }
+            Self::N5025 => {
+                "\
+\x1b[1;33mN5025\x1b[0m \x1b[1mFunction too long\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA function body exceeds the recommended maximum number of lines. Extract helper functions.\
+"
+            }
+            Self::N5026 => {
+                "\
+\x1b[1;33mN5026\x1b[0m \x1b[1mFile too long\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe source file exceeds the recommended maximum line count. Split into multiple files.\
+"
+            }
+            Self::N5027 => {
+                "\
+\x1b[1;33mN5027\x1b[0m \x1b[1mLine too long\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA source line exceeds the maximum allowed column width. Wrap the line.\
+"
+            }
+            Self::N5028 => {
+                "\
+\x1b[1;33mN5028\x1b[0m \x1b[1mInconsistent naming style\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nIdentifier naming is inconsistent within the codebase. Follow the established naming convention.\
+"
+            }
+            Self::N5029 => {
+                "\
+\x1b[1;33mN5029\x1b[0m \x1b[1mNon-canonical ordering\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nItems are not ordered according to the project's convention (e.g., imports before definitions, public before private).\
+"
+            }
+            Self::N5030 => {
+                "\
+\x1b[1;33mN5030\x1b[0m \x1b[1mUnsafe block used\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn unsafe block is used. Ensure that all invariants are manually verified.\
+"
+            }
+            Self::N5031 => {
+                "\
+\x1b[1;33mN5031\x1b[0m \x1b[1mUnsafe function\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA function is declared as unsafe. Only use unsafe when absolutely necessary and document safety requirements.\
+"
+            }
+            Self::N5032 => {
+                "\
+\x1b[1;33mN5032\x1b[0m \x1b[1mUnnecessary unsafe\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn unsafe block or function is unnecessary because it contains no actual unsafe operations.\
+"
+            }
+            Self::N5033 => {
+                "\
+\x1b[1;33mN5033\x1b[0m \x1b[1mComparing boolean literal\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA boolean value is compared to `true` or `false` directly. Use the value directly or use the `!` operator for negation.\
+"
+            }
+            Self::N5034 => {
+                "\
+\x1b[1;33mN5034\x1b[0m \x1b[1mAssigning boolean in conditional\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn assignment using `=` appears in a condition. This is likely a typo for `==`.\
+"
+            }
+            Self::N5035 => {
+                "\
+\x1b[1;33mN5035\x1b[0m \x1b[1mNegating boolean literal\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA boolean literal is negated with `!`. Use the opposite literal directly.\
+"
+            }
+            Self::N5036 => {
+                "\
+\x1b[1;33mN5036\x1b[0m \x1b[1mNested conditional\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA conditional expression is nested inside another conditional in a way that could be simplified.\
+"
+            }
+            Self::N5037 => {
+                "\
+\x1b[1;33mN5037\x1b[0m \x1b[1mConstant condition\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA condition in an if or while is always true or always false, making the branch redundant.\
+"
+            }
+            Self::N5038 => {
+                "\
+\x1b[1;33mN5038\x1b[0m \x1b[1mRedundant cast\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA type cast is unnecessary because the source and target types are the same or the conversion is implicit.\
+"
+            }
+            Self::N5039 => {
+                "\
+\x1b[1;33mN5039\x1b[0m \x1b[1mSuspicious comparison\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA comparison is likely always true or always false (e.g., x == x).\
+"
+            }
+            Self::N5040 => {
+                "\
+\x1b[1;33mN5040\x1b[0m \x1b[1mInfinite loop detected\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA loop condition is always true and there is no break statement, making the loop potentially infinite.\
+"
+            }
+            Self::N5041 => {
+                "\
+\x1b[1;33mN5041\x1b[0m \x1b[1mMissing break in loop\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA loop with a constant true condition has no break statement. Add a condition check and break.\
+"
+            }
+            Self::N5042 => {
+                "\
+\x1b[1;33mN5042\x1b[0m \x1b[1mUninitialized variable\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA variable is used before being assigned a value. Initialize it before use.\
+"
+            }
+            Self::N5043 => {
+                "\
+\x1b[1;33mN5043\x1b[0m \x1b[1mPossibly uninitialized variable\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA variable may be used without being initialized in all code paths.\
+"
+            }
+            Self::N5044 => {
+                "\
+\x1b[1;33mN5044\x1b[0m \x1b[1mFallthrough in match\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA match arm falls through to the next arm. Use an explicit `continue` or handle all cases.\
+"
+            }
+            Self::N5045 => {
+                "\
+\x1b[1;33mN5045\x1b[0m \x1b[1mMissing case in match\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA match on an enum or union type does not cover all variants. Add the missing cases.\
+"
+            }
+            Self::N5046 => {
+                "\
+\x1b[1;33mN5046\x1b[0m \x1b[1mRedundant default case\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA match has a default case that can never be reached because all variants are already covered.\
+"
+            }
+            Self::N5047 => {
+                "\
+\x1b[1;33mN5047\x1b[0m \x1b[1mUnnecessary else-if\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn else-if chain can be simplified. Use a match expression instead.\
+"
+            }
+            Self::N5048 => {
+                "\
+\x1b[1;33mN5048\x1b[0m \x1b[1mRedundant else branch\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe else branch of an if-else is empty or redundant. Remove it.\
+"
+            }
+            Self::N5049 => {
+                "\
+\x1b[1;33mN5049\x1b[0m \x1b[1mEmpty else branch\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn else branch is empty. Either add code or remove the else.\
+"
+            }
+            Self::N5050 => {
+                "\
+\x1b[1;33mN5050\x1b[0m \x1b[1mUnnecessary parentheses\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nParentheses around an expression are not needed and reduce readability. Remove them.\
+"
+            }
+            Self::N5051 => {
+                "\
+\x1b[1;33mN5051\x1b[0m \x1b[1mUnnecessary return\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA return statement at the end of a function is redundant. Remove the return keyword.\
+"
+            }
+            Self::N5052 => {
+                "\
+\x1b[1;33mN5052\x1b[0m \x1b[1mUnnecessary semicolon\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA semicolon appears in a position where it is not needed. Remove it.\
+"
+            }
+            Self::N5053 => {
+                "\
+\x1b[1;33mN5053\x1b[0m \x1b[1mEmpty statement\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn empty statement (bare semicolon or empty line) can be removed.\
+"
+            }
+            Self::N5054 => {
+                "\
+\x1b[1;33mN5054\x1b[0m \x1b[1mStatement with no effect\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn expression statement has no side effects and its result is discarded. It can be removed.\
+"
+            }
+            Self::N5055 => {
+                "\
+\x1b[1;33mN5055\x1b[0m \x1b[1mVariable assigned but not used\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA variable is assigned a value but is never read afterward. Consider removing the assignment.\
+"
+            }
+            Self::N5056 => {
+                "\
+\x1b[1;33mN5056\x1b[0m \x1b[1mFunction argument reassigned\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA function parameter is reassigned inside the function body. Use a local variable instead.\
+"
+            }
+            Self::N5057 => {
+                "\
+\x1b[1;33mN5057\x1b[0m \x1b[1mMutable variable could be immutable\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA variable declared with `var` is never mutated. Use `let` instead.\
+"
+            }
+            Self::N5058 => {
+                "\
+\x1b[1;33mN5058\x1b[0m \x1b[1mRedundant field name in struct literal\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA struct literal uses the field name even though the value is the same name. The shorthand syntax can be used.\
+"
+            }
+            Self::N5059 => {
+                "\
+\x1b[1;33mN5059\x1b[0m \x1b[1mUnnecessary qualification\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA module path qualification is unnecessary because the symbol is already in scope.\
+"
+            }
+            Self::N5060 => {
+                "\
+\x1b[1;33mN5060\x1b[0m \x1b[1mModule naming convention violation\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA module name does not follow the project's naming conventions for modules.\
+"
+            }
+            Self::N5061 => {
+                "\
+\x1b[1;33mN5061\x1b[0m \x1b[1mNon-idiomatic code pattern\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mLint\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe code uses a pattern that is not idiomatic for Nimble. Consider using a more standard approach.\
+"
+            }
+            Self::N6001 => {
+                "\
+\x1b[1;35mN6001\x1b[0m \x1b[1mCode generation failure\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mCodegen\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe code generator encountered an internal error while generating the output. This is a compiler bug. Report it to the Nimble developers with the source code that triggered it.\
+"
+            }
+            Self::N6002 => {
+                "\
+\x1b[1;35mN6002\x1b[0m \x1b[1mUnsupported feature for target\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mCodegen\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA language feature or construct is not supported on the selected code generation target (e.g., architecture, OS).\
+"
+            }
+            Self::N6003 => {
+                "\
+\x1b[1;35mN6003\x1b[0m \x1b[1mLinker error\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mCodegen\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe linker returned an error while linking the compiled output. Check for missing symbols or library paths.\
+"
+            }
+            Self::N6004 => {
+                "\
+\x1b[1;35mN6004\x1b[0m \x1b[1mAssembly error\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mCodegen\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn error occurred during assembly generation. This typically indicates a compiler bug.\
+"
+            }
+            Self::N6005 => {
+                "\
+\x1b[1;35mN6005\x1b[0m \x1b[1mTarget not supported\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mCodegen\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe specified compilation target is not supported by the code generator.\
+"
+            }
+            Self::N6006 => {
+                "\
+\x1b[1;31mN6006\x1b[0m \x1b[1mInvalid optimization level\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mCodegen\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe specified optimization level is not recognized. Valid levels are 0-3, s, or z.\
+"
+            }
+            Self::N6007 => {
+                "\
+\x1b[1;31mN6007\x1b[0m \x1b[1mInvalid debug info level\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mCodegen\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe specified debug information level is invalid.\
+"
+            }
+            Self::N6008 => {
+                "\
+\x1b[1;35mN6008\x1b[0m \x1b[1mInline assembly error\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mCodegen\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn inline assembly block contains invalid syntax or constraints. Check the assembly template.\
+"
+            }
+            Self::N6009 => {
+                "\
+\x1b[1;35mN6009\x1b[0m \x1b[1mCompiler intrinsic error\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mCodegen\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA compiler intrinsic function was used incorrectly or has an invalid signature.\
+"
+            }
+            Self::N6010 => {
+                "\
+\x1b[1;35mN6010\x1b[0m \x1b[1mStack overflow during codegen\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mCodegen\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe code generator's internal stack overflowed while processing a deeply nested construct. Try simplifying the code.\
+"
+            }
+            Self::N6011 => {
+                "\
+\x1b[1;35mN6011\x1b[0m \x1b[1mGlobal offset overflow\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mCodegen\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe global offset table for the generated code exceeds the maximum allowed size. Reduce the number of global variables or functions.\
+"
+            }
+            Self::N6012 => {
+                "\
+\x1b[1;35mN6012\x1b[0m \x1b[1mJump table overflow\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mCodegen\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA generated jump table (for match/large switches) exceeds the maximum size. Use if-else chains instead.\
+"
+            }
+            Self::N6013 => {
+                "\
+\x1b[1;35mN6013\x1b[0m \x1b[1mToo many static variables\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mCodegen\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe number of static variables in the compilation unit exceeds the target limit. Reduce static variable usage.\
+"
+            }
+            Self::N6014 => {
+                "\
+\x1b[1;35mN6014\x1b[0m \x1b[1mToo many functions\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mCodegen\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe number of functions in the compilation unit exceeds the target module limit. Split the code into multiple files.\
+"
+            }
+            Self::N6015 => {
+                "\
+\x1b[1;35mN6015\x1b[0m \x1b[1mFunction too large\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mCodegen\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA single function exceeds the maximum size that the code generator can handle. Split the function into smaller functions.\
+"
+            }
+            Self::N6016 => {
+                "\
+\x1b[1;31mN6016\x1b[0m \x1b[1mExternal symbol not found\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mCodegen\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA symbol referenced as external (e.g., from a different compilation unit or library) was not found during linking.\
+"
+            }
+            Self::N6017 => {
+                "\
+\x1b[1;31mN6017\x1b[0m \x1b[1mDuplicate symbol export\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mCodegen\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nTwo compilation units export the same symbol. Rename one of the symbols.\
+"
+            }
+            Self::N6018 => {
+                "\
+\x1b[1;31mN6018\x1b[0m \x1b[1mUndefined symbol\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mCodegen\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA symbol referenced in the code has no definition anywhere in the compilation unit or its dependencies.\
+"
+            }
+            Self::N6019 => {
+                "\
+\x1b[1;35mN6019\x1b[0m \x1b[1mRelocation overflow\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mCodegen\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA relocation (address fixup) in the generated object code exceeds the maximum range for the target architecture.\
+"
+            }
+            Self::N6020 => {
+                "\
+\x1b[1;35mN6020\x1b[0m \x1b[1mTLS not supported\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mCodegen\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThread-local storage is not available on the target platform. Remove the `thread_local` annotation.\
+"
+            }
+            Self::N6021 => {
+                "\
+\x1b[1;31mN6021\x1b[0m \x1b[1mABI mismatch\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mCodegen\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe calling convention or ABI of an external function does not match the expected ABI. Ensure consistent ABI declarations.\
+"
+            }
+            Self::N6022 => {
+                "\
+\x1b[1;31mN6022\x1b[0m \x1b[1mCPU feature not available\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mCodegen\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA required CPU feature (e.g., AVX2, SSE4.1) is not available on the target platform.\
+"
+            }
+            Self::N6023 => {
+                "\
+\x1b[1;31mN6023\x1b[0m \x1b[1mOS feature not available\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mCodegen\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA required operating system feature is not available on the target platform.\
+"
+            }
+            Self::N6024 => {
+                "\
+\x1b[1;31mN6024\x1b[0m \x1b[1mInline assembly constraint violation\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mCodegen\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn inline assembly constraint is invalid or incompatible with the operands.\
+"
+            }
+            Self::N6025 => {
+                "\
+\x1b[1;35mN6025\x1b[0m \x1b[1mIntrinsic signature mismatch\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mCodegen\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA compiler intrinsic is called with arguments that do not match its expected signature.\
+"
+            }
+            Self::N6026 => {
+                "\
+\x1b[1;31mN6026\x1b[0m \x1b[1mVector type not supported\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mCodegen\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe target does not support the required SIMD vector type. Use a scalar type or check target features.\
+"
+            }
+            Self::N6027 => {
+                "\
+\x1b[1;31mN6027\x1b[0m \x1b[1mAtomic not supported\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mCodegen\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAtomic operations are not supported on the target platform for the specified data type.\
+"
+            }
+            Self::N6028 => {
+                "\
+\x1b[1;31mN6028\x1b[0m \x1b[1mSIMD not supported\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mCodegen\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nSIMD operations are not supported on the target platform. Disable SIMD features or use a different target.\
+"
+            }
+            Self::N6029 => {
+                "\
+\x1b[1;35mN6029\x1b[0m \x1b[1mCodegen buffer overflow\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mCodegen\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn internal code generator buffer overflowed. This is a compiler bug.\
+"
+            }
+            Self::N6030 => {
+                "\
+\x1b[1;31mN6030\x1b[0m \x1b[1mUnsupported calling convention\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mCodegen\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe specified calling convention is not supported on the target platform.\
+"
+            }
+            Self::N6031 => {
+                "\
+\x1b[1;35mN6031\x1b[0m \x1b[1mToo many locals\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mCodegen\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA function has too many local variables for the code generator to handle. Split the function.\
+"
+            }
+            Self::N6032 => {
+                "\
+\x1b[1;31mN6032\x1b[0m \x1b[1mSection attribute conflict\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mCodegen\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nTwo or more items in the same section have conflicting attributes.\
+"
+            }
+            Self::N6033 => {
+                "\
+\x1b[1;31mN6033\x1b[0m \x1b[1mLink once group conflict\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mCodegen\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nTwo or more items in the same link_once group have conflicting definitions.\
+"
+            }
+            Self::N6034 => {
+                "\
+\x1b[1;31mN6034\x1b[0m \x1b[1mVisibility attribute conflict\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mCodegen\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nTwo or more symbols with the same name but different visibility are defined.\
+"
+            }
+            Self::N7001 => {
+                "\
+\x1b[1;35mN7001\x1b[0m \x1b[1mProgram panicked\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mRuntime\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe program encountered an unexpected condition and panicked. This is a runtime error that terminates the process. Check the panic message for details about what went wrong.\
+"
+            }
+            Self::N7002 => {
+                "\
+\x1b[1;35mN7002\x1b[0m \x1b[1mIndex out of bounds\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mRuntime\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn array, list, or tuple index was outside the valid range. Ensure the index is less than the container's length and non-negative.\
+"
+            }
+            Self::N7003 => {
+                "\
+\x1b[1;35mN7003\x1b[0m \x1b[1mStack overflow\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mRuntime\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe program's call stack exceeded the maximum allowed size. This usually indicates infinite recursion or excessive stack allocation.\
+"
+            }
+            Self::N7004 => {
+                "\
+\x1b[1;35mN7004\x1b[0m \x1b[1mArithmetic overflow\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mRuntime\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn arithmetic operation overflowed the range of the integer type. Use checked arithmetic or larger types.\
+"
+            }
+            Self::N7005 => {
+                "\
+\x1b[1;35mN7005\x1b[0m \x1b[1mDivision by zero\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mRuntime\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA division or modulo operation had a zero divisor at runtime. Ensure the divisor is non-zero before the operation.\
+"
+            }
+            Self::N7006 => {
+                "\
+\x1b[1;35mN7006\x1b[0m \x1b[1mNull pointer dereference\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mRuntime\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe program tried to dereference a null or invalid pointer. This is a serious bug.\
+"
+            }
+            Self::N7007 => {
+                "\
+\x1b[1;35mN7007\x1b[0m \x1b[1mUnwrap of None value\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mRuntime\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA `None` value was unwrapped, causing a panic. Use pattern matching or safe unwrapping methods to handle the None case.\
+"
+            }
+            Self::N7008 => {
+                "\
+\x1b[1;35mN7008\x1b[0m \x1b[1mUnwrap of error result\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mRuntime\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn `Err` result was unwrapped, causing a panic. Handle errors with pattern matching or propagate them properly.\
+"
+            }
+            Self::N7009 => {
+                "\
+\x1b[1;35mN7009\x1b[0m \x1b[1mOut of memory\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mRuntime\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe program could not allocate the required memory. This is typically a system resource exhaustion issue.\
+"
+            }
+            Self::N7010 => {
+                "\
+\x1b[1;35mN7010\x1b[0m \x1b[1mAssertion failed\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mRuntime\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA runtime assertion (`assert`) failed. The condition evaluated to false. Check the assertion condition and the program logic.\
+"
+            }
+            Self::N7011 => {
+                "\
+\x1b[1;35mN7011\x1b[0m \x1b[1mUnreachable code executed\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mRuntime\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nCode marked as unreachable was executed, indicating a logic error in the program.\
+"
+            }
+            Self::N7012 => {
+                "\
+\x1b[1;34mN7012\x1b[0m \x1b[1mTODO encountered at runtime\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;34mNote\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mRuntime\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA TODO stub was executed at runtime. This indicates incomplete implementation.\
+"
+            }
+            Self::N7013 => {
+                "\
+\x1b[1;35mN7013\x1b[0m \x1b[1mUnimplemented functionality\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mRuntime\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe program reached a code path that is not yet implemented.\
+"
+            }
+            Self::N7014 => {
+                "\
+\x1b[1;35mN7014\x1b[0m \x1b[1mBuffer overflow\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mRuntime\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA buffer write operation exceeded the buffer's capacity. This can be a security vulnerability.\
+"
+            }
+            Self::N7015 => {
+                "\
+\x1b[1;35mN7015\x1b[0m \x1b[1mInvalid UTF-8 sequence\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mRuntime\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn operation encountered an invalid UTF-8 byte sequence. Ensure all string data is valid UTF-8.\
+"
+            }
+            Self::N7016 => {
+                "\
+\x1b[1;35mN7016\x1b[0m \x1b[1mInteger conversion overflow\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mRuntime\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn integer type conversion resulted in an overflow. Use checked conversion or ensure the value fits in the target type.\
+"
+            }
+            Self::N7017 => {
+                "\
+\x1b[1;35mN7017\x1b[0m \x1b[1mFloat conversion overflow\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mRuntime\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA floating-point conversion resulted in an overflow or underflow.\
+"
+            }
+            Self::N7018 => {
+                "\
+\x1b[1;35mN7018\x1b[0m \x1b[1mNegative index\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mRuntime\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA negative index was used in a context that only accepts non-negative indices.\
+"
+            }
+            Self::N7019 => {
+                "\
+\x1b[1;35mN7019\x1b[0m \x1b[1mInvalid enum discriminant\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mRuntime\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn enum value has an invalid discriminant value, indicating memory corruption or unsafe code violation.\
+"
+            }
+            Self::N7020 => {
+                "\
+\x1b[1;35mN7020\x1b[0m \x1b[1mType cast error at runtime\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mRuntime\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA runtime type cast failed because the value's actual type does not match the target type.\
+"
+            }
+            Self::N7021 => {
+                "\
+\x1b[1;35mN7021\x1b[0m \x1b[1mRecursive call overflow\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mRuntime\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe recursion depth exceeded the maximum allowed limit. Use iteration instead of recursion or increase the recursion limit.\
+"
+            }
+            Self::N7022 => {
+                "\
+\x1b[1;35mN7022\x1b[0m \x1b[1mInvalid allocator state\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mRuntime\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe memory allocator detected an inconsistent internal state. This is a serious bug.\
+"
+            }
+            Self::N7023 => {
+                "\
+\x1b[1;35mN7023\x1b[0m \x1b[1mDouble free detected\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mRuntime\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA memory deallocation was attempted twice on the same allocation. This indicates a memory management bug.\
+"
+            }
+            Self::N7024 => {
+                "\
+\x1b[1;35mN7024\x1b[0m \x1b[1mUse after free\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mRuntime\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nMemory was accessed after it was freed. This indicates a memory management bug.\
+"
+            }
+            Self::N7025 => {
+                "\
+\x1b[1;35mN7025\x1b[0m \x1b[1mMutex poison\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mRuntime\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA mutex is in a poisoned state because a previous lock holder panicked while holding the lock.\
+"
+            }
+            Self::N7026 => {
+                "\
+\x1b[1;35mN7026\x1b[0m \x1b[1mChannel closed\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mRuntime\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA channel operation failed because the channel was closed. Check if the channel is still open before operating.\
+"
+            }
+            Self::N7027 => {
+                "\
+\x1b[1;35mN7027\x1b[0m \x1b[1mTimeout\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mRuntime\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn operation timed out before completing. Increase the timeout or optimize the operation.\
+"
+            }
+            Self::N7028 => {
+                "\
+\x1b[1;35mN7028\x1b[0m \x1b[1mIO error\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mRuntime\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn input/output operation failed. Check the file system, permissions, and device availability.\
+"
+            }
+            Self::N7029 => {
+                "\
+\x1b[1;35mN7029\x1b[0m \x1b[1mNetwork error\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mRuntime\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA network operation failed. Check network connectivity, address correctness, and firewall settings.\
+"
+            }
+            Self::N8001 => {
+                "\
+\x1b[1;31mN8001\x1b[0m \x1b[1mConfiguration parse error\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mBuild System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA configuration file could not be parsed. Check the file format and syntax.\
+"
+            }
+            Self::N8002 => {
+                "\
+\x1b[1;31mN8002\x1b[0m \x1b[1mConfiguration missing field\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mBuild System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA configuration file is missing a required field. Add the missing field.\
+"
+            }
+            Self::N8003 => {
+                "\
+\x1b[1;31mN8003\x1b[0m \x1b[1mConfiguration invalid value\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mBuild System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA configuration field has an invalid value. Check the expected type and valid range.\
+"
+            }
+            Self::N8004 => {
+                "\
+\x1b[1;31mN8004\x1b[0m \x1b[1mBuild target not found\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mBuild System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe specified build target does not exist in the project configuration.\
+"
+            }
+            Self::N8005 => {
+                "\
+\x1b[1;31mN8005\x1b[0m \x1b[1mBuild script error\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mBuild System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA build script (pre-build, post-build) exited with a non-zero status.\
+"
+            }
+            Self::N8006 => {
+                "\
+\x1b[1;31mN8006\x1b[0m \x1b[1mMissing build dependency\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mBuild System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA build-time dependency is not available. Install the required build tools.\
+"
+            }
+            Self::N8007 => {
+                "\
+\x1b[1;31mN8007\x1b[0m \x1b[1mInvalid build profile\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mBuild System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe specified build profile (e.g., debug, release) is not valid.\
+"
+            }
+            Self::N8008 => {
+                "\
+\x1b[1;31mN8008\x1b[0m \x1b[1mInvalid manifest\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mBuild System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe project manifest file has an invalid format or content.\
+"
+            }
+            Self::N8009 => {
+                "\
+\x1b[1;31mN8009\x1b[0m \x1b[1mManifest missing package name\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mBuild System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe package manifest is missing the package name field. Add a name field.\
+"
+            }
+            Self::N8010 => {
+                "\
+\x1b[1;31mN8010\x1b[0m \x1b[1mManifest missing version\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mBuild System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe package manifest is missing the version field. Add a version string.\
+"
+            }
+            Self::N8011 => {
+                "\
+\x1b[1;31mN8011\x1b[0m \x1b[1mManifest duplicate entry\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mBuild System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe manifest contains duplicate entries for the same key. Remove the duplicates.\
+"
+            }
+            Self::N8012 => {
+                "\
+\x1b[1;31mN8012\x1b[0m \x1b[1mManifest invalid dependency\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mBuild System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA dependency specification in the manifest is invalid. Check the dependency format.\
+"
+            }
+            Self::N8013 => {
+                "\
+\x1b[1;31mN8013\x1b[0m \x1b[1mWorkspace member not found\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mBuild System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA workspace member specified in the manifest does not exist.\
+"
+            }
+            Self::N8014 => {
+                "\
+\x1b[1;31mN8014\x1b[0m \x1b[1mWorkspace duplicate member\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mBuild System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA workspace member appears more than once in the members list.\
+"
+            }
+            Self::N8015 => {
+                "\
+\x1b[1;31mN8015\x1b[0m \x1b[1mInvalid toolchain\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mBuild System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe specified toolchain identifier is invalid. Use a recognized toolchain name.\
+"
+            }
+            Self::N8016 => {
+                "\
+\x1b[1;31mN8016\x1b[0m \x1b[1mToolchain not installed\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mBuild System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe required toolchain is not installed. Install it using the appropriate toolchain manager.\
+"
+            }
+            Self::N8017 => {
+                "\
+\x1b[1;31mN8017\x1b[0m \x1b[1mInvalid target triple\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mBuild System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe specified target triple (e.g., x86_64-pc-windows-msvc) is not recognized.\
+"
+            }
+            Self::N8018 => {
+                "\
+\x1b[1;31mN8018\x1b[0m \x1b[1mTest failed\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mBuild System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nOne or more tests failed. Check the test output for details.\
+"
+            }
+            Self::N8019 => {
+                "\
+\x1b[1;31mN8019\x1b[0m \x1b[1mBenchmark failed\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mBuild System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nOne or more benchmarks failed. Check the benchmark output for details.\
+"
+            }
+            Self::N8020 => {
+                "\
+\x1b[1;31mN8020\x1b[0m \x1b[1mMissing test configuration\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mBuild System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA test suite is missing its configuration file.\
+"
+            }
+            Self::N8021 => {
+                "\
+\x1b[1;31mN8021\x1b[0m \x1b[1mInvalid compiler flag\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mBuild System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn invalid compiler flag was specified. Check the available flags.\
+"
+            }
+            Self::N8022 => {
+                "\
+\x1b[1;31mN8022\x1b[0m \x1b[1mConflicting compiler flags\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mBuild System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nTwo or more compiler flags conflict with each other. Remove the conflicting flags.\
+"
+            }
+            Self::N8023 => {
+                "\
+\x1b[1;31mN8023\x1b[0m \x1b[1mUnsupported flag for target\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mBuild System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA compiler flag is not supported for the selected target platform.\
+"
+            }
+            Self::N8024 => {
+                "\
+\x1b[1;31mN8024\x1b[0m \x1b[1mInvalid linker flag\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mBuild System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn invalid linker flag was specified.\
+"
+            }
+            Self::N8025 => {
+                "\
+\x1b[1;31mN8025\x1b[0m \x1b[1mMissing linker\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mBuild System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe system linker was not found. Install the required linker tool.\
+"
+            }
+            Self::N8026 => {
+                "\
+\x1b[1;31mN8026\x1b[0m \x1b[1mMissing assembler\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mBuild System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe system assembler was not found. Install the required assembler.\
+"
+            }
+            Self::N8027 => {
+                "\
+\x1b[1;31mN8027\x1b[0m \x1b[1mOutput path not writable\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mBuild System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe specified output path is not writable. Check permissions.\
+"
+            }
+            Self::N8028 => {
+                "\
+\x1b[1;31mN8028\x1b[0m \x1b[1mCache directory not accessible\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mBuild System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe compiler cache directory is not accessible. Check permissions.\
+"
+            }
+            Self::N8029 => {
+                "\
+\x1b[1;31mN8029\x1b[0m \x1b[1mConcurrent build conflict\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mBuild System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAnother build process is using the same output directory. Wait for it to finish or use a different output path.\
+"
+            }
+            Self::N8030 => {
+                "\
+\x1b[1;31mN8030\x1b[0m \x1b[1mBuild system internal error\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mBuild System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe build system encountered an internal error. Report this bug to the developers.\
+"
+            }
+            Self::N8031 => {
+                "\
+\x1b[1;31mN8031\x1b[0m \x1b[1mInvalid package name\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mBuild System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe package name does not follow the required naming convention.\
+"
+            }
+            Self::N8032 => {
+                "\
+\x1b[1;31mN8032\x1b[0m \x1b[1mPackage name invalid characters\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mBuild System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe package name contains invalid characters. Use only alphanumeric characters, hyphens, and underscores.\
+"
+            }
+            Self::N8033 => {
+                "\
+\x1b[1;31mN8033\x1b[0m \x1b[1mInvalid package version\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mBuild System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe package version string does not follow semantic versioning format.\
+"
+            }
+            Self::N8034 => {
+                "\
+\x1b[1;33mN8034\x1b[0m \x1b[1mLicense not recognized\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mBuild System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe specified license identifier is not in the recognized license list. Use a standard SPDX identifier.\
+"
+            }
+            Self::N8035 => {
+                "\
+\x1b[1;33mN8035\x1b[0m \x1b[1mMissing package license\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mBuild System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe package manifest does not specify a license. Add a license field.\
+"
+            }
+            Self::N8036 => {
+                "\
+\x1b[1;33mN8036\x1b[0m \x1b[1mMissing package description\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mBuild System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe package manifest does not include a description. Add a brief description.\
+"
+            }
+            Self::N8037 => {
+                "\
+\x1b[1;31mN8037\x1b[0m \x1b[1mInvalid edition\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mBuild System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe specified language edition is not recognized or not supported.\
+"
+            }
+            Self::N8038 => {
+                "\
+\x1b[1;33mN8038\x1b[0m \x1b[1mFeature flag not recognized\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;33mWarning\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mBuild System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA feature flag specified in the configuration is not recognized. Check available features.\
+"
+            }
+            Self::N8039 => {
+                "\
+\x1b[1;31mN8039\x1b[0m \x1b[1mFeature flag conflict\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;31mError\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mBuild System\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nTwo or more feature flags conflict and cannot be enabled simultaneously.\
+"
+            }
+            Self::N9001 => {
+                "\
+\x1b[1;35mN9001\x1b[0m \x1b[1mInternal compiler error\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mInternal\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe compiler encountered an unexpected internal error. This is a compiler bug. Please report it to the Nimble development team with a minimal reproduction of the source code.\
+"
+            }
+            Self::N9002 => {
+                "\
+\x1b[1;35mN9002\x1b[0m \x1b[1mInternal bug — please report\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mInternal\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe compiler detected a condition that should never occur during correct compilation. This is a bug. Please file a bug report.\
+"
+            }
+            Self::N9003 => {
+                "\
+\x1b[1;35mN9003\x1b[0m \x1b[1mUnreachable code path in compiler\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mInternal\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe compiler reached a code path that should be unreachable. This indicates a bug in the compiler's logic.\
+"
+            }
+            Self::N9004 => {
+                "\
+\x1b[1;35mN9004\x1b[0m \x1b[1mUnimplemented compiler feature\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mInternal\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe compiler encountered a construct that is not yet implemented. This feature may be added in a future release.\
+"
+            }
+            Self::N9005 => {
+                "\
+\x1b[1;35mN9005\x1b[0m \x1b[1mCompiler assertion failure\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mInternal\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn internal compiler assertion failed. This indicates a bug in the compiler that should be reported.\
+"
+            }
+            Self::N9006 => {
+                "\
+\x1b[1;35mN9006\x1b[0m \x1b[1mCompiler invariant violation\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mInternal\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn internal compiler invariant was violated. This indicates a bug in the compiler that should be reported.\
+"
+            }
+            Self::N9007 => {
+                "\
+\x1b[1;35mN9007\x1b[0m \x1b[1mType checker invariant failure\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mInternal\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe type checker encountered an inconsistent internal state. This is a compiler bug. Report it with a reproduction case.\
+"
+            }
+            Self::N9008 => {
+                "\
+\x1b[1;35mN9008\x1b[0m \x1b[1mName resolution invariant failure\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mInternal\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe name resolution pass encountered an inconsistent internal state. This is a compiler bug.\
+"
+            }
+            Self::N9009 => {
+                "\
+\x1b[1;35mN9009\x1b[0m \x1b[1mCodegen invariant failure\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mInternal\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe code generator encountered an inconsistent internal state. This is a compiler bug.\
+"
+            }
+            Self::N9010 => {
+                "\
+\x1b[1;35mN9010\x1b[0m \x1b[1mCompiler data structure corruption\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mInternal\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nAn internal compiler data structure has been corrupted. This is a serious compiler bug.\
+"
+            }
+            Self::N9011 => {
+                "\
+\x1b[1;35mN9011\x1b[0m \x1b[1mMissing compiler pass\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mInternal\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA required compiler analysis or transformation pass is missing from the compilation pipeline.\
+"
+            }
+            Self::N9012 => {
+                "\
+\x1b[1;35mN9012\x1b[0m \x1b[1mCompiler pass cycle\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mInternal\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nCompiler passes form a dependency cycle. This is a compiler architecture bug.\
+"
+            }
+            Self::N9013 => {
+                "\
+\x1b[1;35mN9013\x1b[0m \x1b[1mCompiler query cycle\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mInternal\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nCompiler queries formed a dependency cycle during incremental compilation.\
+"
+            }
+            Self::N9014 => {
+                "\
+\x1b[1;35mN9014\x1b[0m \x1b[1mIncremental cache mismatch\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mInternal\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe incremental compilation cache is inconsistent with the current source code. A clean rebuild may be needed.\
+"
+            }
+            Self::N9015 => {
+                "\
+\x1b[1;35mN9015\x1b[0m \x1b[1mIncremental fingerprint conflict\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mInternal\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nTwo source files had the same fingerprint, causing a cache conflict. This is a compiler bug.\
+"
+            }
+            Self::N9016 => {
+                "\
+\x1b[1;35mN9016\x1b[0m \x1b[1mAST validation failure\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mInternal\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe Abstract Syntax Tree (AST) failed validation checks. This indicates a bug in the parser or tree construction.\
+"
+            }
+            Self::N9017 => {
+                "\
+\x1b[1;35mN9017\x1b[0m \x1b[1mHIR validation failure\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mInternal\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe High-level Intermediate Representation (HIR) failed validation. This indicates a bug in lowering or analysis passes.\
+"
+            }
+            Self::N9018 => {
+                "\
+\x1b[1;35mN9018\x1b[0m \x1b[1mMIR validation failure\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mInternal\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe Mid-level Intermediate Representation (MIR) failed validation. This indicates a bug in a transformation or optimization pass.\
+"
+            }
+            Self::N9019 => {
+                "\
+\x1b[1;35mN9019\x1b[0m \x1b[1mLLVM / backend error\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mInternal\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe LLVM backend or alternative backend returned an unexpected error. This may be a compiler compatibility issue.\
+"
+            }
+            Self::N9020 => {
+                "\
+\x1b[1;35mN9020\x1b[0m \x1b[1mCompiler memory allocation failure\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mInternal\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe compiler could not allocate required memory. Try building with more RAM or reducing parallel compilation jobs.\
+"
+            }
+            Self::N9021 => {
+                "\
+\x1b[1;35mN9021\x1b[0m \x1b[1mThread panic in compiler worker\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mInternal\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nA compiler worker thread panicked. This is a compiler bug. Try re-running the compilation.\
+"
+            }
+            Self::N9022 => {
+                "\
+\x1b[1;35mN9022\x1b[0m \x1b[1mCompiler resource limit exceeded\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mInternal\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe compiler exceeded a resource limit (e.g., too many types, too many files). Try splitting the project.\
+"
+            }
+            Self::N9023 => {
+                "\
+\x1b[1;35mN9023\x1b[0m \x1b[1mCompiler I/O error\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mInternal\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe compiler encountered an I/O error while reading or writing files. Check disk space, permissions, and path validity.\
+"
+            }
+            Self::N9024 => {
+                "\
+\x1b[1;35mN9024\x1b[0m \x1b[1mCompiler timeout\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mInternal\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe compilation exceeded the maximum allowed time. The code may be too large or the compiler may be stuck in a loop.\
+"
+            }
+            Self::N9025 => {
+                "\
+\x1b[1;35mN9025\x1b[0m \x1b[1mInvalid incremental compilation state\x1b[0m\n\x1b[1mSeverity\x1b[0m  : \x1b[1;35mBug\x1b[0m\n\x1b[1mCategory\x1b[0m  : \x1b[1;36mInternal\x1b[0m\n\x1b[38;5;244m│\x1b[0m\nThe incremental compilation cache was in an invalid state. Perform a clean build to resolve this.\
 "
             }
         }
