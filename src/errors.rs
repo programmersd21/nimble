@@ -8,7 +8,7 @@ use crate::lexer::{Span, TokenKind};
 #[derive(Debug, Clone, Error, Diagnostic)]
 pub enum LexError {
     #[error("Illegal tab character")]
-    #[diagnostic(code("nimble::lex::illegal_tab"))]
+    #[diagnostic(code("N0001"))]
     IllegalTab {
         line: usize,
         column: usize,
@@ -21,7 +21,7 @@ pub enum LexError {
     },
 
     #[error("Unexpected character `{ch}`")]
-    #[diagnostic(code("nimble::lex::unexpected_character"))]
+    #[diagnostic(code("N0002"))]
     UnexpectedCharacter {
         ch: char,
         line: usize,
@@ -33,7 +33,7 @@ pub enum LexError {
     },
 
     #[error("Unmatched closing delimiter")]
-    #[diagnostic(code("nimble::lex::unmatched_delimiter"))]
+    #[diagnostic(code("N0003"))]
     UnmatchedDelimiter {
         delimiter: char,
         line: usize,
@@ -47,7 +47,7 @@ pub enum LexError {
     },
 
     #[error("Invalid float literal `{literal}`")]
-    #[diagnostic(code("nimble::lex::invalid_float"))]
+    #[diagnostic(code("N0004"))]
     InvalidFloat {
         literal: String,
         line: usize,
@@ -59,7 +59,7 @@ pub enum LexError {
     },
 
     #[error("Integer literal `{literal}` out of range")]
-    #[diagnostic(code("nimble::lex::int_overflow"))]
+    #[diagnostic(code("N0005"))]
     IntOverflow {
         literal: String,
         line: usize,
@@ -73,7 +73,7 @@ pub enum LexError {
     },
 
     #[error("Unterminated string literal")]
-    #[diagnostic(code("nimble::lex::unterminated_string"))]
+    #[diagnostic(code("N0006"))]
     UnterminatedString {
         line: usize,
         column: usize,
@@ -86,7 +86,7 @@ pub enum LexError {
     },
 
     #[error("Invalid escape sequence `\\{escape}`")]
-    #[diagnostic(code("nimble::lex::invalid_escape"))]
+    #[diagnostic(code("N0007"))]
     InvalidEscape {
         escape: char,
         line: usize,
@@ -100,7 +100,7 @@ pub enum LexError {
     },
 
     #[error("Newline inside string literal")]
-    #[diagnostic(code("nimble::lex::newline_in_string"))]
+    #[diagnostic(code("N0008"))]
     NewlineInString {
         line: usize,
         column: usize,
@@ -115,7 +115,7 @@ pub enum LexError {
     #[error(
         "Indentation error at line {line}: indent level {indent} does not match any enclosing block"
     )]
-    #[diagnostic(code("nimble::lex::indentation_error"))]
+    #[diagnostic(code("N0009"))]
     IndentationError {
         indent: usize,
         line: usize,
@@ -170,7 +170,7 @@ impl LexError {
 pub enum ParseError {
     // Token-level errors
     #[error("Expected `{expected}` but found `{found}` at line {line}:{column}")]
-    #[diagnostic(code("nimble::parse::expected_token"))]
+    #[diagnostic(code("N1001"))]
     ExpectedToken {
         expected: String,
         found: String,
@@ -183,7 +183,7 @@ pub enum ParseError {
     },
 
     #[error("Unexpected token `{found}` at line {line}:{column}")]
-    #[diagnostic(code("nimble::parse::unexpected_token"))]
+    #[diagnostic(code("N1002"))]
     UnexpectedToken {
         found: String,
         line: usize,
@@ -196,7 +196,7 @@ pub enum ParseError {
 
     // Expression errors
     #[error("Expected expression at line {line}:{column}")]
-    #[diagnostic(code("nimble::parse::expected_expression"))]
+    #[diagnostic(code("N1003"))]
     ExpectedExpression {
         line: usize,
         column: usize,
@@ -207,7 +207,7 @@ pub enum ParseError {
     },
 
     #[error("Unclosed `(` at line {line}:{column}")]
-    #[diagnostic(code("nimble::parse::unclosed_paren"))]
+    #[diagnostic(code("N1004"))]
     UnclosedParen {
         line: usize,
         column: usize,
@@ -219,7 +219,7 @@ pub enum ParseError {
 
     // Block / indentation errors
     #[error("Expected indented block after `:` at line {line}:{column}")]
-    #[diagnostic(code("nimble::parse::expected_indented_block"))]
+    #[diagnostic(code("N1005"))]
     ExpectedIndentedBlock {
         line: usize,
         column: usize,
@@ -230,7 +230,7 @@ pub enum ParseError {
     },
 
     #[error("Unexpected indentation at line {line}:{column}")]
-    #[diagnostic(code("nimble::parse::unexpected_indent"))]
+    #[diagnostic(code("N1006"))]
     UnexpectedIndent {
         line: usize,
         column: usize,
@@ -242,7 +242,7 @@ pub enum ParseError {
 
     // Declaration errors
     #[error("Expected identifier at line {line}:{column}")]
-    #[diagnostic(code("nimble::parse::expected_identifier"))]
+    #[diagnostic(code("N1007"))]
     ExpectedIdentifier {
         line: usize,
         column: usize,
@@ -253,7 +253,7 @@ pub enum ParseError {
     },
 
     #[error("Expected type name at line {line}:{column}")]
-    #[diagnostic(code("nimble::parse::expected_type"))]
+    #[diagnostic(code("N1008"))]
     ExpectedType {
         line: usize,
         column: usize,
@@ -264,7 +264,7 @@ pub enum ParseError {
     },
 
     #[error("Expected parameter name at line {line}:{column}")]
-    #[diagnostic(code("nimble::parse::expected_parameter"))]
+    #[diagnostic(code("N1009"))]
     ExpectedParameter {
         line: usize,
         column: usize,
@@ -281,7 +281,7 @@ pub enum ParseError {
 
     // Internal errors
     #[error("Internal error: {msg}")]
-    #[diagnostic(code("nimble::parse::internal"))]
+    #[diagnostic(code("N9001"))]
     Internal {
         msg: String,
         #[source_code]
@@ -439,7 +439,7 @@ pub fn format_token_kind(kind: &TokenKind) -> String {
 #[derive(Debug, Clone, Error, Diagnostic)]
 pub enum ResolveError {
     #[error("Undefined variable `{name}`")]
-    #[diagnostic(code("nimble::resolve::undefined_variable"))]
+    #[diagnostic(code("N2001"))]
     UndefinedVariable {
         name: String,
         line: usize,
@@ -451,7 +451,7 @@ pub enum ResolveError {
     },
 
     #[error("Duplicate definition of `{name}`")]
-    #[diagnostic(code("nimble::resolve::duplicate_definition"))]
+    #[diagnostic(code("N2002"))]
     DuplicateDefinition {
         name: String,
         existing_span: Span,

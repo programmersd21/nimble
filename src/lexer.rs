@@ -1505,7 +1505,7 @@ mod tests {
             help: "",
         };
         let report = format!("{:?}", miette::Report::new(err));
-        assert!(report.contains("nimble::lex::illegal_tab"));
+        assert!(report.contains("N0001"));
     }
 
     #[test]

@@ -11,7 +11,7 @@ use crate::types::{Substitution, Type};
 #[derive(Debug, Error, Diagnostic)]
 pub enum TypeError {
     #[error("Type mismatch: expected `{expected}`, found `{found}` at line {line}:{column}")]
-    #[diagnostic(code("nimble::type::mismatch"))]
+    #[diagnostic(code("N3001"))]
     Mismatch {
         expected: String,
         found: String,
@@ -24,7 +24,7 @@ pub enum TypeError {
     },
 
     #[error("Cannot reassign to immutable variable `{name}` at line {line}:{column}")]
-    #[diagnostic(code("nimble::type::assign_to_immutable"))]
+    #[diagnostic(code("N3002"))]
     AssignToImmutable {
         name: String,
         line: usize,
@@ -36,7 +36,7 @@ pub enum TypeError {
     },
 
     #[error("Undefined variable `{name}` at line {line}:{column}")]
-    #[diagnostic(code("nimble::type::undefined_variable"))]
+    #[diagnostic(code("N2001"))]
     UndefinedVariable {
         name: String,
         line: usize,
@@ -48,7 +48,7 @@ pub enum TypeError {
     },
 
     #[error("Undefined type `{name}` at line {line}:{column}")]
-    #[diagnostic(code("nimble::type::undefined_type"))]
+    #[diagnostic(code("N3003"))]
     UndefinedType {
         name: String,
         line: usize,
@@ -60,7 +60,7 @@ pub enum TypeError {
     },
 
     #[error("Duplicate definition `{name}` at line {line}:{column}")]
-    #[diagnostic(code("nimble::type::duplicate_definition"))]
+    #[diagnostic(code("N2002"))]
     DuplicateDefinition {
         name: String,
         line: usize,
@@ -72,7 +72,7 @@ pub enum TypeError {
     },
 
     #[error("Call of non‑function value at line {line}:{column}")]
-    #[diagnostic(code("nimble::type::call_non_function"))]
+    #[diagnostic(code("N3004"))]
     CallNonFunction {
         line: usize,
         column: usize,
@@ -83,7 +83,7 @@ pub enum TypeError {
     },
 
     #[error("Argument count mismatch: expected {expected}, found {found} at line {line}:{column}")]
-    #[diagnostic(code("nimble::type::argument_count"))]
+    #[diagnostic(code("N3005"))]
     ArgumentCount {
         expected: usize,
         found: usize,
@@ -98,7 +98,7 @@ pub enum TypeError {
     #[error(
         "Interface `{interface}` requires method `{method}` but the target does not provide it at line {line}:{column}"
     )]
-    #[diagnostic(code("nimble::type::missing_method"))]
+    #[diagnostic(code("N3006"))]
     MissingMethod {
         interface: String,
         method: String,
@@ -111,7 +111,7 @@ pub enum TypeError {
     },
 
     #[error("Occurs check failed: recursive type at line {line}:{column}")]
-    #[diagnostic(code("nimble::type::recursive_type"))]
+    #[diagnostic(code("N3007"))]
     RecursiveType {
         line: usize,
         column: usize,
@@ -122,7 +122,7 @@ pub enum TypeError {
     },
 
     #[error("Internal type‑checker error: {msg}")]
-    #[diagnostic(code("nimble::type::internal"))]
+    #[diagnostic(code("N9001"))]
     Internal {
         msg: String,
         #[source_code]
