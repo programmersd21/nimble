@@ -1,7 +1,7 @@
 # Nimble Functions Demo
 # Functions, recursion, and composition
 
-extern fn nimble_print_i64(x: Int) -> Void
+load std.io
 
 fn double(x: Int) -> Int:
     return x * 2
@@ -17,12 +17,12 @@ fn recursive(n: Int) -> Int:
 
 fn main() -> Int:
     let r1 = double(21)
-    nimble_print_i64(r1)
+    std.io.print_int(r1)
 
     let r2 = apply(3, 4)
-    nimble_print_i64(r2)
+    std.io.print_int(r2)
 
     let r3 = recursive(5)
-    nimble_print_i64(r3)
+    std.io.print_int(r3)
 
     return 0

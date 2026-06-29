@@ -1,8 +1,7 @@
 # Nimble Fibonacci
 # Recursive fibonacci with tail-call-like structure
 
-extern fn nimble_print_str(s: String) -> Void
-extern fn nimble_print_i64(x: Int) -> Void
+load std.io
 
 fn fib(n: Int) -> Int:
     if n <= 1:
@@ -12,8 +11,8 @@ fn fib(n: Int) -> Int:
 
 fn main() -> Int:
     let n = 40
-    nimble_print_str("fibonacci(")
-    nimble_print_i64(n)
-    nimble_print_str(") = ")
-    nimble_print_i64(fib(n))
+    std.io.print_no_newline("fibonacci(")
+    std.io.print_int(n)
+    std.io.print_no_newline(") = ")
+    std.io.print_int(fib(n))
     return 0

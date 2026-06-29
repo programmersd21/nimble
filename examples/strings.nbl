@@ -1,83 +1,70 @@
 # Nimble String Operations Demo
 # Demonstrates runtime-backed string manipulation
 
-extern fn nimble_string_length(s: String) -> Int
-extern fn nimble_string_concat(a: String, b: String) -> String
-extern fn nimble_string_substring(s: String, start: Int, end: Int) -> String
-extern fn nimble_string_find(s: String, needle: String) -> Int
-extern fn nimble_string_trim(s: String) -> String
-extern fn nimble_string_to_upper(s: String) -> String
-extern fn nimble_string_to_lower(s: String) -> String
-extern fn nimble_string_starts_with(s: String, prefix: String) -> Int
-extern fn nimble_string_ends_with(s: String, suffix: String) -> Int
-extern fn nimble_string_replace(s: String, from: String, to: String) -> String
-extern fn nimble_string_repeat(s: String, count: Int) -> String
-extern fn nimble_string_to_int(s: String) -> Int
-extern fn nimble_string_eq(a: String, b: String) -> Int
-extern fn nimble_print_str(s: String) -> Void
-extern fn nimble_print_i64(x: Int) -> Void
+load std.io
+load std.str
 
 fn main() -> Int:
     let s = "Hello, Nimble!"
 
     # Length
-    nimble_print_str("length: ")
-    nimble_print_i64(nimble_string_length(s))
+    std.io.print_no_newline("length: ")
+    std.io.print_int(std.str.length(s))
 
     # Concat
-    let greeting = nimble_string_concat("Hello", " World")
-    nimble_print_str("concat: ")
-    nimble_print_str(greeting)
+    let greeting = std.str.concat("Hello", " World")
+    std.io.print_no_newline("concat: ")
+    std.io.print(greeting)
 
     # Substring
-    let sub = nimble_string_substring(s, 0, 5)
-    nimble_print_str("substring(0,5): ")
-    nimble_print_str(sub)
+    let sub = std.str.substring(s, 0, 5)
+    std.io.print_no_newline("substring(0,5): ")
+    std.io.print(sub)
 
     # Find
-    let pos = nimble_string_find(s, "Nimble")
-    nimble_print_str("find 'Nimble': ")
-    nimble_print_i64(pos)
+    let pos = std.str.find(s, "Nimble")
+    std.io.print_no_newline("find 'Nimble': ")
+    std.io.print_int(pos)
 
     # Trim
     let padded = "  spaced  "
-    let trimmed = nimble_string_trim(padded)
-    nimble_print_str("trimmed: '")
-    nimble_print_str(trimmed)
-    nimble_print_str("'\n")
+    let trimmed = std.str.trim(padded)
+    std.io.print_no_newline("trimmed: '")
+    std.io.print_no_newline(trimmed)
+    std.io.print("'")
 
     # Case conversion
-    let upper = nimble_string_to_upper(s)
-    nimble_print_str("upper: ")
-    nimble_print_str(upper)
+    let upper = std.str.to_upper(s)
+    std.io.print_no_newline("upper: ")
+    std.io.print(upper)
 
-    let lower = nimble_string_to_lower(s)
-    nimble_print_str("lower: ")
-    nimble_print_str(lower)
+    let lower = std.str.to_lower(s)
+    std.io.print_no_newline("lower: ")
+    std.io.print(lower)
 
     # Starts/ends with
-    let sw = nimble_string_starts_with(s, "Hello")
-    nimble_print_str("starts with Hello: ")
-    nimble_print_i64(sw)
+    let sw = std.str.starts_with(s, "Hello")
+    std.io.print_no_newline("starts with Hello: ")
+    std.io.print_bool(sw)
 
     # Replace
-    let replaced = nimble_string_replace(s, "Nimble", "World")
-    nimble_print_str("replace: ")
-    nimble_print_str(replaced)
+    let replaced = std.str.replace(s, "Nimble", "World")
+    std.io.print_no_newline("replace: ")
+    std.io.print(replaced)
 
     # Repeat
-    let repeated = nimble_string_repeat("ha", 3)
-    nimble_print_str("repeat: ")
-    nimble_print_str(repeated)
+    let repeated = std.str.repeat("ha", 3)
+    std.io.print_no_newline("repeat: ")
+    std.io.print(repeated)
 
     # String to int
-    let n = nimble_string_to_int("42")
-    nimble_print_str("string '42' as int: ")
-    nimble_print_i64(n)
+    let n = std.str.to_int("42")
+    std.io.print_no_newline("string '42' as int: ")
+    std.io.print_int(n)
 
     # Equality
-    let eq = nimble_string_eq("abc", "abc")
-    nimble_print_str("'abc' == 'abc': ")
-    nimble_print_i64(eq)
+    let eq = std.str.eq("abc", "abc")
+    std.io.print_no_newline("'abc' == 'abc': ")
+    std.io.print_bool(eq)
 
     return 0

@@ -1,21 +1,17 @@
 # Nimble Random Number Demo
 # Demonstrates random number generation
 
-extern fn nimble_rand_i64() -> Int
-extern fn nimble_rand_f64() -> Float
-extern fn nimble_rand_range(lo: Int, hi: Int) -> Int
-extern fn nimble_print_str(s: String) -> Void
-extern fn nimble_print_i64(x: Int) -> Void
-extern fn nimble_print_f64(x: Float) -> Void
+load std.io
+load std.random
 
 fn main() -> Int:
-    nimble_print_str("random int: ")
-    nimble_print_i64(nimble_rand_i64())
+    std.io.print_no_newline("random int: ")
+    std.io.print_int(std.random.random_int())
 
-    nimble_print_str("random 0-99: ")
-    nimble_print_i64(nimble_rand_range(0, 100))
+    std.io.print_no_newline("random 0-99: ")
+    std.io.print_int(std.random.random_range(0, 100))
 
-    nimble_print_str("random float: ")
-    nimble_print_f64(nimble_rand_f64())
+    std.io.print_no_newline("random float: ")
+    std.io.print_float(std.random.random_float())
 
     return 0

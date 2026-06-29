@@ -1,8 +1,7 @@
 # Nimble Control Flow Demo
 # if/elif/else, while, break, continue
 
-extern fn nimble_print_str(s: String) -> Void
-extern fn nimble_print_i64(x: Int) -> Void
+load std.io
 
 fn classify(n: Int) -> Int:
     if n > 0:
@@ -15,12 +14,12 @@ fn classify(n: Int) -> Int:
 fn countdown(n: Int) -> Void:
     var i = n
     while i >= 0:
-        nimble_print_i64(i)
+        std.io.print_int(i)
         i = i - 1
 
 fn main() -> Int:
     let sig = classify(42)
-    nimble_print_i64(sig)
+    std.io.print_int(sig)
 
     countdown(5)
 
@@ -28,15 +27,15 @@ fn main() -> Int:
     while i < 10:
         if i == 4:
             break
-        nimble_print_i64(i)
+        std.io.print_int(i)
         i = i + 1
 
-    nimble_print_str("evens: ")
+    std.io.print_no_newline("evens: ")
     var j = 0
     while j < 8:
         j = j + 1
         if j % 2 != 0:
             continue
-        nimble_print_i64(j)
+        std.io.print_int(j)
 
     return 0

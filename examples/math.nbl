@@ -1,49 +1,40 @@
 # Nimble Math Demo
 # Demonstrates runtime-backed math functions
 
-extern fn nimble_sin(x: Float) -> Float
-extern fn nimble_cos(x: Float) -> Float
-extern fn nimble_sqrt(x: Float) -> Float
-extern fn nimble_pow(b: Float, e: Float) -> Float
-extern fn nimble_floor(x: Float) -> Float
-extern fn nimble_ceil(x: Float) -> Float
-extern fn nimble_abs_i64(x: Int) -> Int
-extern fn nimble_min_i64(a: Int, b: Int) -> Int
-extern fn nimble_max_i64(a: Int, b: Int) -> Int
-extern fn nimble_print_str(s: String) -> Void
-extern fn nimble_print_i64(x: Int) -> Void
-extern fn nimble_print_f64(x: Float) -> Void
+load std.io
+load std.math
+load std.core
 
 fn main() -> Int:
     # Trigonometry
-    nimble_print_str("sin(0): ")
-    nimble_print_f64(nimble_sin(0.0))
+    std.io.print_no_newline("sin(0): ")
+    std.io.print_float(std.math.math_sin(0.0))
 
-    nimble_print_str("cos(0): ")
-    nimble_print_f64(nimble_cos(0.0))
+    std.io.print_no_newline("cos(0): ")
+    std.io.print_float(std.math.math_cos(0.0))
 
     # Power and roots
-    nimble_print_str("sqrt(16): ")
-    nimble_print_f64(nimble_sqrt(16.0))
+    std.io.print_no_newline("sqrt(16): ")
+    std.io.print_float(std.math.math_sqrt(16.0))
 
-    nimble_print_str("pow(2, 10): ")
-    nimble_print_f64(nimble_pow(2.0, 10.0))
+    std.io.print_no_newline("pow(2, 10): ")
+    std.io.print_float(std.math.math_pow(2.0, 10.0))
 
     # Rounding
-    nimble_print_str("floor(3.7): ")
-    nimble_print_f64(nimble_floor(3.7))
+    std.io.print_no_newline("floor(3.7): ")
+    std.io.print_float(std.math.math_floor(3.7))
 
-    nimble_print_str("ceil(3.2): ")
-    nimble_print_f64(nimble_ceil(3.2))
+    std.io.print_no_newline("ceil(3.2): ")
+    std.io.print_float(std.math.math_ceil(3.2))
 
     # Integer math
-    nimble_print_str("abs(-5): ")
-    nimble_print_i64(nimble_abs_i64(-5))
+    std.io.print_no_newline("abs(-5): ")
+    std.io.print_int(std.core.abs(-5))
 
-    nimble_print_str("min(3,7): ")
-    nimble_print_i64(nimble_min_i64(3, 7))
+    std.io.print_no_newline("min(3,7): ")
+    std.io.print_int(std.core.min(3, 7))
 
-    nimble_print_str("max(3,7): ")
-    nimble_print_i64(nimble_max_i64(3, 7))
+    std.io.print_no_newline("max(3,7): ")
+    std.io.print_int(std.core.max(3, 7))
 
     return 0

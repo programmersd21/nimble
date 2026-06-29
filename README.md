@@ -414,6 +414,8 @@ cargo fmt --all --check
 | `time_demo.nbl` | Time functions (timestamp, sleep) |
 | `test_print.nbl` | Minimal I/O verification |
 
+By default, examples load standard library modules (`load std.io`, `load std.math`, etc.) and access functions through qualified names like `std.io.print_int(42)`. This is the recommended pattern for accessing runtime-backed functionality. The built-in functions (`print`, `print_int`, `print_str`) remain available for quick scripts.
+
 Run all examples with:
 
 ```sh

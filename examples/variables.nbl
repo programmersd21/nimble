@@ -1,29 +1,29 @@
 # Nimble Variables Demo
 # Immutable (let) and mutable (var) bindings, compound assignment
 
-extern fn nimble_print_i64(x: Int) -> Void
+load std.io
 
 fn main() -> Int:
     let x = 42
-    nimble_print_i64(x)
+    std.io.print_int(x)
 
     var y = 10
     y = 20
-    nimble_print_i64(y)
+    std.io.print_int(y)
 
     y += 5
-    nimble_print_i64(y)
+    std.io.print_int(y)
 
     y -= 3
-    nimble_print_i64(y)
+    std.io.print_int(y)
 
     y *= 2
-    nimble_print_i64(y)
+    std.io.print_int(y)
 
     y /= 4
-    nimble_print_i64(y)
+    std.io.print_int(y)
 
     y %= 3
-    nimble_print_i64(y)
+    std.io.print_int(y)
 
     return 0

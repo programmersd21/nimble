@@ -35,7 +35,7 @@ pub enum TypeError {
         span: SourceSpan,
     },
 
-    #[error("Undefined variable `{name}` at line {line}:{column}")]
+    #[error("Undefined variable `{name}`")]
     #[diagnostic(code("N2001"))]
     UndefinedVariable {
         name: String,
@@ -45,6 +45,7 @@ pub enum TypeError {
         src: String,
         #[label("undefined `{name}`")]
         span: SourceSpan,
+        suggestion: Option<String>,
     },
 
     #[error("Undefined type `{name}` at line {line}:{column}")]
@@ -161,6 +162,7 @@ impl TypeError {
             column: span.column,
             src: source.to_string(),
             span: (span.byte_index, span.length.max(1)).into(),
+            suggestion: None,
         }
     }
 
@@ -219,6 +221,16 @@ impl TypeError {
             TypeError::Internal { span, .. } => *span,
         };
         Span::new_with_len(0, 0, span.offset(), span.len())
+    }
+}
+
+fn collect_qualified_name(expr: &Expr) -> Option<String> {
+    match expr {
+        Expr::Identifier(name, _) => Some(name.clone()),
+        Expr::MemberAccess { object, member, .. } => {
+            collect_qualified_name(object).map(|p| format!("{}.{}", p, member))
+        }
+        _ => None,
     }
 }
 
@@ -848,8 +860,8 @@ impl TypeChecker {
                     }
                     return Err(TypeError::undefined_variable(&self.source, member, *span));
                 }
-                if let Expr::Identifier(prefix, _) = object.as_ref() {
-                    let qualified = format!("{}.{}", prefix, member);
+                if let Some(qn) = collect_qualified_name(object) {
+                    let qualified = format!("{}.{}", qn, member);
                     if let Some(sym) = env.lookup(&qualified) {
                         return Ok(sym.type_.clone());
                     }

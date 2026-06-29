@@ -4,12 +4,13 @@
 
 extern fn nimble_hex_encode(data: String, len: Int, upper: Int) -> String
 extern fn nimble_hex_decode(hex: String, len: Int) -> String
+extern fn nimble_string_length(s: String) -> Int
 
-fn encode(data: String) -> String:
-    return nimble_hex_encode(data, 0, 0)
+fn encode_hex(data: String) -> String:
+    return nimble_hex_encode(data, nimble_string_length(data), 0)
 
-fn encode_upper(data: String) -> String:
-    return nimble_hex_encode(data, 0, 1)
+fn encode_hex_upper(data: String) -> String:
+    return nimble_hex_encode(data, nimble_string_length(data), 1)
 
-fn decode(hex: String) -> String:
-    return nimble_hex_decode(hex, 0)
+fn decode_hex(hex: String) -> String:
+    return nimble_hex_decode(hex, nimble_string_length(hex))

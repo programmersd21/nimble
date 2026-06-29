@@ -1,8 +1,7 @@
 # Nimble Interfaces Demo
 # Structural typing via interface conformance
 
-extern fn nimble_print_str(s: String) -> Void
-extern fn nimble_print_i64(x: Int) -> Void
+load std.io
 
 interface Shape:
     fn area(self: Shape) -> Int
@@ -24,10 +23,10 @@ fn main() -> Int:
     let sq = Square{side: 6}
     let r = Rect{width: 4, height: 7}
 
-    nimble_print_str("square area: ")
-    nimble_print_i64(square_area(sq))
+    std.io.print_no_newline("square area: ")
+    std.io.print_int(square_area(sq))
 
-    nimble_print_str("rect area: ")
-    nimble_print_i64(rect_area(r))
+    std.io.print_no_newline("rect area: ")
+    std.io.print_int(rect_area(r))
 
     return 0

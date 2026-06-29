@@ -1,8 +1,7 @@
 # Nimble Types Demo
 # Primitive types: Int, Float, Bool, String
 
-extern fn nimble_print_str(s: String) -> Void
-extern fn nimble_print_i64(x: Int) -> Void
+load std.io
 
 fn main() -> Int:
     let a: Int = 42
@@ -10,11 +9,11 @@ fn main() -> Int:
     let c: Bool = true
     let d: String = "hello"
 
-    nimble_print_i64(a)
-    nimble_print_str(d)
+    std.io.print_int(a)
+    std.io.print(d)
 
     var inferred = 99
     inferred = 100
-    nimble_print_i64(inferred)
+    std.io.print_int(inferred)
 
     return 0

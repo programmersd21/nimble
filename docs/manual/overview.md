@@ -55,7 +55,7 @@ The codegen supports optional LLVM debug info emission (`DILocation`, `DISubprog
 - **Error propagation**: `?` operator on Result types unwraps or early-returns the error.
 - **Resource cleanup**: `defer` statements run on scope exit.
 - **Compile-time macros**: `macro name(params): body` with AST substitution.
-- **Standard library loading**: `load std.<module>` imports std modules, and `load std` loads the root standard library aggregator.
+- **Standard library loading**: `load std.<module>` imports std modules via qualified names (e.g., `std.io.print_int()`), and `load std` loads the root standard library aggregator. All 21 examples demonstrate this pattern.
 - **Textual IR**: codegen emits human-readable `.ll` files. No LLVM dependency is needed at compile time for normal compilation.
 - **Debug info**: optional `--emit-llvm` mode includes LLVM debug metadata.
 

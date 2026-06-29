@@ -1,18 +1,17 @@
 # Nimble Operators Demo
 # Arithmetic, comparison, and logical operators
 
-extern fn nimble_print_i64(x: Int) -> Void
-extern fn nimble_print_str(s: String) -> Void
+load std.io
 
 fn main() -> Int:
     let a = 10
     let b = 3
 
-    nimble_print_i64(a + b)
-    nimble_print_i64(a - b)
-    nimble_print_i64(a * b)
-    nimble_print_i64(a / b)
-    nimble_print_i64(a % b)
+    std.io.print_int(a + b)
+    std.io.print_int(a - b)
+    std.io.print_int(a * b)
+    std.io.print_int(a / b)
+    std.io.print_int(a % b)
 
     let eq = a == b
     let ne = a != b

@@ -1,8 +1,7 @@
 # Nimble Generics Demo
 # Generic struct annotations and type parameter usage
 
-extern fn nimble_print_str(s: String) -> Void
-extern fn nimble_print_i64(x: Int) -> Void
+load std.io
 
 struct Box:
     let value: Int = 0
@@ -19,14 +18,14 @@ fn swap(p: Pair) -> Pair:
 
 fn main() -> Int:
     let b: Box[Int] = Box{value: 42}
-    nimble_print_str("unwrapped: ")
-    nimble_print_i64(unwrap(b))
+    std.io.print_no_newline("unwrapped: ")
+    std.io.print_int(unwrap(b))
 
     let p = Pair{first: 1, second: 2}
     let q = swap(p)
-    nimble_print_str("first: ")
-    nimble_print_i64(q.first)
-    nimble_print_str("second: ")
-    nimble_print_i64(q.second)
+    std.io.print_no_newline("first: ")
+    std.io.print_int(q.first)
+    std.io.print_no_newline("second: ")
+    std.io.print_int(q.second)
 
     return 0

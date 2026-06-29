@@ -4,12 +4,13 @@
 
 extern fn nimble_base64_encode(data: String, len: Int, url_safe: Int) -> String
 extern fn nimble_base64_decode(data: String, len: Int) -> String
+extern fn nimble_string_length(s: String) -> Int
 
-fn encode(data: String) -> String:
-    return nimble_base64_encode(data, 0, 0)
+fn encode_b64(data: String) -> String:
+    return nimble_base64_encode(data, nimble_string_length(data), 0)
 
-fn encode_url_safe(data: String) -> String:
-    return nimble_base64_encode(data, 0, 1)
+fn encode_b64_url_safe(data: String) -> String:
+    return nimble_base64_encode(data, nimble_string_length(data), 1)
 
-fn decode(data: String) -> String:
-    return nimble_base64_decode(data, 0)
+fn decode_b64(data: String) -> String:
+    return nimble_base64_decode(data, nimble_string_length(data))

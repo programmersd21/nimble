@@ -1,8 +1,7 @@
 # Nimble Structs Demo
 # Structs with named fields, field access, and functions
 
-extern fn nimble_print_str(s: String) -> Void
-extern fn nimble_print_i64(x: Int) -> Void
+load std.io
 
 struct Point:
     let x: Int = 0
@@ -20,15 +19,15 @@ fn perimeter(r: Rectangle) -> Int:
 
 fn main() -> Int:
     let p = Point{x: 3, y: 4}
-    nimble_print_str("x: ")
-    nimble_print_i64(p.x)
-    nimble_print_str("y: ")
-    nimble_print_i64(p.y)
+    std.io.print_no_newline("x: ")
+    std.io.print_int(p.x)
+    std.io.print_no_newline("y: ")
+    std.io.print_int(p.y)
 
     let rect = Rectangle{width: 10, height: 5}
-    nimble_print_str("area: ")
-    nimble_print_i64(area(rect))
-    nimble_print_str("perimeter: ")
-    nimble_print_i64(perimeter(rect))
+    std.io.print_no_newline("area: ")
+    std.io.print_int(area(rect))
+    std.io.print_no_newline("perimeter: ")
+    std.io.print_int(perimeter(rect))
 
     return 0

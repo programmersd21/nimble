@@ -203,17 +203,33 @@ impl Resolver {
         None
     }
 
+    fn find_closest_name(&self, name: &str) -> Option<String> {
+        let mut candidates: Vec<&str> = Vec::new();
+        for scope in self.scopes.iter() {
+            for key in scope.keys() {
+                if !candidates.contains(&key.as_str()) {
+                    candidates.push(key.as_str());
+                }
+            }
+        }
+        let suggestions =
+            crate::diagnostics::suggestions::get_spelling_suggestions(name, &candidates, 1);
+        suggestions.first().map(|(n, _)| n.clone())
+    }
+
     fn resolve_ident(&mut self, name: &str, span: &Span) {
         if let Some(id) = self.lookup_scope(name) {
             self.resolved.insert(span.byte_index, id);
         } else {
             let src = String::new();
+            let suggestion = self.find_closest_name(name);
             self.errors.push(ResolveError::UndefinedVariable {
                 name: name.to_string(),
                 line: span.line,
                 column: span.column,
                 src,
                 span: (span.byte_index, span.length.max(1)).into(),
+                suggestion,
             });
         }
     }

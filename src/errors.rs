@@ -448,6 +448,7 @@ pub enum ResolveError {
         src: String,
         #[label("`{name}` is not defined in this scope")]
         span: SourceSpan,
+        suggestion: Option<String>,
     },
 
     #[error("Duplicate definition of `{name}`")]

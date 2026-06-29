@@ -1,18 +1,17 @@
 # Nimble FizzBuzz
 # Classic programming puzzle with control flow
 
-extern fn nimble_print_str(s: String) -> Void
-extern fn nimble_print_i64(x: Int) -> Void
+load std.io
 
 fn fizzbuzz(n: Int) -> Void:
     if n % 3 == 0 && n % 5 == 0:
-        nimble_print_str("FizzBuzz")
+        std.io.print("FizzBuzz")
     elif n % 3 == 0:
-        nimble_print_str("Fizz")
+        std.io.print("Fizz")
     elif n % 5 == 0:
-        nimble_print_str("Buzz")
+        std.io.print("Buzz")
     else:
-        nimble_print_i64(n)
+        std.io.print_int(n)
 
 fn main() -> Int:
     var i = 1

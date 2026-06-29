@@ -1,23 +1,19 @@
 # Nimble Hashing Demo
 # Demonstrates FNV-1a, SipHash, and xxHash3 hashing
 
-extern fn nimble_hash_fnv1a(data: String, len: Int) -> Int
-extern fn nimble_hash_sip(data: String, len: Int) -> Int
-extern fn nimble_hash_xxhash3(data: String, len: Int) -> Int
-extern fn nimble_string_length(s: String) -> Int
-extern fn nimble_print_str(s: String) -> Void
-extern fn nimble_print_i64(x: Int) -> Void
+load std.io
+load std.hash
 
 fn main() -> Int:
     let value = "nimble"
 
-    nimble_print_str("FNV-1a:  ")
-    nimble_print_i64(nimble_hash_fnv1a(value, nimble_string_length(value)))
+    std.io.print_no_newline("FNV-1a:  ")
+    std.io.print_int(std.hash.fnv1a(value))
 
-    nimble_print_str("SipHash: ")
-    nimble_print_i64(nimble_hash_sip(value, nimble_string_length(value)))
+    std.io.print_no_newline("SipHash: ")
+    std.io.print_int(std.hash.sip(value))
 
-    nimble_print_str("xxHash3: ")
-    nimble_print_i64(nimble_hash_xxhash3(value, nimble_string_length(value)))
+    std.io.print_no_newline("xxHash3: ")
+    std.io.print_int(std.hash.xxhash3(value))
 
     return 0

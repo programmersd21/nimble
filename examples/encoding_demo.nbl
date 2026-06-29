@@ -1,37 +1,34 @@
 # Nimble Encoding Demo
 # Demonstrates base64 and hex encoding/decoding
 
-extern fn nimble_base64_encode(data: String, len: Int, url_safe: Int) -> String
-extern fn nimble_base64_decode(data: String, len: Int) -> String
-extern fn nimble_hex_encode(data: String, len: Int, upper: Int) -> String
-extern fn nimble_hex_decode(hex: String, len: Int) -> String
-extern fn nimble_string_length(s: String) -> Int
-extern fn nimble_print_str(s: String) -> Void
+load std.io
+load std.encoding.base64
+load std.encoding.hex
 
 fn main() -> Int:
     # Base64 standard
     let data = "hello world"
-    let encoded = nimble_base64_encode(data, nimble_string_length(data), 0)
-    nimble_print_str("base64: ")
-    nimble_print_str(encoded)
+    let encoded = std.encoding.base64.encode_b64(data)
+    std.io.print_no_newline("base64: ")
+    std.io.print(encoded)
 
-    let decoded = nimble_base64_decode(encoded, nimble_string_length(encoded))
-    nimble_print_str("decoded: ")
-    nimble_print_str(decoded)
+    let decoded = std.encoding.base64.decode_b64(encoded)
+    std.io.print_no_newline("decoded: ")
+    std.io.print(decoded)
 
     # Base64 URL-safe
-    let url_encoded = nimble_base64_encode(data, nimble_string_length(data), 1)
-    nimble_print_str("base64url: ")
-    nimble_print_str(url_encoded)
+    let url_encoded = std.encoding.base64.encode_b64_url_safe(data)
+    std.io.print_no_newline("base64url: ")
+    std.io.print(url_encoded)
 
     # Hex encoding (lowercase)
-    let hex_lower = nimble_hex_encode(data, nimble_string_length(data), 0)
-    nimble_print_str("hex lower: ")
-    nimble_print_str(hex_lower)
+    let hex_lower = std.encoding.hex.encode_hex(data)
+    std.io.print_no_newline("hex lower: ")
+    std.io.print(hex_lower)
 
     # Hex encoding (uppercase)
-    let hex_upper = nimble_hex_encode(data, nimble_string_length(data), 1)
-    nimble_print_str("hex upper: ")
-    nimble_print_str(hex_upper)
+    let hex_upper = std.encoding.hex.encode_hex_upper(data)
+    std.io.print_no_newline("hex upper: ")
+    std.io.print(hex_upper)
 
     return 0

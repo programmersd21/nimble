@@ -1,7 +1,7 @@
 # Nimble Booleans Demo
 # Boolean logic with and, or, not
 
-extern fn nimble_print_i64(x: Int) -> Void
+load std.io
 
 fn test_and(a: Bool, b: Bool) -> Bool:
     return a && b
@@ -21,9 +21,9 @@ fn main() -> Int:
     let r3 = test_not(f)
 
     if t && !f:
-        nimble_print_i64(1)
+        std.io.print_int(1)
 
     if f || t:
-        nimble_print_i64(2)
+        std.io.print_int(2)
 
     return 0

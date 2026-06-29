@@ -2,6 +2,7 @@ pub mod builder;
 pub mod cache;
 pub mod codes;
 pub mod diagnostic;
+pub mod handler;
 pub mod json;
 pub mod label;
 pub mod lsp;
@@ -297,7 +298,9 @@ impl DiagnosticEngine {
         _source: &str,
     ) -> Diagnostic {
         match err {
-            ResolveError::UndefinedVariable { name, span, .. } => {
+            ResolveError::UndefinedVariable {
+                name, span, suggestion, ..
+            } => {
                 let diag_span =
                     DiagnosticSpan::new(file_id, span.offset(), span.offset() + span.len());
                 let mut builder =
@@ -308,20 +311,30 @@ impl DiagnosticEngine {
                             format!("`{}` is not defined in this scope", name),
                         );
 
-                // Find typo suggestions in scope
-                let candidates = vec![
-                    "println", "print", "printf", "let", "var", "fn", "if", "while",
-                ];
-                let suggestions = suggestions::get_spelling_suggestions(name, &candidates, 3);
-                if !suggestions.is_empty() {
-                    let best = &suggestions[0].0;
+                if let Some(sugg) = suggestion {
                     builder = builder
-                        .help(format!("did you mean `{}`?", best))
+                        .help(format!("did you mean `{}`?", sugg))
                         .suggestion(Suggestion::new(
-                            format!("change `{}` to `{}`", name, best),
+                            format!("change `{}` to `{}`", name, sugg),
                             Applicability::MaybeIncorrect,
-                            vec![FixIt::new(diag_span, best.clone())],
+                            vec![FixIt::new(diag_span, sugg.clone())],
                         ));
+                } else {
+                    // Fallback: hardcoded candidates
+                    let candidates = vec![
+                        "println", "print", "let", "var", "fn", "if", "while",
+                    ];
+                    let suggestions = suggestions::get_spelling_suggestions(name, &candidates, 3);
+                    if !suggestions.is_empty() {
+                        let best = &suggestions[0].0;
+                        builder = builder
+                            .help(format!("did you mean `{}`?", best))
+                            .suggestion(Suggestion::new(
+                                format!("change `{}` to `{}`", name, best),
+                                Applicability::MaybeIncorrect,
+                                vec![FixIt::new(diag_span, best.clone())],
+                            ));
+                    }
                 }
                 builder.build()
             }
@@ -397,25 +410,38 @@ impl DiagnosticEngine {
             .note("variables declared with let are immutable")
             .help("use `var` or `mut` if mutation is intended")
             .build(),
-            TypeError::UndefinedVariable { name, .. } => {
+            TypeError::UndefinedVariable {
+                name, suggestion, ..
+            } => {
                 let mut builder =
                     DiagnosticBuilder::error(format!("Undefined variable `{}`", name))
                         .code(ErrorCode::N2001)
                         .primary_label(diag_span.clone(), format!("undefined `{}`", name));
 
-                let candidates = vec![
-                    "println", "print", "printf", "let", "var", "fn", "if", "while",
-                ];
-                let suggestions = suggestions::get_spelling_suggestions(name, &candidates, 3);
-                if !suggestions.is_empty() {
-                    let best = &suggestions[0].0;
+                if let Some(sugg) = suggestion {
                     builder = builder
-                        .help(format!("did you mean `{}`?", best))
+                        .help(format!("did you mean `{}`?", sugg))
                         .suggestion(Suggestion::new(
-                            format!("change `{}` to `{}`", name, best),
+                            format!("change `{}` to `{}`", name, sugg),
                             Applicability::MaybeIncorrect,
-                            vec![FixIt::new(diag_span, best.clone())],
+                            vec![FixIt::new(diag_span, sugg.clone())],
                         ));
+                } else {
+                    let candidates = vec![
+                        "println", "print", "let", "var", "fn", "if", "while",
+                    ];
+                    let suggestions =
+                        suggestions::get_spelling_suggestions(name, &candidates, 3);
+                    if !suggestions.is_empty() {
+                        let best = &suggestions[0].0;
+                        builder = builder
+                            .help(format!("did you mean `{}`?", best))
+                            .suggestion(Suggestion::new(
+                                format!("change `{}` to `{}`", name, best),
+                                Applicability::MaybeIncorrect,
+                                vec![FixIt::new(diag_span, best.clone())],
+                            ));
+                    }
                 }
                 builder.build()
             }

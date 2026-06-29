@@ -1,71 +1,61 @@
 # Nimble Standard Library Demo
 # Demonstrates runtime-backed operations (core math, string, encoding, hash)
 
-extern fn nimble_abs_i64(x: Int) -> Int
-extern fn nimble_min_i64(a: Int, b: Int) -> Int
-extern fn nimble_max_i64(a: Int, b: Int) -> Int
-extern fn nimble_clamp_i64(v: Int, lo: Int, hi: Int) -> Int
-extern fn nimble_popcount(x: Int) -> Int
-extern fn nimble_string_length(s: String) -> Int
-extern fn nimble_string_concat(a: String, b: String) -> String
-extern fn nimble_string_to_upper(s: String) -> String
-extern fn nimble_string_trim(s: String) -> String
-extern fn nimble_hash_sip(data: String, len: Int) -> Int
-extern fn nimble_hash_fnv1a(data: String, len: Int) -> Int
-extern fn nimble_rand_i64() -> Int
-extern fn nimble_rand_range(lo: Int, hi: Int) -> Int
-extern fn nimble_int_to_string(val: Int) -> String
-extern fn nimble_base64_encode(data: String, len: Int, url_safe: Int) -> String
-extern fn nimble_print_str(s: String) -> Void
+load std.io
+load std.core
+load std.str
+load std.hash
+load std.random
+load std.encoding.base64
 
 fn main() -> Int:
     # Core math backed by runtime
-    nimble_print_str("abs(-5): ")
-    print_int(nimble_abs_i64(-5))
+    std.io.print_no_newline("abs(-5): ")
+    std.io.print_int(std.core.abs(-5))
 
-    nimble_print_str("max(3,7): ")
-    print_int(nimble_max_i64(3, 7))
+    std.io.print_no_newline("max(3,7): ")
+    std.io.print_int(std.core.max(3, 7))
 
-    nimble_print_str("min(3,7): ")
-    print_int(nimble_min_i64(3, 7))
+    std.io.print_no_newline("min(3,7): ")
+    std.io.print_int(std.core.min(3, 7))
 
-    nimble_print_str("clamp(10,0,5): ")
-    print_int(nimble_clamp_i64(10, 0, 5))
+    std.io.print_no_newline("clamp(10,0,5): ")
+    std.io.print_int(std.core.clamp(10, 0, 5))
 
-    nimble_print_str("popcount(42): ")
-    print_int(nimble_popcount(42))
+    std.io.print_no_newline("popcount(42): ")
+    std.io.print_int(std.core.count_ones(42))
 
     # String operations
     let msg = "  hello world  "
-    let len = nimble_string_length(msg)
-    nimble_print_str("length: ")
-    print_int(len)
+    let len = std.str.length(msg)
+    std.io.print_no_newline("length: ")
+    std.io.print_int(len)
 
-    let upper = nimble_string_to_upper(msg)
-    nimble_print_str("upper: ")
-    nimble_print_str(upper)
+    let upper = std.str.to_upper(msg)
+    std.io.print_no_newline("upper: ")
+    std.io.print(upper)
 
-    let trimmed = nimble_string_trim(msg)
-    nimble_print_str("trimmed: ")
-    nimble_print_str(trimmed)
+    let trimmed = std.str.trim(msg)
+    std.io.print_no_newline("trimmed: ")
+    std.io.print(trimmed)
 
     # Hashing
     let data = "nimble"
-    let h1 = nimble_hash_fnv1a(data, nimble_string_length(data))
-    let h2 = nimble_hash_sip(data, nimble_string_length(data))
-    nimble_print_str("fnv1a hash: ")
-    print_int(h1)
-    nimble_print_str("sip hash: ")
-    print_int(h2)
+    let h1 = std.hash.fnv1a(data)
+    let h2 = std.hash.sip(data)
+    std.io.print_no_newline("fnv1a hash: ")
+    std.io.print_int(h1)
+    std.io.print_no_newline("sip hash: ")
+    std.io.print_int(h2)
 
     # Random numbers
-    let r = nimble_rand_range(1, 100)
-    nimble_print_str("random 1-100: ")
-    print_int(r)
+    let r = std.random.random_range(1, 100)
+    std.io.print_no_newline("random 1-100: ")
+    std.io.print_int(r)
 
     # Base64 encoding
-    let encoded = nimble_base64_encode("hello", 5, 0)
-    nimble_print_str("base64: ")
-    nimble_print_str(encoded)
+    let encoded = std.encoding.base64.encode_b64("hello")
+    std.io.print_no_newline("base64: ")
+    std.io.print(encoded)
 
     return 0

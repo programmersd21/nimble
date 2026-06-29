@@ -1,8 +1,8 @@
 # Hello, World!
 # The traditional first program
 
-extern fn nimble_print_str(s: String) -> Void
+load std.io
 
 fn main() -> Int:
-    nimble_print_str("Hello, Nimble!")
+    std.io.print("Hello, Nimble!")
     return 0

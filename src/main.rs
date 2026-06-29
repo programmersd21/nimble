@@ -3,6 +3,13 @@ use miette::Result;
 use nimble::Parser;
 use std::path::{Path, PathBuf};
 
+fn install_diagnostic_handler() {
+    miette::set_hook(Box::new(|_| {
+        Box::new(nimble::diagnostics::handler::RustyHandler::new())
+    }))
+    .expect("failed to install diagnostic hook");
+}
+
 #[derive(ClapParser)]
 #[command(
     name = "nimble",
@@ -148,6 +155,7 @@ enum PkgAction {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    install_diagnostic_handler();
     let cli = Cli::parse();
 
     match cli.command {

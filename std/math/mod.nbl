@@ -33,111 +33,120 @@ extern fn nimble_is_infinite(x: Float) -> Int
 extern fn nimble_is_finite(x: Float) -> Int
 extern fn nimble_next_after(x: Float, y: Float) -> Float
 
-const PI: Float = 3.141592653589793
-const E: Float = 2.718281828459045
-const TAU: Float = 6.283185307179586
-const INF: Float = 1e308
+fn PI() -> Float:
+    return 3.141592653589793
 
-fn sin(x: Float) -> Float:
+fn E() -> Float:
+    return 2.718281828459045
+
+fn TAU() -> Float:
+    return 6.283185307179586
+
+fn INF() -> Float:
+    return 1.0 / 0.0
+
+fn math_sin(x: Float) -> Float:
     return nimble_sin(x)
 
-fn cos(x: Float) -> Float:
+fn math_cos(x: Float) -> Float:
     return nimble_cos(x)
 
-fn tan(x: Float) -> Float:
+fn math_tan(x: Float) -> Float:
     return nimble_tan(x)
 
-fn asin(x: Float) -> Float:
+fn math_asin(x: Float) -> Float:
     return nimble_asin(x)
 
-fn acos(x: Float) -> Float:
+fn math_acos(x: Float) -> Float:
     return nimble_acos(x)
 
-fn atan(x: Float) -> Float:
+fn math_atan(x: Float) -> Float:
     return nimble_atan(x)
 
-fn atan2(y: Float, x: Float) -> Float:
+fn math_atan2(y: Float, x: Float) -> Float:
     return nimble_atan2(y, x)
 
-fn sinh(x: Float) -> Float:
+fn math_sinh(x: Float) -> Float:
     return nimble_sinh(x)
 
-fn cosh(x: Float) -> Float:
+fn math_cosh(x: Float) -> Float:
     return nimble_cosh(x)
 
-fn tanh(x: Float) -> Float:
+fn math_tanh(x: Float) -> Float:
     return nimble_tanh(x)
 
-fn sqrt(x: Float) -> Float:
+fn math_sqrt(x: Float) -> Float:
     return nimble_sqrt(x)
 
-fn cbrt(x: Float) -> Float:
+fn math_cbrt(x: Float) -> Float:
     return nimble_cbrt(x)
 
-fn pow(b: Float, e: Float) -> Float:
+fn math_pow(b: Float, e: Float) -> Float:
     return nimble_pow(b, e)
 
-fn floor(x: Float) -> Float:
+fn math_floor(x: Float) -> Float:
     return nimble_floor(x)
 
-fn ceil(x: Float) -> Float:
+fn math_ceil(x: Float) -> Float:
     return nimble_ceil(x)
 
-fn round(x: Float) -> Float:
+fn math_round(x: Float) -> Float:
     return nimble_round(x)
 
-fn trunc(x: Float) -> Float:
+fn math_trunc(x: Float) -> Float:
     return nimble_trunc(x)
 
-fn abs_float(x: Float) -> Float:
+fn math_abs(x: Float) -> Float:
     return nimble_fabs(x)
 
-fn ln(x: Float) -> Float:
+fn math_ln(x: Float) -> Float:
     return nimble_log(x)
 
-fn log2(x: Float) -> Float:
+fn math_log2(x: Float) -> Float:
     return nimble_log2(x)
 
-fn log10(x: Float) -> Float:
+fn math_log10(x: Float) -> Float:
     return nimble_log10(x)
 
-fn exp(x: Float) -> Float:
+fn math_exp(x: Float) -> Float:
     return nimble_exp(x)
 
-fn fma(a: Float, b: Float, c: Float) -> Float:
+fn math_fma(a: Float, b: Float, c: Float) -> Float:
     return nimble_fma(a, b, c)
 
-fn hypot(a: Float, b: Float) -> Float:
+fn math_hypot(a: Float, b: Float) -> Float:
     return nimble_hypot(a, b)
 
-fn fmod(a: Float, b: Float) -> Float:
+fn math_fmod(a: Float, b: Float) -> Float:
     return nimble_fmod(a, b)
 
-fn is_nan(x: Float) -> Bool:
+fn math_is_nan(x: Float) -> Bool:
     if nimble_is_nan(x) != 0:
         return true
     return false
 
-fn is_infinite(x: Float) -> Bool:
+fn math_is_infinite(x: Float) -> Bool:
     if nimble_is_infinite(x) != 0:
         return true
     return false
 
-fn is_finite(x: Float) -> Bool:
+fn math_is_finite(x: Float) -> Bool:
     if nimble_is_finite(x) != 0:
         return true
     return false
 
-fn next_after(x: Float, y: Float) -> Float:
+fn math_next_after(x: Float, y: Float) -> Float:
     return nimble_next_after(x, y)
 
 fn degrees_to_radians(degrees: Float) -> Float:
-    return degrees * PI / 180.0
+    return degrees * PI() / 180.0
 
 fn radians_to_degrees(radians: Float) -> Float:
-    return radians * 180.0 / PI
+    return radians * 180.0 / PI()
 
 fn lerp(a: Float, b: Float, t: Float) -> Float:
-    return a + (b - a) * nimble_clamp_f64(t, 0.0, 1.0)
-
-extern fn nimble_clamp_f64(v: Float, lo: Float, hi: Float) -> Float
+    if t < 0.0:
+        return a
+    elif t > 1.0:
+        return b
+    return a + (b - a) * t
